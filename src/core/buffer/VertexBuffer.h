@@ -29,6 +29,10 @@ namespace HWPT {
 
         ~VertexBuffer();
 
+        VkBuffer& GetHandle() {
+            return m_vertexBuffer;
+        }
+
     private:
         VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;

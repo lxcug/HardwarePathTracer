@@ -13,7 +13,7 @@
 
 
 namespace HWPT {
-    enum ShaderType {
+    enum class ShaderType {
         None = 0x0,
         Vertex,
         Geometry,
