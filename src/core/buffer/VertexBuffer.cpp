@@ -32,6 +32,11 @@ namespace HWPT {
         vkDestroyBuffer(VulkanBackendApp::GetGlobalDevice(), m_vertexBuffer, nullptr);
     }
 
+    void VertexBuffer::Bind(VkCommandBuffer CommandBuffer) {
+        VkDeviceSize Offset = 0;
+        vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &m_vertexBuffer, &Offset);
+    }
+
     VkVertexInputBindingDescription Vertex::GetBindingDescription() {
         VkVertexInputBindingDescription BindingDescription{};
 

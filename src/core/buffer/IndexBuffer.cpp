@@ -32,4 +32,8 @@ namespace HWPT {
         vkFreeMemory(VulkanBackendApp::GetGlobalDevice(), m_indexBufferMemory, nullptr);
         vkDestroyBuffer(VulkanBackendApp::GetGlobalDevice(), m_indexBuffer, nullptr);
     }
+
+    void IndexBuffer::Bind(VkCommandBuffer CommandBuffer) {
+        vkCmdBindIndexBuffer(CommandBuffer, m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+    }
 }
