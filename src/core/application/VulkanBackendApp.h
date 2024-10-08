@@ -105,6 +105,8 @@ namespace HWPT {
         // FrameBuffer Resize Callback
         static void FrameBufferResizeCallback(GLFWwindow* Window, int Width, int Height);
 
+        void RecreateSwapChain();
+
     private:
         // VulkanContext Init
         void CreateVkInstance();

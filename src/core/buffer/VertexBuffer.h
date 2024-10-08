@@ -29,6 +29,8 @@ namespace HWPT {
 
         ~VertexBuffer();
 
+        void Bind(VkCommandBuffer CommandBuffer);
+
         VkBuffer& GetHandle() {
             return m_vertexBuffer;
         }

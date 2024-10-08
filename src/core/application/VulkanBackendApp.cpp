@@ -95,10 +95,10 @@ namespace HWPT {
         vkDestroyPipeline(m_device, m_computePipeline, nullptr);
         vkDestroyCommandPool(m_device, m_commandPool.GraphicsPool, nullptr);
         vkDestroyCommandPool(m_device, m_commandPool.ComputePool, nullptr);
-        vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
         vkDestroyRenderPass(m_device, m_renderPass, nullptr);
+        vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
         vkDestroyDevice(m_device, nullptr);
-//        vkDestroyInstance(m_instance, nullptr);
+        vkDestroyInstance(m_instance, nullptr);
 
         glfwDestroyWindow(m_window);
         glfwTerminate();
@@ -107,13 +107,17 @@ namespace HWPT {
     void VulkanBackendApp::DrawFrame() {
         vkWaitForFences(m_device, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
 
+        if (m_frameBufferResized) {
+            RecreateSwapChain();
+        }
+
         uint ImageIndex;
         VkResult Result = vkAcquireNextImageKHR(m_device, m_swapChain.SwapChainHandle, UINT64_MAX,
                                                 m_imageAvailableSemaphores[m_currentFrame],
                                                 VK_NULL_HANDLE, &ImageIndex);
-        if (Result == VK_ERROR_OUT_OF_DATE_KHR || Result == VK_SUBOPTIMAL_KHR || m_frameBufferResized) {
+        if (Result == VK_ERROR_OUT_OF_DATE_KHR || Result == VK_SUBOPTIMAL_KHR) {
             m_frameBufferResized = false;
-//            RecreateSwapChain(); // TODO
+            RecreateSwapChain();
         }
         else if (Result != VK_SUCCESS) {
             throw std::runtime_error("Failed to acquire swap chain images");
@@ -144,7 +148,13 @@ namespace HWPT {
         PresentInfo.pSwapchains = &m_swapChain.SwapChainHandle;
         PresentInfo.pImageIndices = &ImageIndex;
 
-        VK_CHECK(vkQueuePresentKHR(m_queue.PresentQueue, &PresentInfo));
+        Result = vkQueuePresentKHR(m_queue.PresentQueue, &PresentInfo);
+        if (Result == VK_ERROR_OUT_OF_DATE_KHR || Result == VK_SUBOPTIMAL_KHR) {
+            RecreateSwapChain();
+        }
+        else if (Result != VK_SUCCESS) {
+            throw std::runtime_error("Failed to present swap chain images");
+        }
 
         m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
@@ -192,9 +202,6 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateSurface() {
-        glfwCreateWindowSurface(
-                m_instance, m_window, nullptr, &m_surface
-        );
         VK_CHECK(glfwCreateWindowSurface(m_instance, m_window, nullptr, &m_surface));
     }
 
@@ -373,10 +380,9 @@ namespace HWPT {
             Extent.height = std::clamp(Extent.height, MinExtent.height, MaxExtent.height);
         }
 
-        uint ImageCount = SwapChainSupport.Capabilities.minImageCount;
-        ImageCount = std::clamp(SwapChainSupport.Capabilities.minImageCount,
-                                SwapChainSupport.Capabilities.minImageCount,
-                                SwapChainSupport.Capabilities.maxImageCount);
+        uint ImageCount = std::clamp(SwapChainSupport.Capabilities.minImageCount,
+                                     SwapChainSupport.Capabilities.minImageCount,
+                                     SwapChainSupport.Capabilities.maxImageCount);
 
         VkSwapchainCreateInfoKHR CreateInfo{};
         CreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -421,10 +427,10 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CleanUpSwapChain() {
-        for (auto FrameBuffer : m_swapChainFrameBuffers) {
+        for (auto& FrameBuffer : m_swapChainFrameBuffers) {
             vkDestroyFramebuffer(m_device, FrameBuffer, nullptr);
         }
-        for (auto ImageView : m_swapChain.SwapChainImageViews) {
+        for (auto& ImageView : m_swapChain.SwapChainImageViews) {
             vkDestroyImageView(m_device, ImageView, nullptr);
         }
         vkDestroySwapchainKHR(m_device, m_swapChain.SwapChainHandle, nullptr);
@@ -817,9 +823,8 @@ namespace HWPT {
 
         vkCmdBeginRenderPass(CommandBuffer, &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
-        VkDeviceSize Offsets = 0;
-        vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &m_vertexBuffer->GetHandle(), &Offsets);
-        vkCmdBindIndexBuffer(CommandBuffer, m_indexBuffer->GetHandle(), 0, VK_INDEX_TYPE_UINT32);
+        m_vertexBuffer->Bind(CommandBuffer);
+        m_indexBuffer->Bind(CommandBuffer);
         vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout,
                                 0, 1, m_descriptorSets.data(), 0, nullptr);
 
@@ -840,6 +845,20 @@ namespace HWPT {
         vkCmdEndRenderPass(CommandBuffer);
 
         VK_CHECK(vkEndCommandBuffer(CommandBuffer));
+    }
+
+    void VulkanBackendApp::RecreateSwapChain() {
+        glfwGetFramebufferSize(m_window, (int*)&m_windowWidth, (int*)&m_windowHeight);
+        while (m_windowWidth == 0 || m_windowHeight == 0) {
+            glfwGetFramebufferSize(m_window, (int*)&m_windowWidth, (int*)&m_windowHeight);
+            glfwWaitEvents();
+        }
+
+        vkDeviceWaitIdle(m_device);
+
+        CleanUpSwapChain();
+        CreateSwapChain();
+        CreateFrameBuffers();
     }
 
     void SwapChain::GetImages(VkDevice Device) {
