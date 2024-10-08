@@ -15,6 +15,10 @@ namespace HWPT {
 
         ~IndexBuffer();
 
+        VkBuffer& GetHandle() {
+            return m_indexBuffer;
+        }
+
     private:
         VkBuffer m_indexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory m_indexBufferMemory = VK_NULL_HANDLE;

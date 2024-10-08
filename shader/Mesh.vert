@@ -12,6 +12,6 @@ layout (binding = 0) uniform dataPerFrame {
 };
 
 void main() {
-    gl_Position = projTrans * viewTrans * modelTrans * vec4(aPos, 1.f);
+    gl_Position = vec4(aPos, 1.f);
     fragColor = aColor;
 }

@@ -32,11 +32,11 @@ using uint = uint32_t;
 #endif
 
 #if !BUILD_RELEASE && !BUILD_SHIPPING
-#define VK_CHECK(exp) do { VkResult Result = exp; \
-Check(Result == VK_SUCCESS); } while(false)
+#define VK_CHECK(exp) do { VkResult _Result_ = exp; \
+Check(_Result_ == VK_SUCCESS); } while(false)
 
-#define VK_CHECK_WITH_MESSAGE(exp, message) do { VkResult Result = exp; \
-if (Result != VK_SUCCESS) \
+#define VK_CHECK_WITH_MESSAGE(exp, message) do { VkResult _Result_ = exp; \
+if (_Result_ != VK_SUCCESS) \
     throw std::runtime_error(message); } while(false)
 #else
 #define VK_CHECK(exp) exp

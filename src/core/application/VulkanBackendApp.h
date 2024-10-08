@@ -67,7 +67,7 @@ namespace HWPT {
 
         void Init() override;
 
-        void DrawFrame();
+        void DrawFrame() override;
 
         VkCommandBuffer BeginIntermediateCommand();
 
@@ -145,7 +145,19 @@ namespace HWPT {
 
         void CreateComputePipeline();
 
-    private:
+        void CreateVertexBuffer();
+
+        void CreateIndexBuffer();
+
+        void CreateDescriptorPool();
+
+        void CreateDescriptorSets();
+
+        void CreateSyncObjects();
+
+        void RecordCommandBuffer(VkCommandBuffer CommandBuffer, uint ImageIndex);
+
+    protected:
         std::string m_windowTitle = "VulkanBackend Application";
         uint m_windowWidth = 1600, m_windowHeight = 900;
         GLFWwindow* m_window = nullptr;
@@ -163,7 +175,10 @@ namespace HWPT {
 #endif
         inline static std::vector<const char *> DeviceExtensions = {
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-                VK_NV_RAY_TRACING_EXTENSION_NAME
+                VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+                VK_KHR_RAY_QUERY_EXTENSION_NAME,
+                VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+                VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME
         };
 
         VkInstance m_instance = VK_NULL_HANDLE;
@@ -173,7 +188,7 @@ namespace HWPT {
         QueueHandle m_queue;
         SwapChain m_swapChain;
         VkRenderPass m_renderPass = VK_NULL_HANDLE;
-        std::vector<VkFramebuffer> SwapChainFrameBuffers;
+        std::vector<VkFramebuffer> m_swapChainFrameBuffers;
         CommandPool m_commandPool;
         std::vector<VkCommandBuffer> m_graphicsCommandBuffers;
         std::vector<VkCommandBuffer> m_computeCommandBuffers;
@@ -186,9 +201,19 @@ namespace HWPT {
         VkPipelineLayout m_computePipelineLayout = VK_NULL_HANDLE;
         VkPipeline m_computePipeline = VK_NULL_HANDLE;
 
+        VkDescriptorPool m_descriptorPool;
+        std::vector<VkDescriptorSet> m_descriptorSets;
+
         uint m_currentFrame = 0;
 
         inline static VulkanBackendApp* g_application = nullptr;
+
+        VertexBuffer* m_vertexBuffer;
+        IndexBuffer* m_indexBuffer;
+
+        std::vector<VkSemaphore> m_imageAvailableSemaphores;
+        std::vector<VkSemaphore> m_renderFinishedSemaphores;
+        std::vector<VkFence> m_inFlightFences;
     };
 }
 
