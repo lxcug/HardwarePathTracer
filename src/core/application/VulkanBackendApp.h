@@ -11,12 +11,16 @@
 #include <string>
 #include <iostream>
 #include <vector>
+#include <chrono>
 #include <optional>
 #include <functional>
 #include "core/buffer/VertexBuffer.h"
 #include "core/buffer/IndexBuffer.h"
 #include "core/buffer/UniformBuffer.h"
 #include "core/buffer/StorageBuffer.h"
+#include "core/FPSCalculator.h"
+#include "core/texture/Texture2D.h"
+#include "core/texture/Sampler.h"
 
 
 namespace HWPT {
@@ -38,7 +42,7 @@ namespace HWPT {
         std::vector<VkPresentModeKHR> PresentModes;
     };
 
-    struct QueueHandle {
+    struct Queue {
         VkQueue GraphicsQueue = VK_NULL_HANDLE;
         VkQueue ComputeQueue = VK_NULL_HANDLE;
         VkQueue PresentQueue = VK_NULL_HANDLE;
@@ -87,10 +91,6 @@ namespace HWPT {
 
         static VulkanBackendApp* GetApplication() {
             return g_application;
-        }
-
-        static VkDevice GetGlobalDevice() {
-            return GetApplication()->GetVkDevice();
         }
 
     private:
@@ -147,10 +147,6 @@ namespace HWPT {
 
         void CreateComputePipeline();
 
-        void CreateVertexBuffer();
-
-        void CreateIndexBuffer();
-
         void CreateDescriptorPool();
 
         void CreateDescriptorSets();
@@ -159,12 +155,22 @@ namespace HWPT {
 
         void RecordCommandBuffer(VkCommandBuffer CommandBuffer, uint ImageIndex);
 
+        void CreateVertexBuffer();
+
+        void CreateIndexBuffer();
+
+        void CreateUniformBuffers();
+
+        void CreateTextureAndSampler();
+
     protected:
         std::string m_windowTitle = "VulkanBackend Application";
         uint m_windowWidth = 1600, m_windowHeight = 900;
         GLFWwindow* m_window = nullptr;
         bool m_frameBufferResized = false;
         bool m_contextInited = false;
+
+        std::shared_ptr<FPSCalculator> m_fpsCalculator;
 
 #if !BUILD_RELEASE && !BUILD_SHIPPING
         inline static bool m_enableValidationLayers = true;
@@ -177,6 +183,7 @@ namespace HWPT {
 #endif
         inline static std::vector<const char *> DeviceExtensions = {
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+                VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
                 VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
                 VK_KHR_RAY_QUERY_EXTENSION_NAME,
                 VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
@@ -187,7 +194,7 @@ namespace HWPT {
         VkSurfaceKHR m_surface = VK_NULL_HANDLE;
         VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
         VkDevice m_device = VK_NULL_HANDLE;
-        QueueHandle m_queue;
+        Queue m_queue;
         SwapChain m_swapChain;
         VkRenderPass m_renderPass = VK_NULL_HANDLE;
         std::vector<VkFramebuffer> m_swapChainFrameBuffers;
@@ -212,6 +219,9 @@ namespace HWPT {
 
         VertexBuffer* m_vertexBuffer;
         IndexBuffer* m_indexBuffer;
+        std::vector<UniformBuffer*> m_MVPUniformBuffers;
+        Texture2D* m_texture = nullptr;
+        Sampler* m_sampler = nullptr;
 
         std::vector<VkSemaphore> m_imageAvailableSemaphores;
         std::vector<VkSemaphore> m_renderFinishedSemaphores;

@@ -11,10 +11,20 @@
 
 namespace HWPT {
 
+    VkDevice GetVKDevice() {
+        return VulkanBackendApp::GetApplication()->GetVkDevice();
+    }
+
+    VkPhysicalDevice GetVKPhysicalDevice() {
+        return VulkanBackendApp::GetApplication()->GetPhysicalDevice();
+    }
+
     void VulkanBackendApp::Run() {
         Check(m_contextInited);
 
         while (!glfwWindowShouldClose(m_window)) {
+            m_fpsCalculator->Tick();
+
             glfwPollEvents();
             DrawFrame();
         }
@@ -29,6 +39,8 @@ namespace HWPT {
         InitWindow();
         InitVulkan();
         m_contextInited = true;
+
+        m_fpsCalculator = std::make_shared<FPSCalculator>(1.f);
     }
 
     void VulkanBackendApp::InitWindow() {
@@ -60,6 +72,9 @@ namespace HWPT {
         CreateComputeDescriptorSetLayout();
         CreateComputePipeline();
 
+        CreateTextureAndSampler();
+
+        CreateUniformBuffers();
         CreateDescriptorPool();
         CreateDescriptorSets();
 
@@ -78,6 +93,11 @@ namespace HWPT {
     void VulkanBackendApp::CleanUp() {
         delete m_vertexBuffer;
         delete m_indexBuffer;
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            delete m_MVPUniformBuffers[i];
+        }
+        delete m_texture;
+        delete m_sampler;
 
         CleanUpSwapChain();
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -342,6 +362,12 @@ namespace HWPT {
             CreateInfo.ppEnabledLayerNames = ValidationLayers.data();
         }
 
+        // Sync2
+        VkPhysicalDeviceSynchronization2FeaturesKHR Sync2Feature = {};
+        Sync2Feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR;
+        Sync2Feature.synchronization2 = VK_TRUE;
+        CreateInfo.pNext = &Sync2Feature;
+
         VK_CHECK(vkCreateDevice(m_physicalDevice, &CreateInfo, nullptr, &m_device));
         vkGetDeviceQueue(m_device, Indices.GraphicsFamily.value(), 0, &m_queue.GraphicsQueue);
         vkGetDeviceQueue(m_device, Indices.ComputeFamily.value(), 0, &m_queue.ComputeQueue);
@@ -383,6 +409,7 @@ namespace HWPT {
         uint ImageCount = std::clamp(SwapChainSupport.Capabilities.minImageCount,
                                      SwapChainSupport.Capabilities.minImageCount,
                                      SwapChainSupport.Capabilities.maxImageCount);
+        Check(MAX_FRAMES_IN_FLIGHT >= ImageCount);
 
         VkSwapchainCreateInfoKHR CreateInfo{};
         CreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -576,10 +603,20 @@ namespace HWPT {
         UBOLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
         UBOLayoutBinding.pImmutableSamplers = nullptr;
 
+        VkDescriptorSetLayoutBinding SamplerLayoutBinding{};
+        SamplerLayoutBinding.binding = 1;
+        SamplerLayoutBinding.descriptorCount = 1;
+        SamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        SamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        std::array<VkDescriptorSetLayoutBinding, 2> Bindings = {
+                UBOLayoutBinding, SamplerLayoutBinding
+        };
+
         VkDescriptorSetLayoutCreateInfo LayoutInfo{};
         LayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-//        LayoutInfo.bindingCount = 1;
-//        LayoutInfo.pBindings = &UBOLayoutBinding;
+        LayoutInfo.bindingCount = Bindings.size();
+        LayoutInfo.pBindings = Bindings.data();
 
         VK_CHECK(vkCreateDescriptorSetLayout(m_device, &LayoutInfo, nullptr, &m_graphicsDescriptorSetLayout));
     }
@@ -740,10 +777,10 @@ namespace HWPT {
 
     void VulkanBackendApp::CreateVertexBuffer() {
         const std::vector<Vertex> Vertices = {
-                {glm::vec3(-.5f, .5f, 0.f),  glm::vec3(0.f, 1.f, 0.f)},
-                {glm::vec3(.5f, .5f, 0.f),   glm::vec3(1.f, 0.f, 0.f)},
-                {glm::vec3(.5f, -.5f, 0.f),  glm::vec3(0.f, 0.f, 1.f)},
-                {glm::vec3(-.5f, -.5f, 0.f), glm::vec3(1.f, 1.f, 0.f)}
+                {glm::vec3(-.5f, .5f, 0.f),  glm::vec3(0.f, 1.f, 0.f), glm::vec2(0.f, 0.f)},
+                {glm::vec3(.5f, .5f, 0.f),   glm::vec3(1.f, 0.f, 0.f), glm::vec2(0.f, 1.f)},
+                {glm::vec3(.5f, -.5f, 0.f),  glm::vec3(0.f, 0.f, 1.f), glm::vec2(1.f, 1.f)},
+                {glm::vec3(-.5f, -.5f, 0.f), glm::vec3(1.f, 1.f, 0.f), glm::vec2(1.f, 0.f)}
         };
         m_vertexBuffer = new VertexBuffer(sizeof(Vertex) * Vertices.size(), (void*)Vertices.data());
     }
@@ -755,15 +792,37 @@ namespace HWPT {
         m_indexBuffer = new IndexBuffer(Indices.size(), (void*)Indices.data());
     }
 
+    struct MVPData {
+        glm::mat4 ModelTrans;
+        glm::mat4 ViewTrans;
+        glm::mat4 ProjTrans;
+        glm::vec3 DebugColor;
+    };
+
+    void VulkanBackendApp::CreateUniformBuffers() {
+        MVPData MVP{};
+        MVP.ModelTrans = glm::identity<glm::mat4>();
+        MVP.ViewTrans = glm::lookAt(glm::vec3(0.f, 0.f, 2.f), glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f));
+        MVP.ProjTrans = glm::perspective(glm::radians(60.f), (float)m_windowWidth / (float)m_windowHeight, 1e-3f, 1000.f);
+        MVP.DebugColor = glm::vec3(.5f, .9f, .6f);
+
+        m_MVPUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            m_MVPUniformBuffers[i] = new UniformBuffer(sizeof(MVPData), &MVP);
+        }
+    }
+
     void VulkanBackendApp::CreateDescriptorPool() {
-        VkDescriptorPoolSize PoolSize{};
-        PoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        PoolSize.descriptorCount = MAX_FRAMES_IN_FLIGHT;
+        std::array<VkDescriptorPoolSize, 2> PoolSizes{};
+        PoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        PoolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT;
+        PoolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        PoolSizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT;
 
         VkDescriptorPoolCreateInfo PoolInfo{};
         PoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-        PoolInfo.poolSizeCount = 1;
-        PoolInfo.pPoolSizes = &PoolSize;
+        PoolInfo.poolSizeCount = PoolSizes.size();
+        PoolInfo.pPoolSizes = PoolSizes.data();
         PoolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
 
         VK_CHECK(vkCreateDescriptorPool(m_device, &PoolInfo, nullptr, &m_descriptorPool));
@@ -780,9 +839,33 @@ namespace HWPT {
         m_descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
         VK_CHECK(vkAllocateDescriptorSets(m_device, &AllocateInfo, m_descriptorSets.data()));
 
+        std::array<VkWriteDescriptorSet, 2> DescriptorWrites{};
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-//            VkDescriptorBufferInfo BufferInfo{};
-//            BufferInfo.buffer
+            VkDescriptorBufferInfo BufferInfo{};
+            BufferInfo.buffer = m_MVPUniformBuffers[i]->GetHandle();
+            BufferInfo.offset = 0;
+            BufferInfo.range = VK_WHOLE_SIZE;
+            DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            DescriptorWrites[0].dstSet = m_descriptorSets[i];
+            DescriptorWrites[0].dstBinding = 0;
+            DescriptorWrites[0].dstArrayElement = 0;
+            DescriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            DescriptorWrites[0].descriptorCount = 1;
+            DescriptorWrites[0].pBufferInfo = &BufferInfo;
+
+            VkDescriptorImageInfo ImageInfo{};
+            ImageInfo.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+            ImageInfo.imageView = m_texture->CreateSRV();
+            ImageInfo.sampler = m_sampler->GetHandle();
+            DescriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            DescriptorWrites[1].dstSet = m_descriptorSets[i];
+            DescriptorWrites[1].dstBinding = 1;
+            DescriptorWrites[1].dstArrayElement = 0;
+            DescriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            DescriptorWrites[1].descriptorCount = 1;
+            DescriptorWrites[1].pImageInfo = &ImageInfo;
+
+            vkUpdateDescriptorSets(m_device, 2, DescriptorWrites.data(), 0, nullptr);
         }
     }
 
@@ -825,6 +908,14 @@ namespace HWPT {
         vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
         m_vertexBuffer->Bind(CommandBuffer);
         m_indexBuffer->Bind(CommandBuffer);
+
+        MVPData MVP{};
+        MVP.ModelTrans = glm::identity<glm::mat4>();
+        MVP.ViewTrans = glm::lookAt(glm::vec3(0.f, 0.f, 2.f), glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f));
+        MVP.ProjTrans = glm::perspective(glm::radians(60.f), (float)m_windowWidth / (float)m_windowHeight, 1e-3f, 1000.f);
+        MVP.DebugColor = glm::vec3(.5f, .9f, .6f);
+        m_MVPUniformBuffers[ImageIndex]->Update(&MVP);
+
         vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout,
                                 0, 1, m_descriptorSets.data(), 0, nullptr);
 
@@ -859,6 +950,13 @@ namespace HWPT {
         CleanUpSwapChain();
         CreateSwapChain();
         CreateFrameBuffers();
+    }
+
+    void VulkanBackendApp::CreateTextureAndSampler() {
+        m_texture = new Texture2D();
+        m_texture->CreateTexture("../../asset/texture.jpg");
+        m_sampler = new Sampler();
+        m_sampler->CreateSampler();
     }
 
     void SwapChain::GetImages(VkDevice Device) {

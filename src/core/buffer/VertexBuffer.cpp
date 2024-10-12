@@ -13,9 +13,9 @@ namespace HWPT {
         auto [StagingBuffer, StagingBufferMemory] = RHI::CreateStagingBuffer(Size);
 
         void* MappedData = nullptr;
-        vkMapMemory(VulkanBackendApp::GetGlobalDevice(), StagingBufferMemory, 0, Size, 0, &MappedData);
+        vkMapMemory(GetVKDevice(), StagingBufferMemory, 0, Size, 0, &MappedData);
         memcpy(MappedData, Data, Size);
-        vkUnmapMemory(VulkanBackendApp::GetGlobalDevice(), StagingBufferMemory);
+        vkUnmapMemory(GetVKDevice(), StagingBufferMemory);
 
         RHI::CreateBuffer(Size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -23,13 +23,13 @@ namespace HWPT {
 
         RHI::CopyBuffer(StagingBuffer, m_vertexBuffer, Size);
 
-        vkDestroyBuffer(VulkanBackendApp::GetGlobalDevice(), StagingBuffer, nullptr);
-        vkFreeMemory(VulkanBackendApp::GetGlobalDevice(), StagingBufferMemory, nullptr);
+        vkDestroyBuffer(GetVKDevice(), StagingBuffer, nullptr);
+        vkFreeMemory(GetVKDevice(), StagingBufferMemory, nullptr);
     }
 
     VertexBuffer::~VertexBuffer() {
-        vkFreeMemory(VulkanBackendApp::GetGlobalDevice(), m_vertexBufferMemory, nullptr);
-        vkDestroyBuffer(VulkanBackendApp::GetGlobalDevice(), m_vertexBuffer, nullptr);
+        vkFreeMemory(GetVKDevice(), m_vertexBufferMemory, nullptr);
+        vkDestroyBuffer(GetVKDevice(), m_vertexBuffer, nullptr);
     }
 
     void VertexBuffer::Bind(VkCommandBuffer CommandBuffer) {
@@ -47,18 +47,23 @@ namespace HWPT {
         return BindingDescription;
     }
 
-    std::array<VkVertexInputAttributeDescription, 2> Vertex::GetAttributeDescriptions() {
-        VkVertexInputAttributeDescription Attr0, Attr1;
-        Attr0.binding = 0;
-        Attr0.location = 0;
-        Attr0.format = VK_FORMAT_R32G32B32_SFLOAT;
-        Attr0.offset = offsetof(Vertex, Pos);
+    std::array<VkVertexInputAttributeDescription, 3> Vertex::GetAttributeDescriptions() {
+        std::array<VkVertexInputAttributeDescription, 3> AttributeDescriptions{};
+        AttributeDescriptions[0].binding = 0;
+        AttributeDescriptions[0].location = 0;
+        AttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+        AttributeDescriptions[0].offset = offsetof(Vertex, Pos);
 
-        Attr1.binding = 0;
-        Attr1.location = 1;
-        Attr1.format = VK_FORMAT_R32G32B32_SFLOAT;
-        Attr1.offset = offsetof(Vertex, Color);
+        AttributeDescriptions[1].binding = 0;
+        AttributeDescriptions[1].location = 1;
+        AttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        AttributeDescriptions[1].offset = offsetof(Vertex, Color);
 
-        return {Attr0, Attr1};
+        AttributeDescriptions[2].binding = 0;
+        AttributeDescriptions[2].location = 2;
+        AttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+        AttributeDescriptions[2].offset = offsetof(Vertex, TexCoord);
+
+        return AttributeDescriptions;
     }
 }
