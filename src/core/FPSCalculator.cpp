@@ -10,7 +10,7 @@ namespace HWPT {
 
     FPSCalculator::FPSCalculator(float RecordInterval): m_recordInterval(RecordInterval) {}
 
-    bool FPSCalculator::Tick() {
+    auto FPSCalculator::Tick() -> bool {
         auto StartTime = std::chrono::high_resolution_clock::now();
         m_deltaTime = std::chrono::duration<double>(StartTime - m_currentTime).count();
         m_elapsedTime += m_deltaTime;
@@ -18,8 +18,8 @@ namespace HWPT {
         m_frameCount++;
 
         if (m_elapsedTime >= m_recordInterval) {
-            m_fps = (uint)(m_frameCount / m_elapsedTime);
-            std::cout << "fps: " << m_fps << std::endl;
+            m_fps = static_cast<uint>(m_frameCount / m_elapsedTime);
+            std::cout << "fps: " << m_fps << '\n';
 
             m_elapsedTime = 0.f;
             m_frameCount = 0;

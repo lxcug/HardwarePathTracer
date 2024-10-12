@@ -48,4 +48,4 @@ namespace HWPT {
 //        ShaderStageInfo.module = m_shaderModule;
 //        ShaderStageInfo.pName = Entry.c_str();
 //    }
-}
+}  // namespace HWPT

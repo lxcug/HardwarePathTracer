@@ -11,13 +11,13 @@
 namespace HWPT {
     class UniformBuffer {
     public:
-        UniformBuffer(VkDeviceSize Size, void* Data);
+        UniformBuffer(VkDeviceSize Size, const void *Data);
 
         ~UniformBuffer();
 
         void Update(void* Data);
 
-        VkBuffer& GetHandle() {
+        auto GetHandle() -> VkBuffer& {
             return m_uniformBuffer;
         }
 
@@ -27,6 +27,6 @@ namespace HWPT {
         void* m_mappedData = nullptr;
         VkDeviceSize m_size = 0;
     };
-}
+}  // namespace HWPT
 
 #endif //HARDWAREPATHTRACER_UNIFORMBUFFER_H

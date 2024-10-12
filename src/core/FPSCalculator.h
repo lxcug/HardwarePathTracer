@@ -14,13 +14,13 @@ namespace HWPT {
     public:
         FPSCalculator(float RecordInterval = 1.f);  // NOLINT
 
-        bool Tick();
+        auto Tick() -> bool;
 
-        [[nodiscard]] uint GetFPS() const {
+        [[nodiscard]] auto GetFPS() const -> uint {
             return m_fps;
         }
 
-        [[nodiscard]] double GetDeltaTime() const {
+        [[nodiscard]] auto GetDeltaTime() const -> double {
             return m_deltaTime;
         }
 
@@ -33,6 +33,6 @@ namespace HWPT {
         double m_deltaTime = 0.;
         uint m_fps = 0;
     };
-}
+}  // namespace HWPT
 
 #endif //HARDWAREPATHTRACER_FPSCALCULATOR_H

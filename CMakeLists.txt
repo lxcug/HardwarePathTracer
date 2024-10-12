@@ -3,6 +3,8 @@ project(HardwarePathTracer)
 
 set(CMAKE_CXX_STANDARD 17)
 
+set(CMAKE_CXX_CLANG_TIDY "clang-tidy")
+
 find_package(Vulkan REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)

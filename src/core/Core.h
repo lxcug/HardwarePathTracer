@@ -20,10 +20,10 @@
 
 // NOTE: Should be implemented in Application
 namespace HWPT {
-    VkDevice GetVKDevice();
+    auto GetVKDevice() -> VkDevice;
 
-    VkPhysicalDevice GetVKPhysicalDevice();
-}
+    auto GetVKPhysicalDevice() -> VkPhysicalDevice;
+}  // namespace HWPT
 
 #if BUILD_DEVELOP
 #define BUILD_SHIPPING 0

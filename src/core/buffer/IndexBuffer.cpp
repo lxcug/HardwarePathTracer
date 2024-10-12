@@ -9,11 +9,11 @@
 
 namespace HWPT {
 
-    IndexBuffer::IndexBuffer(uint IndexCount, void *Data) {
+    IndexBuffer::IndexBuffer(uint IndexCount, const void *Data): m_indexCount(IndexCount) {
         VkDeviceSize Size = IndexCount * sizeof(uint);
         auto [StagingBuffer, StagingBufferMemory] = RHI::CreateStagingBuffer(Size);
 
-        void* MappedData = nullptr;
+        void *MappedData = nullptr;
         vkMapMemory(GetVKDevice(), StagingBufferMemory, 0, Size, 0, &MappedData);
         memcpy(MappedData, Data, Size);
         vkUnmapMemory(GetVKDevice(), StagingBufferMemory);
@@ -36,4 +36,7 @@ namespace HWPT {
     void IndexBuffer::Bind(VkCommandBuffer CommandBuffer) {
         vkCmdBindIndexBuffer(CommandBuffer, m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
     }
-}
+
+    IndexBuffer::IndexBuffer(uint IndexCount, const uint *Data)
+    : IndexBuffer(IndexCount, static_cast<const void*>(Data)) {}
+}  // namespace HWPT
