@@ -28,13 +28,13 @@ namespace HWPT {
         ~Texture2D();
 
     private:
-        VkImage m_texture;
-        VkDeviceMemory m_textureMemory;
-        uint m_width, m_height;
-        TextureFormat m_format;
-        void* m_mappedData;
+        VkImage m_texture = VK_NULL_HANDLE;
+        VkDeviceMemory m_textureMemory = VK_NULL_HANDLE;
+        uint m_width = 0, m_height = 0;
+        TextureFormat m_format = TextureFormat::None;
+        void* m_mappedData = nullptr;
         bool IsSRVCreated = false;
-        VkImageView m_textureView;
+        VkImageView m_textureView = VK_NULL_HANDLE;
     };
 }
 

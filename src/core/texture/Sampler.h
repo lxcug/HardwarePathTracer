@@ -20,7 +20,7 @@ namespace HWPT {
         }
 
     private:
-        VkSampler m_sampler;
+        VkSampler m_sampler = VK_NULL_HANDLE;
     };
 }
 

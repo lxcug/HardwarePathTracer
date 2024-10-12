@@ -45,12 +45,12 @@ namespace HWPT {
         }
 
         size_t fileSize = ShaderFile.tellg();
-        std::vector<char> buffer(fileSize);
+        std::vector<char> Buffer(fileSize);
         ShaderFile.seekg(0);
-        ShaderFile.read(buffer.data(), (long long) fileSize);
+        ShaderFile.read(Buffer.data(), (long long) fileSize);
         ShaderFile.close();
 
-        return buffer;
+        return Buffer;
     }
 }
 
