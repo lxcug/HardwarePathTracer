@@ -9,7 +9,7 @@
 namespace HWPT {
 
     ShaderBase::~ShaderBase() {
-        vkDestroyShaderModule(VulkanBackendApp::GetGlobalDevice(), m_shaderModule, nullptr);
+        vkDestroyShaderModule(GetVKDevice(), m_shaderModule, nullptr);
     }
 
     void ShaderBase::CreateShaderModule(const std::filesystem::path &ShaderPath) {
@@ -22,7 +22,7 @@ namespace HWPT {
         CreateInfo.codeSize = ShaderSource.size();
         CreateInfo.pCode = reinterpret_cast<const uint32_t *>(ShaderSource.data());
 
-        VK_CHECK(vkCreateShaderModule(VulkanBackendApp::GetGlobalDevice(), &CreateInfo, nullptr, &m_shaderModule));
+        VK_CHECK(vkCreateShaderModule(GetVKDevice(), &CreateInfo, nullptr, &m_shaderModule));
     }
 
 //    void ShaderBase::BindShaderStage(const std::string &Entry) {

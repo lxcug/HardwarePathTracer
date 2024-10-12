@@ -7,14 +7,23 @@
 
 #include <cstdint>
 #include <cassert>
+#include <iostream>
 #include <stdexcept>
 #include <vulkan/vulkan.h>
+// Math
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 
 #define BUILD_DEVELOP 1
 #define BUILD_SHIPPING 0
 #define BUILD_RELEASE 0
 
-namespace HWPT {}
+// NOTE: Should be implemented in Application
+namespace HWPT {
+    VkDevice GetVKDevice();
+
+    VkPhysicalDevice GetVKPhysicalDevice();
+}
 
 #if BUILD_DEVELOP
 #define BUILD_SHIPPING 0
@@ -42,7 +51,6 @@ if (_Result_ != VK_SUCCESS) \
 #define VK_CHECK(exp) exp
 #define VK_CHECK_WITH_MESSAGE(exp, message) exp
 #endif
-
 
 
 #endif //HARDWAREPATHTRACER_CORE_H

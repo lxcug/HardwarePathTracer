@@ -15,10 +15,17 @@ namespace HWPT {
 
         ~UniformBuffer();
 
+        void Update(void* Data);
+
+        VkBuffer& GetHandle() {
+            return m_uniformBuffer;
+        }
+
     private:
         VkBuffer m_uniformBuffer = VK_NULL_HANDLE;
         VkDeviceMemory m_uniformBufferMemory = VK_NULL_HANDLE;
-        void* MappedData;
+        void* m_mappedData = nullptr;
+        VkDeviceSize m_size = 0;
     };
 }
 

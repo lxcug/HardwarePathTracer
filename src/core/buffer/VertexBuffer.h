@@ -15,12 +15,14 @@ namespace HWPT {
     struct Vertex {
         glm::vec3 Pos;
         glm::vec3 Color;
+        glm::vec2 TexCoord;
 
-        Vertex(const glm::vec3& pos, const glm::vec3 &color): Pos(pos), Color(color) {}
+        Vertex(const glm::vec3& Pos, const glm::vec3 &Color, const glm::vec2& TexCoord):
+        Pos(Pos), Color(Color), TexCoord(TexCoord) {}
 
         static VkVertexInputBindingDescription GetBindingDescription();
 
-        static std::array<VkVertexInputAttributeDescription, 2> GetAttributeDescriptions();
+        static std::array<VkVertexInputAttributeDescription, 3> GetAttributeDescriptions();
     };
 
     class VertexBuffer {
@@ -28,6 +30,8 @@ namespace HWPT {
         VertexBuffer(VkDeviceSize Size, void* Data);
 
         ~VertexBuffer();
+
+        void Bind(VkCommandBuffer CommandBuffer);
 
         VkBuffer& GetHandle() {
             return m_vertexBuffer;

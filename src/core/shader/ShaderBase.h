@@ -37,20 +37,20 @@ namespace HWPT {
     };
 
 
-    static std::vector<char> LoadShaderFile(const std::filesystem::path& shaderPath) {
-        std::ifstream shaderFile(shaderPath, std::ios::ate | std::ios::binary);
+    static std::vector<char> LoadShaderFile(const std::filesystem::path& ShaderPath) {
+        std::ifstream ShaderFile(ShaderPath, std::ios::ate | std::ios::binary);
 
-        if (!shaderFile.is_open()) {
+        if (!ShaderFile.is_open()) {
             throw std::runtime_error("Failed to open file!");
         }
 
-        size_t fileSize = shaderFile.tellg();
-        std::vector<char> buffer(fileSize);
-        shaderFile.seekg(0);
-        shaderFile.read(buffer.data(), (long long) fileSize);
-        shaderFile.close();
+        size_t fileSize = ShaderFile.tellg();
+        std::vector<char> Buffer(fileSize);
+        ShaderFile.seekg(0);
+        ShaderFile.read(Buffer.data(), (long long) fileSize);
+        ShaderFile.close();
 
-        return buffer;
+        return Buffer;
     }
 }
 
