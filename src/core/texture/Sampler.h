@@ -15,13 +15,13 @@ namespace HWPT {
 
         void CreateSampler();
 
-        VkSampler GetHandle() {
+        auto GetHandle() -> VkSampler {
             return m_sampler;
         }
 
     private:
         VkSampler m_sampler = VK_NULL_HANDLE;
     };
-}
+}  // namespace HWPT
 
 #endif //HARDWAREPATHTRACER_SAMPLER_H

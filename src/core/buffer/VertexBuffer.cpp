@@ -9,17 +9,18 @@
 
 namespace HWPT {
 
-    VertexBuffer::VertexBuffer(VkDeviceSize Size, void *Data) {
+    VertexBuffer::VertexBuffer(VkDeviceSize Size, const void *Data) {
         auto [StagingBuffer, StagingBufferMemory] = RHI::CreateStagingBuffer(Size);
 
-        void* MappedData = nullptr;
+        void *MappedData = nullptr;
         vkMapMemory(GetVKDevice(), StagingBufferMemory, 0, Size, 0, &MappedData);
         memcpy(MappedData, Data, Size);
         vkUnmapMemory(GetVKDevice(), StagingBufferMemory);
 
-        RHI::CreateBuffer(Size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                     m_vertexBuffer, m_vertexBufferMemory);
+        RHI::CreateBuffer(Size,
+                          VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                          VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                          m_vertexBuffer, m_vertexBufferMemory);
 
         RHI::CopyBuffer(StagingBuffer, m_vertexBuffer, Size);
 
@@ -37,7 +38,10 @@ namespace HWPT {
         vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &m_vertexBuffer, &Offset);
     }
 
-    VkVertexInputBindingDescription Vertex::GetBindingDescription() {
+    VertexBuffer::VertexBuffer(VkDeviceSize Size, const Vertex *Data)
+            : VertexBuffer(Size, static_cast<const void *>(Data)) {}
+
+    auto Vertex::GetBindingDescription() -> VkVertexInputBindingDescription {
         VkVertexInputBindingDescription BindingDescription{};
 
         BindingDescription.binding = 0;
@@ -47,7 +51,7 @@ namespace HWPT {
         return BindingDescription;
     }
 
-    std::array<VkVertexInputAttributeDescription, 3> Vertex::GetAttributeDescriptions() {
+    auto Vertex::GetAttributeDescriptions() -> std::array<VkVertexInputAttributeDescription, 3> {
         std::array<VkVertexInputAttributeDescription, 3> AttributeDescriptions{};
         AttributeDescriptions[0].binding = 0;
         AttributeDescriptions[0].location = 0;
@@ -66,4 +70,4 @@ namespace HWPT {
 
         return AttributeDescriptions;
     }
-}
+}  // namespace HWPT

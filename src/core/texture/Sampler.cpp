@@ -33,4 +33,4 @@ namespace HWPT {
         VK_CHECK(vkCreateSampler(GetVKDevice(), &CreateInfo, nullptr, &m_sampler));
     }
 
-}
+}  // namespace HWPT

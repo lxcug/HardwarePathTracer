@@ -20,7 +20,7 @@ namespace HWPT {
     private:
         virtual void Init() = 0;
     };
-}
+}  // namespace HWPT
 
 
 #endif //HARDWAREPATHTRACER_APPLICATION_H

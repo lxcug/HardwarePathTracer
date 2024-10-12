@@ -8,4 +8,4 @@
 
 namespace HWPT {
 
-}
+}  // namespace HWPT

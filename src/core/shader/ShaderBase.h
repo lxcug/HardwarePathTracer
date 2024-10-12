@@ -13,7 +13,7 @@
 
 
 namespace HWPT {
-    enum class ShaderType {
+    enum class ShaderType : uint8_t {
         None = 0x0,
         Vertex,
         Geometry,
@@ -37,7 +37,7 @@ namespace HWPT {
     };
 
 
-    static std::vector<char> LoadShaderFile(const std::filesystem::path& ShaderPath) {
+    static auto LoadShaderFile(const std::filesystem::path& ShaderPath) -> std::vector<char> {
         std::ifstream ShaderFile(ShaderPath, std::ios::ate | std::ios::binary);
 
         if (!ShaderFile.is_open()) {
@@ -47,11 +47,11 @@ namespace HWPT {
         size_t fileSize = ShaderFile.tellg();
         std::vector<char> Buffer(fileSize);
         ShaderFile.seekg(0);
-        ShaderFile.read(Buffer.data(), (long long) fileSize);
+        ShaderFile.read(Buffer.data(), static_cast<int64_t>(fileSize));
         ShaderFile.close();
 
         return Buffer;
     }
-}
+}  // namespace HWPT
 
 #endif //HARDWAREPATHTRACER_SHADERBASE_H

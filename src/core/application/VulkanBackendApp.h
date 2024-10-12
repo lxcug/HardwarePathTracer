@@ -31,7 +31,7 @@ namespace HWPT {
         std::optional<uint> ComputeFamily;
         std::optional<uint> PresentFamily;
 
-        [[nodiscard]] bool IsComplete() const {
+        [[nodiscard]] auto IsComplete() const -> bool {
             return GraphicsFamily.has_value() && ComputeFamily.has_value() && PresentFamily.has_value();
         }
     };
@@ -73,23 +73,23 @@ namespace HWPT {
 
         void DrawFrame() override;
 
-        VkCommandBuffer BeginIntermediateCommand();
+        auto BeginIntermediateCommand() -> VkCommandBuffer;
 
         void EndIntermediateCommand(VkCommandBuffer commandBuffer);
 
-        VkInstance GetVkInstance() {
+        auto GetVkInstance() -> VkInstance {
             return m_instance;
         }
 
-        VkDevice GetVkDevice() {
+        auto GetVkDevice() -> VkDevice {
             return m_device;
         }
 
-        VkPhysicalDevice GetPhysicalDevice() {
+        auto GetPhysicalDevice() -> VkPhysicalDevice {
             return m_physicalDevice;
         }
 
-        static VulkanBackendApp* GetApplication() {
+        static auto GetApplication() -> VulkanBackendApp* {
             return g_application;
         }
 
@@ -111,19 +111,19 @@ namespace HWPT {
         // VulkanContext Init
         void CreateVkInstance();
 
-        static std::vector<const char*> GetRequiredExtensions();
+        static auto GetRequiredExtensions() -> std::vector<const char*>;
 
         void CreateSurface();
 
         void SelectPhysicalDevice();
 
-        QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice PhysicalDevice);
+        auto FindQueueFamilies(VkPhysicalDevice PhysicalDevice) -> QueueFamilyIndices;
 
-        static bool IsDeviceExtensionSupport(VkPhysicalDevice PhysicalDevice);
+        static auto IsDeviceExtensionSupport(VkPhysicalDevice PhysicalDevice) -> bool;
 
-        SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice PhysicalDevice);
+        auto QuerySwapChainSupport(VkPhysicalDevice PhysicalDevice) -> SwapChainSupportDetails;
 
-        bool IsSuitableDevice(VkPhysicalDevice PhysicalDevice);
+        auto IsSuitableDevice(VkPhysicalDevice PhysicalDevice) -> bool;
 
         void CreateLogicalDevice();
 
@@ -227,6 +227,6 @@ namespace HWPT {
         std::vector<VkSemaphore> m_renderFinishedSemaphores;
         std::vector<VkFence> m_inFlightFences;
     };
-}
+}  // namespace HWPT
 
 #endif //HARDWAREPATHTRACER_VULKANBACKENDAPP_H

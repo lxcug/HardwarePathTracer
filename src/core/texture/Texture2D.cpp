@@ -13,7 +13,10 @@ namespace HWPT {
 
     void Texture2D::CreateTexture(const std::filesystem::path &TexturePath) {
         int Channels;
-        stbi_uc* Pixels = stbi_load(TexturePath.string().c_str(), (int*)&m_width, (int*)&m_height,
+        stbi_set_flip_vertically_on_load(false);
+        stbi_uc* Pixels = stbi_load(TexturePath.string().c_str(),
+                                    reinterpret_cast<int*>(&m_width),
+                                    reinterpret_cast<int*>(&m_height),
                                     &Channels, STBI_rgb_alpha);
         Check(Pixels);
         m_format = GetTextureFormat(Channels);
@@ -46,7 +49,7 @@ namespace HWPT {
         vkDestroyImageView(GetVKDevice(), m_textureView, nullptr);
     }
 
-    VkImageView Texture2D::CreateSRV() {
+    auto Texture2D::CreateSRV() -> VkImageView {
         if (IsSRVCreated) {
             return m_textureView;
         }
@@ -67,4 +70,4 @@ namespace HWPT {
         return m_textureView;
     }
 
-}
+}  // namespace HWPT

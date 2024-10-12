@@ -20,20 +20,22 @@ namespace HWPT {
         Vertex(const glm::vec3& Pos, const glm::vec3 &Color, const glm::vec2& TexCoord):
         Pos(Pos), Color(Color), TexCoord(TexCoord) {}
 
-        static VkVertexInputBindingDescription GetBindingDescription();
+        static auto GetBindingDescription() -> VkVertexInputBindingDescription;
 
-        static std::array<VkVertexInputAttributeDescription, 3> GetAttributeDescriptions();
+        static auto GetAttributeDescriptions() -> std::array<VkVertexInputAttributeDescription, 3>;
     };
 
     class VertexBuffer {
     public:
-        VertexBuffer(VkDeviceSize Size, void* Data);
+        VertexBuffer(VkDeviceSize Size, const void* Data);
+
+        VertexBuffer(VkDeviceSize Size, const Vertex* Data);
 
         ~VertexBuffer();
 
         void Bind(VkCommandBuffer CommandBuffer);
 
-        VkBuffer& GetHandle() {
+        auto GetHandle() -> VkBuffer& {
             return m_vertexBuffer;
         }
 
@@ -41,6 +43,6 @@ namespace HWPT {
         VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
     };
-}
+}  // namespace HWPT
 
 #endif //HARDWAREPATHTRACER_VERTEXBUFFER_H

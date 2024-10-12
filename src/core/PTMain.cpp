@@ -1,7 +1,7 @@
 #include <iostream>
 #include "core/application/VulkanBackendApp.h"
 
-int main() {
+auto main() -> int {
     HWPT::VulkanBackendApp App;
     App.Init();
 

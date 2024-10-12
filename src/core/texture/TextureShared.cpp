@@ -6,7 +6,7 @@
 
 
 namespace HWPT {
-    TextureFormat GetTextureFormat(int Channels) {
+    auto GetTextureFormat(int Channels) -> TextureFormat {
         switch (Channels) {
             case 3:
                 return TextureFormat::RGB;
@@ -18,7 +18,7 @@ namespace HWPT {
         }
     }
 
-    VkFormat GetVKFormat(TextureFormat Format) {
+    auto GetVKFormat(TextureFormat Format) -> VkFormat {
         return VK_FORMAT_R8G8B8A8_SRGB;  // TODO
         switch (Format) {
             case TextureFormat::RGB:
@@ -31,4 +31,4 @@ namespace HWPT {
                 return VK_FORMAT_UNDEFINED;
         }
     }
-}
+}  // namespace HWPT

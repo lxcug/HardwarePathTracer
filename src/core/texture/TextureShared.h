@@ -16,11 +16,11 @@ namespace HWPT {
         RGBA
     };
 
-    TextureFormat GetTextureFormat(int Channels);
+    auto GetTextureFormat(int Channels) -> TextureFormat;
 
-    VkFormat GetVKFormat(TextureFormat Format);
+    auto GetVKFormat(TextureFormat Format) -> VkFormat;
 
-    enum class TextureUsage {
+    enum class TextureUsage : uint8_t {
         None = 0x0,
         RTV,
         SRV,
@@ -28,6 +28,6 @@ namespace HWPT {
         DSV,  // TODO: Depth Stencil View
         CBV  // TODO: Const Buffer View
     };
-}
+}  // namespace HWPT
 
 #endif //HARDWAREPATHTRACER_TEXTURESHARED_H

@@ -23,7 +23,7 @@ namespace HWPT {
     public:
         void CreateTexture(const std::filesystem::path& TexturePath);
 
-        VkImageView CreateSRV();
+        auto CreateSRV() -> VkImageView;
 
         ~Texture2D();
 
@@ -36,6 +36,6 @@ namespace HWPT {
         bool IsSRVCreated = false;
         VkImageView m_textureView = VK_NULL_HANDLE;
     };
-}
+}  // namespace HWPT
 
 #endif //HARDWAREPATHTRACER_TEXTURE2D_H

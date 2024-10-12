@@ -13,6 +13,6 @@ namespace HWPT {
     public:
 
     };
-}
+}  // namespace HWPT
 
 #endif //HARDWAREPATHTRACER_COMPUTESHADER_H
