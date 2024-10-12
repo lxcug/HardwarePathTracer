@@ -8,7 +8,7 @@
 
 namespace HWPT::RHI {
 
-    uint FindMemoryType(uint TypeFilter, VkMemoryPropertyFlags Properties) {
+    auto FindMemoryType(uint TypeFilter, VkMemoryPropertyFlags Properties) -> uint {
         VkPhysicalDeviceMemoryProperties memoryProperties;
         vkGetPhysicalDeviceMemoryProperties(GetVKPhysicalDevice(), &memoryProperties);
 
@@ -60,7 +60,7 @@ namespace HWPT::RHI {
         App->EndIntermediateCommand(CommandBuffer);
     }
 
-    std::tuple<VkBuffer, VkDeviceMemory> CreateStagingBuffer(VkDeviceSize Size) {
+    auto CreateStagingBuffer(VkDeviceSize Size) -> std::tuple<VkBuffer, VkDeviceMemory> {
         VkBuffer StagingBuffer;
         VkDeviceMemory StagingBufferMemory;
 
@@ -167,4 +167,4 @@ namespace HWPT::RHI {
         VulkanBackendApp::GetApplication()->EndIntermediateCommand(CommandBuffer);
     }
 
-}
+}  // namespace HWPT::RHI

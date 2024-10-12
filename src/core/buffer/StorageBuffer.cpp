@@ -30,5 +30,4 @@ namespace HWPT {
         vkDestroyBuffer(GetVKDevice(), m_storageBuffer, nullptr);
     }
 
-
-}
+}  // namespace HWPT
