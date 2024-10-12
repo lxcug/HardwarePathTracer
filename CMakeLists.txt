@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 find_package(Vulkan REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
-#find_package(Stb REQUIRED)
+find_package(Stb REQUIRED)
 
 add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/application/Application.cpp
@@ -28,6 +28,14 @@ add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/buffer/StorageBuffer.h
         src/core/buffer/UniformBuffer.cpp
         src/core/buffer/UniformBuffer.h
+        src/core/texture/Texture2D.cpp
+        src/core/texture/Texture2D.h
+        src/core/texture/TextureShared.cpp
+        src/core/texture/TextureShared.h
+        src/core/texture/Sampler.cpp
+        src/core/texture/Sampler.h
+        src/core/FPSCalculator.cpp
+        src/core/FPSCalculator.h
 )
 
 include_directories(
@@ -37,7 +45,7 @@ include_directories(
 target_include_directories(
         HardwarePathTracer
         PRIVATE ./include
-#        PRIVATE ${Stb_INCLUDE_DIR}
+        PRIVATE ${Stb_INCLUDE_DIR}
 )
 
 target_link_libraries(

@@ -20,7 +20,12 @@ namespace HWPT::RHI {
 
     std::tuple<VkBuffer, VkDeviceMemory> CreateStagingBuffer(VkDeviceSize Size);
 
-}
+    void CreateTexture2D(uint Width, uint Height, VkFormat Format, VkImageUsageFlags Usage,
+                         VkImageTiling Tiling, VkImage& Texture, VkDeviceMemory& TextureMemory);
 
+    void TransitionTextureLayout(VkImage Image, VkFormat Format, VkImageLayout OldLayout, VkImageLayout NewLayout);
+
+    void CopyBufferToTexture(VkImage Image, VkBuffer Buffer, uint Width, uint Height);
+}
 
 #endif //HARDWAREPATHTRACER_RHI_H
