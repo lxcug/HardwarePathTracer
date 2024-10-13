@@ -42,5 +42,4 @@ namespace HWPT {
         return Format == TextureFormat::Depth32 || Format == TextureFormat::Depth32Stencil8 ||
                Format == TextureFormat::Depth24Stencil8;
     }
-
 }  // namespace HWPT

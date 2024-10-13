@@ -19,7 +19,6 @@ namespace HWPT {
 
         if (m_elapsedTime >= m_recordInterval) {
             m_fps = static_cast<uint>(m_frameCount / m_elapsedTime);
-
             m_elapsedTime = 0.f;
             m_frameCount = 0;
             return true;
