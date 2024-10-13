@@ -10,15 +10,20 @@
 
 
 namespace HWPT {
-    enum class TextureFormat {
+    enum class TextureFormat : uint8_t {
         None = 0x0,
         RGB,
-        RGBA
+        RGBA,
+        Depth32,
+        Depth32Stencil8,
+        Depth24Stencil8
     };
 
     auto GetTextureFormat(int Channels) -> TextureFormat;
 
     auto GetVKFormat(TextureFormat Format) -> VkFormat;
+
+    auto IsDepthStencilTexture(TextureFormat Format) -> bool;
 
     enum class TextureUsage : uint8_t {
         None = 0x0,

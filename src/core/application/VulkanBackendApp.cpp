@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <core/shader/ShaderBase.h>
 #include <core/buffer/VertexBuffer.h>
+#include "core/RHI.h"
 
 
 namespace HWPT {
@@ -27,10 +28,41 @@ namespace HWPT {
 
             glfwPollEvents();
             DrawFrame();
+
+            BeginImGui();
+            DrawImGuiFrame();
+            EndImGui();
+
+            Present();
         }
         vkDeviceWaitIdle(m_device);
 
         CleanUp();
+    }
+
+    void VulkanBackendApp::DrawImGuiFrame() {
+        // TODO: Viewport
+//        {
+//            ImGui::Begin("Viewport");
+//            ImVec2 RegionSize = ImGui::GetContentRegionAvail();
+//            m_viewportSize = {RegionSize.x, RegionSize.y};
+////            std::cout << "Viewport Size: " << m_viewportSize.x << " " << m_viewportSize.y << std::endl;
+////            auto Texture = ImGui_ImplVulkan_AddTexture(m_sampler->GetHandle(),
+////                                                       m_swapChain.SwapChainImageViews[m_imageIndex],
+////                                                       VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL);
+////            ImGui::Image(Texture, ImVec2(m_viewportSize.x, m_viewportSize.y), ImVec2(0, -1), ImVec2(1, 0));
+//            ImGui::End();
+//        }
+        {
+            ImGui::Begin("Settings");
+
+            ImGui::End();
+        }
+        {
+            ImGui::Begin("Statistics");
+            ImGui::Text("FPS: %d", m_fpsCalculator->GetFPS());
+            ImGui::End();
+        }
     }
 
     void VulkanBackendApp::Init() {
@@ -38,6 +70,7 @@ namespace HWPT {
         g_application = this;
         InitWindow();
         InitVulkan();
+        InitImGui();
         m_contextInited = true;
 
         m_fpsCalculator = std::make_shared<FPSCalculator>(1.f);
@@ -98,6 +131,9 @@ namespace HWPT {
         }
         delete m_texture;
         delete m_sampler;
+        delete m_depthTexture;
+
+        CleanUpImGui();
 
         CleanUpSwapChain();
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -128,16 +164,15 @@ namespace HWPT {
         vkWaitForFences(m_device, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
 
         if (m_frameBufferResized) {
-            RecreateSwapChain();
+            OnWindowResize();
+            m_frameBufferResized = false;
         }
 
-        uint ImageIndex;
         VkResult Result = vkAcquireNextImageKHR(m_device, m_swapChain.SwapChainHandle, UINT64_MAX,
                                                 m_imageAvailableSemaphores[m_currentFrame],
-                                                VK_NULL_HANDLE, &ImageIndex);
+                                                VK_NULL_HANDLE, &m_imageIndex);
         if (Result == VK_ERROR_OUT_OF_DATE_KHR || Result == VK_SUBOPTIMAL_KHR) {
-            m_frameBufferResized = false;
-            RecreateSwapChain();
+            OnWindowResize();
         }
         else if (Result != VK_SUCCESS) {
             throw std::runtime_error("Failed to acquire swap chain images");
@@ -145,7 +180,7 @@ namespace HWPT {
 
         vkResetFences(m_device, 1, &m_inFlightFences[m_currentFrame]);
         vkResetCommandBuffer(m_graphicsCommandBuffers[m_currentFrame], 0);
-        RecordCommandBuffer(m_graphicsCommandBuffers[m_currentFrame], ImageIndex);
+        RecordCommandBuffer(m_graphicsCommandBuffers[m_currentFrame], m_imageIndex);
 
         VkSubmitInfo SubmitInfo{};
         SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -161,24 +196,6 @@ namespace HWPT {
         SubmitInfo.pSignalSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
 
         VK_CHECK(vkQueueSubmit(m_queue.GraphicsQueue, 1, &SubmitInfo, m_inFlightFences[m_currentFrame]));
-
-        VkPresentInfoKHR PresentInfo{};
-        PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-        PresentInfo.waitSemaphoreCount = 1;
-        PresentInfo.pWaitSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
-        PresentInfo.swapchainCount = 1;
-        PresentInfo.pSwapchains = &m_swapChain.SwapChainHandle;
-        PresentInfo.pImageIndices = &ImageIndex;
-
-        Result = vkQueuePresentKHR(m_queue.PresentQueue, &PresentInfo);
-        if (Result == VK_ERROR_OUT_OF_DATE_KHR || Result == VK_SUBOPTIMAL_KHR) {
-            RecreateSwapChain();
-        }
-        else if (Result != VK_SUCCESS) {
-            throw std::runtime_error("Failed to present swap chain images");
-        }
-
-        m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
     void VulkanBackendApp::CreateVkInstance() {
@@ -422,7 +439,7 @@ namespace HWPT {
         CreateInfo.presentMode = PresentMode;
         CreateInfo.imageExtent = Extent;
         CreateInfo.imageArrayLayers = 1;
-        CreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+        CreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
         QueueFamilyIndices Indices = FindQueueFamilies(m_physicalDevice);
         std::unordered_set<uint> QueueFamilySet = {
@@ -453,6 +470,9 @@ namespace HWPT {
         m_swapChain.Format = SurfaceFormat.format;
         m_swapChain.GetImages(m_device);
         m_swapChain.CreateImageViews(m_device);
+
+        delete m_depthTexture;
+        m_depthTexture = new Texture2D(Extent.width, Extent.height, TextureFormat::Depth32);
     }
 
     void VulkanBackendApp::CleanUpSwapChain() {
@@ -474,29 +494,47 @@ namespace HWPT {
         ColorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         ColorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
         ColorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        ColorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        ColorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;  // TODO ? For ImGui
+
+        VkAttachmentDescription DepthAttachment{};
+        DepthAttachment.format = GetVKFormat(TextureFormat::Depth32);
+        DepthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        DepthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        DepthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        DepthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        DepthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
         VkAttachmentReference ColorAttachmentRef{};
         ColorAttachmentRef.attachment = 0;
         ColorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        VkAttachmentReference DepthAttachmentRef{};
+        DepthAttachmentRef.attachment = 1;
+        DepthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
         VkSubpassDescription SubPass{};
         SubPass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         SubPass.colorAttachmentCount = 1;
         SubPass.pColorAttachments = &ColorAttachmentRef;
+        SubPass.pDepthStencilAttachment = &DepthAttachmentRef;
 
         VkSubpassDependency Dependency{};
         Dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
         Dependency.dstSubpass = 0;
-        Dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        Dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        Dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
         Dependency.srcAccessMask = 0;
-        Dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-        Dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        Dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
+        std::array<VkAttachmentDescription, 2> Attachments = {
+                ColorAttachment,
+                DepthAttachment
+        };
         VkRenderPassCreateInfo CreateInfo{};
         CreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-        CreateInfo.attachmentCount = 1;
-        CreateInfo.pAttachments = &ColorAttachment;
+        CreateInfo.attachmentCount = Attachments.size();
+        CreateInfo.pAttachments = Attachments.data();
         CreateInfo.subpassCount = 1;
         CreateInfo.pSubpasses = &SubPass;
         CreateInfo.dependencyCount = 1;
@@ -509,8 +547,9 @@ namespace HWPT {
         m_swapChainFrameBuffers.resize(m_swapChain.SwapChainImages.size());
 
         for (size_t Index = 0; Index < m_swapChainFrameBuffers.size(); Index++) {
-            std::array<VkImageView, 1> Attachments = {
-                    m_swapChain.SwapChainImageViews[Index]
+            std::array<VkImageView, 2> Attachments = {
+                    m_swapChain.SwapChainImageViews[Index],
+                    m_depthTexture->CreateSRV()
             };
 
             VkFramebufferCreateInfo CreateInfo{};
@@ -719,6 +758,19 @@ namespace HWPT {
 
         VK_CHECK(vkCreatePipelineLayout(m_device, &PipelineLayoutInfo, nullptr, &m_graphicsPipelineLayout));
 
+        // Depth-Stencil Test
+        VkPipelineDepthStencilStateCreateInfo DepthStencil{};
+        DepthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        DepthStencil.depthTestEnable = VK_TRUE;
+        DepthStencil.depthWriteEnable = VK_TRUE;
+        DepthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+        DepthStencil.depthBoundsTestEnable = VK_FALSE;
+//        DepthStencil.minDepthBounds = 0.f;
+//        DepthStencil.maxDepthBounds = 1.f;
+        DepthStencil.stencilTestEnable = VK_FALSE;
+        DepthStencil.front = {};
+        DepthStencil.back = {};
+
         VkGraphicsPipelineCreateInfo PipelineInfo{};
         PipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
         PipelineInfo.stageCount = ShaderStages.size();
@@ -728,7 +780,7 @@ namespace HWPT {
         PipelineInfo.pViewportState = &ViewportState;
         PipelineInfo.pRasterizationState = &Rasterizer;
         PipelineInfo.pMultisampleState = &Multisampling;
-        PipelineInfo.pDepthStencilState = nullptr;
+        PipelineInfo.pDepthStencilState = &DepthStencil;
         PipelineInfo.pColorBlendState = &ColorBlending;
         PipelineInfo.pDynamicState = &DynamicState;
         PipelineInfo.layout = m_graphicsPipelineLayout;
@@ -781,17 +833,23 @@ namespace HWPT {
 
     void VulkanBackendApp::CreateVertexBuffer() {
         const std::vector<Vertex> Vertices = {
-                {glm::vec3(-.5f, .5f, 0.f),  glm::vec3(0.f, 1.f, 0.f), glm::vec2(1.f, 1.f)},
-                {glm::vec3(.5f, .5f, 0.f),   glm::vec3(1.f, 0.f, 0.f), glm::vec2(0.f, 1.f)},
-                {glm::vec3(.5f, -.5f, 0.f),  glm::vec3(0.f, 0.f, 1.f), glm::vec2(0.f, 0.f)},
-                {glm::vec3(-.5f, -.5f, 0.f), glm::vec3(1.f, 1.f, 0.f), glm::vec2(1.f, 0.f)}
+                {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+                {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+                {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+                {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
+
+                {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+                {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+                {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+                {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
         };
         m_vertexBuffer = new VertexBuffer(sizeof(Vertex) * Vertices.size(), Vertices.data());
     }
 
     void VulkanBackendApp::CreateIndexBuffer() {
         const std::vector<uint> Indices = {
-                0, 1, 2, 2, 3, 0
+                0, 1, 2, 2, 3, 0,
+                4, 5, 6, 6, 7, 4
         };
         m_indexBuffer = new IndexBuffer(Indices.size(), Indices.data());
     }
@@ -806,7 +864,7 @@ namespace HWPT {
     void VulkanBackendApp::CreateUniformBuffers() {
         MVPData MVP{};
         MVP.ModelTrans = glm::identity<glm::mat4>();
-        MVP.ViewTrans = glm::lookAt(glm::vec3(0.f, 0.f, 2.f), glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f));
+        MVP.ViewTrans = glm::lookAt(glm::vec3(1.f, 1.f, 2.f), glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f));
         MVP.ProjTrans = glm::perspective(glm::radians(60.f),
                                          static_cast<float>(m_windowWidth) / static_cast<float>(m_windowHeight),
                                          1e-3f, 1000.f);
@@ -830,7 +888,6 @@ namespace HWPT {
         PoolInfo.poolSizeCount = PoolSizes.size();
         PoolInfo.pPoolSizes = PoolSizes.data();
         PoolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
-
         VK_CHECK(vkCreateDescriptorPool(m_device, &PoolInfo, nullptr, &m_descriptorPool));
     }
 
@@ -906,9 +963,11 @@ namespace HWPT {
         RenderPassInfo.framebuffer = m_swapChainFrameBuffers[ImageIndex];
         RenderPassInfo.renderArea.offset = {0, 0};
         RenderPassInfo.renderArea.extent = m_swapChain.Extent;
-        VkClearValue ClearValue = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-        RenderPassInfo.clearValueCount = 1;
-        RenderPassInfo.pClearValues = &ClearValue;
+        std::array<VkClearValue, 2> ClearValues{};
+        ClearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        ClearValues[1].depthStencil = {1.0f, 0};
+        RenderPassInfo.clearValueCount = ClearValues.size();
+        RenderPassInfo.pClearValues = ClearValues.data();
 
         vkCmdBeginRenderPass(CommandBuffer, &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
@@ -917,7 +976,7 @@ namespace HWPT {
 
         MVPData MVP{};
         MVP.ModelTrans = glm::identity<glm::mat4>();
-        MVP.ViewTrans = glm::lookAt(glm::vec3(0.f, 0.f, 2.f), glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f));
+        MVP.ViewTrans = glm::lookAt(glm::vec3(1.f, 1.f, 2.f), glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f));
         MVP.ProjTrans = glm::perspective(glm::radians(60.f),
                                          static_cast<float>(m_windowWidth) / static_cast<float>(m_windowHeight),
                                          1e-3f, 1000.f);
@@ -952,7 +1011,6 @@ namespace HWPT {
             glfwGetFramebufferSize(m_window, reinterpret_cast<int*>(&m_windowWidth), reinterpret_cast<int*>(&m_windowHeight));
             glfwWaitEvents();
         }
-
         vkDeviceWaitIdle(m_device);
 
         CleanUpSwapChain();
@@ -965,6 +1023,155 @@ namespace HWPT {
         m_texture->CreateTexture("../../asset/texture.jpg");
         m_sampler = new Sampler();
         m_sampler->CreateSampler();
+    }
+
+    void VulkanBackendApp::InitImGui() {
+        m_imguiInfrastructure = new ImGuiInfrastructure(MAX_FRAMES_IN_FLIGHT);
+
+        // Setup Dear ImGui context
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGui::StyleColorsDark();
+        ImGuiIO& IO = ImGui::GetIO();
+
+        auto Consolas = IO.Fonts->AddFontFromFileTTF("../../asset/font/Consolas-Regular.ttf", 16.f);
+        IO.Fonts->Build();
+        IO.FontDefault = Consolas;
+
+        ImGui_ImplVulkan_InitInfo InitInfo{};
+        InitInfo.Instance = m_instance;
+        InitInfo.PhysicalDevice = m_physicalDevice;
+        InitInfo.Device = m_device;
+        InitInfo.QueueFamily = FindQueueFamilies(m_physicalDevice).GraphicsFamily.value();
+        InitInfo.Queue = m_queue.GraphicsQueue;
+        InitInfo.DescriptorPool = m_imguiInfrastructure->m_descriptorPool;
+        InitInfo.RenderPass = m_imguiInfrastructure->m_renderPass;
+        InitInfo.MinImageCount = MAX_FRAMES_IN_FLIGHT;
+        InitInfo.ImageCount = MAX_FRAMES_IN_FLIGHT;
+        InitInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+
+        ImGui_ImplVulkan_Init(&InitInfo);
+        ImGui_ImplGlfw_InitForVulkan(m_window, true);
+
+        IO.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+        IO.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+        IO.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // IF using Docking Branch
+        IO.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // IF using Multi View
+    }
+
+    void VulkanBackendApp::BeginImGui() {
+        ImGui_ImplGlfw_NewFrame();
+        ImGui_ImplVulkan_NewFrame();
+        ImGui::NewFrame();
+//        EnableWholeScreenDocking();
+    }
+
+    void VulkanBackendApp::EndImGui() {
+        auto CommandBuffer = BeginIntermediateCommand();
+
+        VkRenderPassBeginInfo RenderPassInfo{};
+        RenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        RenderPassInfo.renderPass = m_imguiInfrastructure->m_renderPass;
+        RenderPassInfo.framebuffer = m_imguiInfrastructure->m_frameBuffers[m_imageIndex];
+        RenderPassInfo.renderArea.offset = {0, 0};
+        RenderPassInfo.renderArea.extent = m_swapChain.Extent;
+        VkClearValue ClearValue = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+        RenderPassInfo.clearValueCount = 1;
+        RenderPassInfo.pClearValues = &ClearValue;
+        vkCmdBeginRenderPass(CommandBuffer, &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        ImGui::Render();
+        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), CommandBuffer);
+
+        vkCmdEndRenderPass(CommandBuffer);
+        EndIntermediateCommand(CommandBuffer);
+
+        // For ImGui MultiView
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+        glfwMakeContextCurrent(m_window);
+    }
+
+    void VulkanBackendApp::CleanUpImGui() {
+        ImGui_ImplVulkan_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+        delete m_imguiInfrastructure;
+    }
+
+    void VulkanBackendApp::Present() {
+        VkPresentInfoKHR PresentInfo{};
+        PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+        PresentInfo.waitSemaphoreCount = 1;
+        PresentInfo.pWaitSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
+        PresentInfo.swapchainCount = 1;
+        PresentInfo.pSwapchains = &m_swapChain.SwapChainHandle;
+        PresentInfo.pImageIndices = &m_imageIndex;
+
+        VkResult Result = vkQueuePresentKHR(m_queue.PresentQueue, &PresentInfo);
+        if (Result == VK_ERROR_OUT_OF_DATE_KHR || Result == VK_SUBOPTIMAL_KHR) {
+            OnWindowResize();
+        }
+        else if (Result != VK_SUCCESS) {
+            throw std::runtime_error("Failed to present swap chain images");
+        }
+
+        m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+    }
+
+    void VulkanBackendApp::EnableWholeScreenDocking() {
+        static bool dockspaceOpen = true;
+        static bool opt_fullscreen_persistant = true;
+        bool opt_fullscreen = opt_fullscreen_persistant;
+        static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
+
+        // We are using the ImGuiWindowFlags_NoDocking flag to make the parent window not dockable into,
+        // because it would be confusing to have two docking targets within each others.
+        ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
+        if (opt_fullscreen) {
+            ImGuiViewport* viewport = ImGui::GetMainViewport();
+            ImGui::SetNextWindowPos(viewport->Pos);
+            ImGui::SetNextWindowSize(viewport->Size);
+            ImGui::SetNextWindowViewport(viewport->ID);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+            window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+            window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+        }
+
+        // When using ImGuiDockNodeFlags_PassthruCentralNode, DockSpace() will render our background and handle the pass-thru hole, so we ask Begin() to not render a background.
+        if (dockspace_flags & ImGuiDockNodeFlags_PassthruCentralNode)
+            window_flags |= ImGuiWindowFlags_NoBackground;
+
+        // Important: note that we proceed even if Begin() returns false (aka window is collapsed).
+        // This is because we want to keep our DockSpace() active. If a DockSpace() is inactive,
+        // all active windows docked into it will lose their parent and become undocked.
+        // We cannot preserve the docking relationship between an active window and an inactive docking, otherwise
+        // any change of dockspace/settings would lead to windows being stuck in limbo and never being visible.
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+        ImGui::Begin("DockSpace Demo", &dockspaceOpen, window_flags);
+        ImGui::PopStyleVar();
+
+        if (opt_fullscreen)
+            ImGui::PopStyleVar(2);
+
+        // DockSpace
+        ImGuiIO& io = ImGui::GetIO();
+        ImGuiStyle& style = ImGui::GetStyle();
+        float minWinSizeX = style.WindowMinSize.x;
+        style.WindowMinSize.x = 370.0f;
+
+        if(io.ConfigFlags & ImGuiConfigFlags_DockingEnable) {
+            ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
+            ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
+        }
+        style.WindowMinSize.x = minWinSizeX;
+        ImGui::End();
+    }
+
+    void VulkanBackendApp::OnWindowResize() {
+        RecreateSwapChain();
+        m_imguiInfrastructure->RecreateFrameBuffer();
     }
 
     void SwapChain::GetImages(VkDevice Device) {

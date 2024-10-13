@@ -131,7 +131,37 @@ namespace HWPT::RHI {
 
             SourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
             DestinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        } else {
+        } else if (OldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
+                   NewLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+            Barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            Barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+            SourceStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            DestinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        } else if (OldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
+                   NewLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL) {
+            Barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            Barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+            SourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            DestinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        }
+        else if (OldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR &&
+                 NewLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+            Barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+            Barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+            SourceStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+            DestinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        } else if (OldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL &&
+                   NewLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
+            Barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            Barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+
+            SourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            DestinationStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+        }
+        else {
             throw std::runtime_error("Unsupported layout transition!");
         }
 
@@ -139,6 +169,23 @@ namespace HWPT::RHI {
                              0, 0, nullptr, 0, nullptr, 1, &Barrier);
 
         VulkanBackendApp::GetApplication()->EndIntermediateCommand(CommandBuffer);
+    }
+
+    void CreateImageView(VkImage Image, VkFormat Format, VkImageView& ImageView) {
+        VkImageViewCreateInfo ViewCreateInfo{};
+        ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        ViewCreateInfo.image = Image;
+        ViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        ViewCreateInfo.format = Format;
+        ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        ViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+        ViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        ViewCreateInfo.subresourceRange.levelCount = 1;
+        ViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+        ViewCreateInfo.subresourceRange.layerCount = 1;
+        VK_CHECK(vkCreateImageView(GetVKDevice(), &ViewCreateInfo, nullptr, &ImageView));
     }
 
     void CopyBufferToTexture(VkImage Image, VkBuffer Buffer, uint Width, uint Height) {

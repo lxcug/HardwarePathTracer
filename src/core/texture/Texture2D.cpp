@@ -6,6 +6,7 @@
 #include "core/RHI.h"
 
 #define STB_IMAGE_IMPLEMENTATION
+
 #include "stb_image.h"
 
 
@@ -14,9 +15,9 @@ namespace HWPT {
     void Texture2D::CreateTexture(const std::filesystem::path &TexturePath) {
         int Channels;
         stbi_set_flip_vertically_on_load(false);
-        stbi_uc* Pixels = stbi_load(TexturePath.string().c_str(),
-                                    reinterpret_cast<int*>(&m_width),
-                                    reinterpret_cast<int*>(&m_height),
+        stbi_uc *Pixels = stbi_load(TexturePath.string().c_str(),
+                                    reinterpret_cast<int *>(&m_width),
+                                    reinterpret_cast<int *>(&m_height),
                                     &Channels, STBI_rgb_alpha);
         Check(Pixels);
         m_format = GetTextureFormat(Channels);
@@ -24,7 +25,7 @@ namespace HWPT {
         VkDeviceSize MemorySize = m_width * m_height * 4;  // TODO
         auto [StagingBuffer, StagingBufferMemory] = RHI::CreateStagingBuffer(MemorySize);
 
-        void* MappedData = nullptr;
+        void *MappedData = nullptr;
         vkMapMemory(GetVKDevice(), StagingBufferMemory, 0, MemorySize, 0, &MappedData);
         memcpy(MappedData, Pixels, MemorySize);
         vkUnmapMemory(GetVKDevice(), StagingBufferMemory);
@@ -34,19 +35,23 @@ namespace HWPT {
                              VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                              VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
         RHI::TransitionTextureLayout(m_texture, GetVKFormat(m_format),
-                                     VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+                                     VK_IMAGE_LAYOUT_UNDEFINED,
+                                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         RHI::CopyBufferToTexture(m_texture, StagingBuffer, m_width, m_height);
         RHI::TransitionTextureLayout(m_texture, GetVKFormat(m_format),
-                                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL);
+                                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                     VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL);
 
         vkDestroyBuffer(GetVKDevice(), StagingBuffer, nullptr);
         vkFreeMemory(GetVKDevice(), StagingBufferMemory, nullptr);
     }
 
     Texture2D::~Texture2D() {
+        if (IsSRVCreated) {
+            vkDestroyImageView(GetVKDevice(), m_textureView, nullptr);
+        }
         vkDestroyImage(GetVKDevice(), m_texture, nullptr);
         vkFreeMemory(GetVKDevice(), m_textureMemory, nullptr);
-        vkDestroyImageView(GetVKDevice(), m_textureView, nullptr);
     }
 
     auto Texture2D::CreateSRV() -> VkImageView {
@@ -59,7 +64,11 @@ namespace HWPT {
         CreateInfo.image = m_texture;
         CreateInfo.format = GetVKFormat(m_format);
         CreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        CreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        VkImageAspectFlags AspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
+        if (IsDepthStencilTexture(m_format)) {
+            AspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
+        }
+        CreateInfo.subresourceRange.aspectMask = AspectFlags;
         CreateInfo.subresourceRange.baseMipLevel = 0;
         CreateInfo.subresourceRange.levelCount = 1;
         CreateInfo.subresourceRange.baseArrayLayer = 0;
@@ -68,6 +77,21 @@ namespace HWPT {
         VK_CHECK(vkCreateImageView(GetVKDevice(), &CreateInfo, nullptr, &m_textureView));
         IsSRVCreated = true;
         return m_textureView;
+    }
+
+    Texture2D::Texture2D(uint Width, uint Height, TextureFormat Format)
+            : m_width(Width), m_height(Height), m_format(Format) {
+
+        switch (m_format) {
+            case TextureFormat::Depth32:
+                RHI::CreateTexture2D(Width, Height, GetVKFormat(m_format),
+                                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                                     VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
+                break;
+            default:
+                Check(false);
+                break;
+        }
     }
 
 }  // namespace HWPT

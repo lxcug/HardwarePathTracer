@@ -19,16 +19,28 @@ namespace HWPT {
     }
 
     auto GetVKFormat(TextureFormat Format) -> VkFormat {
-        return VK_FORMAT_R8G8B8A8_SRGB;  // TODO
         switch (Format) {
             case TextureFormat::RGB:
-                return VK_FORMAT_R8G8B8_SRGB;
+                [[fallthrough]];
             case TextureFormat::RGBA:
                 return VK_FORMAT_R8G8B8A8_SRGB;
-            case TextureFormat::None: [[fallthrough]];
+            case TextureFormat::Depth32:
+                return VK_FORMAT_D32_SFLOAT;
+            case TextureFormat::Depth32Stencil8:
+                return VK_FORMAT_D32_SFLOAT_S8_UINT;
+            case TextureFormat::Depth24Stencil8:
+                return VK_FORMAT_D24_UNORM_S8_UINT;
+            case TextureFormat::None:
+                [[fallthrough]];
             default:
                 Check(false);
                 return VK_FORMAT_UNDEFINED;
         }
     }
+
+    auto IsDepthStencilTexture(TextureFormat Format) -> bool {
+        return Format == TextureFormat::Depth32 || Format == TextureFormat::Depth32Stencil8 ||
+               Format == TextureFormat::Depth24Stencil8;
+    }
+
 }  // namespace HWPT

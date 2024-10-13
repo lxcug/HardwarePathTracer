@@ -21,11 +21,19 @@ namespace HWPT {
 
     class Texture2D {
     public:
+        Texture2D() = default;
+
+        Texture2D(uint Width, uint Height, TextureFormat Format);
+
+        ~Texture2D();
+
         void CreateTexture(const std::filesystem::path& TexturePath);
 
         auto CreateSRV() -> VkImageView;
 
-        ~Texture2D();
+        auto GetHandle() -> VkImage& {
+            return m_texture;
+        }
 
     private:
         VkImage m_texture = VK_NULL_HANDLE;
