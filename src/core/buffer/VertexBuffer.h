@@ -23,11 +23,11 @@ namespace HWPT {
 
         Vertex(const glm::vec3& Pos, const glm::vec3 &Color, const glm::vec2& TexCoord):
         Pos(Pos), Color(Color), TexCoord(TexCoord) {}
-
+      
         auto operator==(const Vertex& Other) const -> bool {
             return Pos == Other.Pos;
         }
-
+      
         static auto GetBindingDescription() -> VkVertexInputBindingDescription;
 
         static auto GetAttributeDescriptions() -> std::array<VkVertexInputAttributeDescription, 3>;
@@ -52,7 +52,6 @@ namespace HWPT {
         VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
     };
 }  // namespace HWPT
-
 
 namespace std {
     template<> struct hash<HWPT::Vertex> {

@@ -82,7 +82,7 @@ namespace HWPT {
         IsSRVCreated = true;
         return m_textureView;
     }
-
+  
     Texture2D::Texture2D(uint Width, uint Height, TextureFormat Format)
             : m_width(Width), m_height(Height), m_format(Format) {
 
@@ -97,5 +97,4 @@ namespace HWPT {
                 break;
         }
     }
-
 }  // namespace HWPT

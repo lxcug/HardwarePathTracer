@@ -24,7 +24,7 @@ namespace HWPT {
     auto GetVKFormat(TextureFormat Format) -> VkFormat;
 
     auto IsDepthStencilTexture(TextureFormat Format) -> bool;
-
+  
     enum class TextureUsage : uint8_t {
         None = 0x0,
         RTV,

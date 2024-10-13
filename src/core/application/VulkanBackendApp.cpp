@@ -999,7 +999,6 @@ namespace HWPT {
         Scissor.offset = {0, 0};
         Scissor.extent = m_swapChain.Extent;
         vkCmdSetScissorWithCount(CommandBuffer, 1, &Scissor);
-
         vkCmdDrawIndexed(CommandBuffer, m_vikingRoom->GetIndexCount(), 1, 0, 0, 0);
         vkCmdEndRenderPass(CommandBuffer);
 
