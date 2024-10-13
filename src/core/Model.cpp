@@ -2,9 +2,9 @@
 // Created by HUSTLX on 2024/10/14.
 //
 
-#include "Model.h"
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
+#include "Model.h"
 #include <unordered_map>
 
 
@@ -15,18 +15,22 @@ namespace HWPT {
         m_texture = new Texture2D(TexturePath);
     }
 
-    void Model::LoadModel(const std::filesystem::path &TexturePath) {
+    void Model::LoadModel(const std::filesystem::path &ModelPath) {
         tinyobj::attrib_t Attrib;
         std::vector<tinyobj::shape_t> Shapes;
         std::vector<tinyobj::material_t> Materials;
-        std::string warn, err;
+        std::string Warn, Err;
 
-        Check(tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &warn, &err, TexturePath.string().c_str()));
+        bool LoadSuccess = tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Err, ModelPath.string().c_str());
+        Check(LoadSuccess);
 
         std::vector<Vertex> Vertices;
         std::vector<uint> Indices;
         std::unordered_map<Vertex, uint> UniqueVertices;
+
+        Check(!Shapes.empty());
         for (const auto& Shape : Shapes) {
+            Check(!Shape.mesh.indices.empty());
             for (const auto& Index : Shape.mesh.indices) {
                 Vertex _Vertex{};
                 _Vertex.Pos = {
