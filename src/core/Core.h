@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <vulkan/vulkan.h>
 // Math
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 
@@ -28,6 +29,14 @@ namespace HWPT {
 #if BUILD_DEVELOP
 #define BUILD_SHIPPING 0
 #define BUILD_RELEASE 0
+#endif
+#if BUILD_SHIPPING
+#define BUILD_DEVELOP 0
+#define BUILD_RELEASE 0
+#endif
+#if BUILD_RELEASE
+#define BUILD_DEVELOP 0
+#define BUILD_SHIPPING 0
 #endif
 
 using uint = uint32_t;
