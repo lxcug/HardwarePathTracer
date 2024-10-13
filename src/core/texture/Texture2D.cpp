@@ -12,6 +12,10 @@
 
 namespace HWPT {
 
+    Texture2D::Texture2D(const std::filesystem::path &TexturePath) {
+        CreateTexture(TexturePath);
+    }
+
     void Texture2D::CreateTexture(const std::filesystem::path &TexturePath) {
         int Channels;
         stbi_set_flip_vertically_on_load(false);

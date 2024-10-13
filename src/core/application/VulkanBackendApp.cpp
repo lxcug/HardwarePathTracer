@@ -124,6 +124,7 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CleanUp() {
+        delete m_vikingRoom;
         delete m_vertexBuffer;
         delete m_indexBuffer;
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -864,7 +865,7 @@ namespace HWPT {
     void VulkanBackendApp::CreateUniformBuffers() {
         MVPData MVP{};
         MVP.ModelTrans = glm::identity<glm::mat4>();
-        MVP.ViewTrans = glm::lookAt(glm::vec3(1.f, 1.f, 2.f), glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f));
+        MVP.ViewTrans = glm::lookAt(glm::vec3(1.f, 1.f, 3.f), glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f));
         MVP.ProjTrans = glm::perspective(glm::radians(60.f),
                                          static_cast<float>(m_windowWidth) / static_cast<float>(m_windowHeight),
                                          1e-3f, 1000.f);
@@ -918,7 +919,8 @@ namespace HWPT {
 
             VkDescriptorImageInfo ImageInfo{};
             ImageInfo.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
-            ImageInfo.imageView = m_texture->CreateSRV();
+//            ImageInfo.imageView = m_texture->CreateSRV();
+            ImageInfo.imageView = m_vikingRoom->GetTexture()->CreateSRV();
             ImageInfo.sampler = m_sampler->GetHandle();
             DescriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             DescriptorWrites[1].dstSet = m_descriptorSets[i];
@@ -971,12 +973,11 @@ namespace HWPT {
 
         vkCmdBeginRenderPass(CommandBuffer, &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
-        m_vertexBuffer->Bind(CommandBuffer);
-        m_indexBuffer->Bind(CommandBuffer);
+        m_vikingRoom->Bind(CommandBuffer);
 
         MVPData MVP{};
         MVP.ModelTrans = glm::identity<glm::mat4>();
-        MVP.ViewTrans = glm::lookAt(glm::vec3(1.f, 1.f, 2.f), glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f));
+        MVP.ViewTrans = glm::lookAt(glm::vec3(1.f, 1.f, 3.f), glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f));
         MVP.ProjTrans = glm::perspective(glm::radians(60.f),
                                          static_cast<float>(m_windowWidth) / static_cast<float>(m_windowHeight),
                                          1e-3f, 1000.f);
@@ -999,7 +1000,7 @@ namespace HWPT {
         Scissor.extent = m_swapChain.Extent;
         vkCmdSetScissorWithCount(CommandBuffer, 1, &Scissor);
 
-        vkCmdDrawIndexed(CommandBuffer, m_indexBuffer->GetIndexCount(), 1, 0, 0, 0);
+        vkCmdDrawIndexed(CommandBuffer, m_vikingRoom->GetIndexCount(), 1, 0, 0, 0);
         vkCmdEndRenderPass(CommandBuffer);
 
         VK_CHECK(vkEndCommandBuffer(CommandBuffer));
@@ -1019,8 +1020,10 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateTextureAndSampler() {
-        m_texture = new Texture2D();
-        m_texture->CreateTexture("../../asset/texture.jpg");
+        m_vikingRoom = new Model("../../asset/viking_room/viking_room.obj",
+                                 "../../asset/viking_room/viking_room.png");
+
+        m_texture = new Texture2D("../../asset/texture.jpg");
         m_sampler = new Sampler();
         m_sampler->CreateSampler();
     }

@@ -21,7 +21,7 @@ namespace HWPT {
 
     class Texture2D {
     public:
-        Texture2D() = default;
+        Texture2D(const std::filesystem::path& TexturePath);
 
         Texture2D(uint Width, uint Height, TextureFormat Format);
 

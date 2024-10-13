@@ -22,6 +22,7 @@
 #include "core/texture/Texture2D.h"
 #include "core/texture/Sampler.h"
 #include "ImGuiIntegration.h"
+#include "core/Model.h"
 
 
 namespace HWPT {
@@ -256,6 +257,8 @@ namespace HWPT {
         ImGuiInfrastructure* m_imguiInfrastructure = nullptr;
 
         glm::vec2 m_viewportSize = glm::vec2(0.f, 0.f);
+
+        Model* m_vikingRoom = nullptr;
     };
 }  // namespace HWPT
 
