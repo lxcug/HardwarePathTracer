@@ -21,6 +21,8 @@
 #include "core/FPSCalculator.h"
 #include "core/texture/Texture2D.h"
 #include "core/texture/Sampler.h"
+#include "ImGuiIntegration.h"
+#include "core/Model.h"
 
 
 namespace HWPT {
@@ -73,6 +75,8 @@ namespace HWPT {
 
         void DrawFrame() override;
 
+        void DrawImGuiFrame();
+
         auto BeginIntermediateCommand() -> VkCommandBuffer;
 
         void EndIntermediateCommand(VkCommandBuffer commandBuffer);
@@ -93,6 +97,10 @@ namespace HWPT {
             return g_application;
         }
 
+        auto GetSwapChain() -> SwapChain {
+            return m_swapChain;
+        }
+
     private:
         // Init GLFW Windows
         void InitWindow();
@@ -102,10 +110,23 @@ namespace HWPT {
 
         void CleanUp();
 
+        void Present();
+
         // FrameBuffer Resize Callback
         static void FrameBufferResizeCallback(GLFWwindow* Window, int Width, int Height);
 
         void RecreateSwapChain();
+
+    private:
+        void InitImGui();
+
+        void BeginImGui();
+
+        void EndImGui();
+
+        void CleanUpImGui();
+
+        void EnableWholeScreenDocking();
 
     private:
         // VulkanContext Init
@@ -163,6 +184,8 @@ namespace HWPT {
 
         void CreateTextureAndSampler();
 
+        void OnWindowResize();
+
     protected:
         std::string m_windowTitle = "VulkanBackend Application";
         uint m_windowWidth = 1600, m_windowHeight = 900;
@@ -196,8 +219,11 @@ namespace HWPT {
         VkDevice m_device = VK_NULL_HANDLE;
         Queue m_queue;
         SwapChain m_swapChain;
-        VkRenderPass m_renderPass = VK_NULL_HANDLE;
         std::vector<VkFramebuffer> m_swapChainFrameBuffers;
+        Texture2D* m_depthTexture = nullptr;
+//        SwapChain m_viewportSwapChain;  // TODO
+//        std::vector<VkFramebuffer> m_viewportFrameBuffer;
+        VkRenderPass m_renderPass = VK_NULL_HANDLE;
         CommandPool m_commandPool;
         std::vector<VkCommandBuffer> m_graphicsCommandBuffers;
         std::vector<VkCommandBuffer> m_computeCommandBuffers;
@@ -210,15 +236,16 @@ namespace HWPT {
         VkPipelineLayout m_computePipelineLayout = VK_NULL_HANDLE;
         VkPipeline m_computePipeline = VK_NULL_HANDLE;
 
-        VkDescriptorPool m_descriptorPool;
+        VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
         std::vector<VkDescriptorSet> m_descriptorSets;
 
         uint m_currentFrame = 0;
+        uint m_imageIndex = 0;
 
         inline static VulkanBackendApp* g_application = nullptr;
 
-        VertexBuffer* m_vertexBuffer;
-        IndexBuffer* m_indexBuffer;
+        VertexBuffer* m_vertexBuffer = nullptr;
+        IndexBuffer* m_indexBuffer = nullptr;
         std::vector<UniformBuffer*> m_MVPUniformBuffers;
         Texture2D* m_texture = nullptr;
         Sampler* m_sampler = nullptr;
@@ -226,6 +253,12 @@ namespace HWPT {
         std::vector<VkSemaphore> m_imageAvailableSemaphores;
         std::vector<VkSemaphore> m_renderFinishedSemaphores;
         std::vector<VkFence> m_inFlightFences;
+
+        ImGuiInfrastructure* m_imguiInfrastructure = nullptr;
+
+        glm::vec2 m_viewportSize = glm::vec2(0.f, 0.f);
+
+        Model* m_vikingRoom = nullptr;
     };
 }  // namespace HWPT
 

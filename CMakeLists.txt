@@ -9,6 +9,9 @@ find_package(Vulkan REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(Stb REQUIRED)
+find_package(tinyobjloader CONFIG REQUIRED)
+
+add_subdirectory(${PROJECT_SOURCE_DIR}/vendor)
 
 add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/application/Application.cpp
@@ -38,6 +41,10 @@ add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/texture/Sampler.h
         src/core/FPSCalculator.cpp
         src/core/FPSCalculator.h
+        src/core/application/ImGuiIntegration.cpp
+        src/core/application/ImGuiIntegration.h
+        src/core/Model.cpp
+        src/core/Model.h
 )
 
 include_directories(
@@ -55,4 +62,6 @@ target_link_libraries(
         PRIVATE Vulkan::Vulkan
         PRIVATE glfw
         PRIVATE glm::glm
+        PRIVATE imgui
+        PRIVATE tinyobjloader::tinyobjloader
 )
