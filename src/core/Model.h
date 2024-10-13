@@ -20,7 +20,7 @@ namespace HWPT {
 
         ~Model();
 
-        void LoadModel(const std::filesystem::path& TexturePath);
+        void LoadModel(const std::filesystem::path& ModelPath);
 
         void Bind(VkCommandBuffer CommandBuffer);
 
