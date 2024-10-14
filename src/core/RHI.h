@@ -20,8 +20,8 @@ namespace HWPT::RHI {
 
     auto CreateStagingBuffer(VkDeviceSize Size) -> std::tuple<VkBuffer, VkDeviceMemory>;
 
-    void CreateTexture2D(uint Width, uint Height, uint NumMips, VkFormat Format,
-                         VkImageUsageFlags Usage, VkImageTiling Tiling,
+    void CreateTexture2D(uint Width, uint Height, uint NumMips, VkSampleCountFlagBits SampleCount,
+                         VkFormat Format, VkImageUsageFlags Usage, VkImageTiling Tiling,
                          VkImage& Texture, VkDeviceMemory& TextureMemory);
 
     void TransitionTextureLayout(VkImage Image, uint NumMips, VkImageLayout OldLayout, VkImageLayout NewLayout);
