@@ -67,6 +67,16 @@ namespace HWPT {
         VkCommandPool ComputePool = VK_NULL_HANDLE;
     };
 
+    struct MSAABuffer {
+        Texture2D* MSAAColorBuffer = nullptr;
+        Texture2D* MSAADepthBuffer = nullptr;
+
+        ~MSAABuffer() {
+            delete MSAAColorBuffer;
+            delete MSAADepthBuffer;
+        }
+    };
+
     class VulkanBackendApp : public ApplicationBase {
     public:
         void Run() override;
@@ -116,6 +126,8 @@ namespace HWPT {
         static void FrameBufferResizeCallback(GLFWwindow* Window, int Width, int Height);
 
         void RecreateSwapChain();
+
+        void CreateMSAABuffers();
 
     private:
         void InitImGui();
@@ -187,6 +199,8 @@ namespace HWPT {
         void OnWindowResize();
 
     protected:
+        VkDevice m_device = VK_NULL_HANDLE;
+
         std::string m_windowTitle = "VulkanBackend Application";
         uint m_windowWidth = 1600, m_windowHeight = 900;
         GLFWwindow* m_window = nullptr;
@@ -216,11 +230,9 @@ namespace HWPT {
         VkInstance m_instance = VK_NULL_HANDLE;
         VkSurfaceKHR m_surface = VK_NULL_HANDLE;
         VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
-        VkDevice m_device = VK_NULL_HANDLE;
         Queue m_queue;
         SwapChain m_swapChain;
         std::vector<VkFramebuffer> m_swapChainFrameBuffers;
-        Texture2D* m_depthTexture = nullptr;
 //        SwapChain m_viewportSwapChain;  // TODO
 //        std::vector<VkFramebuffer> m_viewportFrameBuffer;
         VkRenderPass m_renderPass = VK_NULL_HANDLE;
@@ -258,6 +270,9 @@ namespace HWPT {
         glm::vec2 m_viewportSize = glm::vec2(0.f, 0.f);
 
         Model* m_vikingRoom = nullptr;
+        uint m_msaaSamples = 8;
+
+        MSAABuffer* m_msaaBuffers = nullptr;
     };
 }  // namespace HWPT
 
