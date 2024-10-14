@@ -16,7 +16,7 @@
 namespace HWPT {
     class Model {
     public:
-        Model(const std::filesystem::path& ModelPath, const std::filesystem::path& TexturePath);
+        Model(const std::filesystem::path& ModelPath, const std::filesystem::path& TexturePath, bool GenerateMips = false);
 
         ~Model();
 
@@ -36,6 +36,7 @@ namespace HWPT {
         Texture2D* m_texture = nullptr;
         IndexBuffer* m_indexBuffer = nullptr;
         VertexBuffer* m_vertexBuffer = nullptr;
+        bool m_generateMips = false;
     };
 
 }  // namespace HWPT

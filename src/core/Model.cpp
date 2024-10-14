@@ -3,6 +3,7 @@
 //
 
 #define TINYOBJLOADER_IMPLEMENTATION
+
 #include <tiny_obj_loader.h>
 #include "Model.h"
 #include <unordered_map>
@@ -10,9 +11,10 @@
 
 namespace HWPT {
     Model::Model(const std::filesystem::path &ModelPath,
-                       const std::filesystem::path &TexturePath){
+                 const std::filesystem::path &TexturePath, bool GenerateMips)
+            : m_generateMips(GenerateMips) {
         LoadModel(ModelPath);
-        m_texture = new Texture2D(TexturePath);
+        m_texture = new Texture2D(TexturePath, m_generateMips);
     }
 
     void Model::LoadModel(const std::filesystem::path &ModelPath) {
@@ -21,7 +23,8 @@ namespace HWPT {
         std::vector<tinyobj::material_t> Materials;
         std::string Warn, Err;
 
-        bool LoadSuccess = tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Err, ModelPath.string().c_str());
+        bool LoadSuccess = tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Err,
+                                            ModelPath.string().c_str());
         Check(LoadSuccess);
 
         std::vector<Vertex> Vertices;
@@ -29,9 +32,9 @@ namespace HWPT {
         std::unordered_map<Vertex, uint> UniqueVertices;
 
         Check(!Shapes.empty());
-        for (const auto& Shape : Shapes) {
+        for (const auto &Shape: Shapes) {
             Check(!Shape.mesh.indices.empty());
-            for (const auto& Index : Shape.mesh.indices) {
+            for (const auto &Index: Shape.mesh.indices) {
                 Vertex _Vertex{};
                 _Vertex.Pos = {
                         Attrib.vertices[3 * Index.vertex_index + 0],

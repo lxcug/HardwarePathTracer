@@ -11,6 +11,8 @@
 namespace HWPT {
     class Sampler {
     public:
+        Sampler();
+
         ~Sampler();
 
         void CreateSampler();
