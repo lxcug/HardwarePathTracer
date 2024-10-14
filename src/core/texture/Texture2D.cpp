@@ -12,29 +12,59 @@
 
 namespace HWPT {
 
-    Texture2D::Texture2D(const std::filesystem::path &TexturePath, bool GenerateMips)
-            : m_generateMips(GenerateMips) {
+    // TextureUsage is ShaderResourceView when giving a TexturePath
+    Texture2D::Texture2D(const std::filesystem::path &TexturePath, uint MSAASamples,
+                         bool GenerateMips)
+            : m_msaaSamples(MSAASamples), m_generateMips(GenerateMips),
+              m_textureUsage(TextureUsage::SRV) {
         CreateTexture(TexturePath);
     }
 
-    Texture2D::Texture2D(uint Width, uint Height, TextureFormat Format, bool GenerateMips)
-            : m_width(Width), m_height(Height), m_format(Format), m_generateMips(GenerateMips) {
-        if (m_generateMips) {
-            m_numMips = CalculateNumMips(m_width, m_height);
-        }
-        switch (m_format) {
-            case TextureFormat::Depth32:
-                RHI::CreateTexture2D(Width, Height, m_numMips, GetVKFormat(m_format),
+    Texture2D::Texture2D(uint Width, uint Height, TextureFormat Format, TextureUsage Usage,
+                         uint MSAASamples, bool GenerateMips)
+            : m_width(Width), m_height(Height), m_format(Format),
+              m_textureUsage(Usage), m_msaaSamples(MSAASamples), m_generateMips(GenerateMips) {
+
+        switch (m_textureUsage) {
+            case TextureUsage::ColorAttachment:
+                RHI::CreateTexture2D(Width, Height, m_numMips, GetVKSampleCount(m_msaaSamples),
+                                     GetVKFormat(m_format),
+                                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                                     VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
+                break;
+            case TextureUsage::DepthStencilAttachment:
+                RHI::CreateTexture2D(Width, Height, m_numMips, GetVKSampleCount(m_msaaSamples),
+                                     GetVKFormat(m_format),
                                      VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                                      VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
                 break;
-            default:
-                Check(false);
+            case TextureUsage::ColorAttachmentMSAA:
+                RHI::CreateTexture2D(Width, Height, m_numMips, GetVKSampleCount(m_msaaSamples),
+                                     GetVKFormat(m_format),
+                                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                                     VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+                                     VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
                 break;
+            case TextureUsage::DepthStencilAttachmentMSAA:
+                RHI::CreateTexture2D(Width, Height, m_numMips, GetVKSampleCount(m_msaaSamples),
+                                     GetVKFormat(m_format),
+                                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                                     VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
+                break;
+            case TextureUsage::SRV:
+                RHI::CreateTexture2D(Width, Height, m_numMips, GetVKSampleCount(m_msaaSamples),
+                                     GetVKFormat(m_format),
+                                     VK_IMAGE_USAGE_SAMPLED_BIT,
+                                     VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
+                break;
+            default:
+                throw std::runtime_error("Unsupported TextureUsage");
         }
     }
 
     void Texture2D::CreateTexture(const std::filesystem::path &TexturePath) {
+        Check(m_textureUsage != TextureUsage::None);
+
         int Channels;
         stbi_set_flip_vertically_on_load(false);
         stbi_uc *Pixels = stbi_load(TexturePath.string().c_str(),
@@ -57,7 +87,8 @@ namespace HWPT {
         vkUnmapMemory(GetVKDevice(), StagingBufferMemory);
         stbi_image_free(Pixels);
 
-        RHI::CreateTexture2D(m_width, m_height, m_numMips, GetVKFormat(m_format),
+        RHI::CreateTexture2D(m_width, m_height, m_numMips, GetVKSampleCount(m_msaaSamples),
+                             GetVKFormat(m_format),
                              VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                              VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
         RHI::TransitionTextureLayout(m_texture, m_numMips,

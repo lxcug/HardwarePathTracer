@@ -95,6 +95,7 @@ namespace HWPT {
         CreateLogicalDevice();
         CreateSwapChain();
         CreateRenderPass();
+        CreateMSAABuffers();
         CreateFrameBuffers();
 
         CreateCommandPool();
@@ -124,6 +125,7 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CleanUp() {
+        delete m_msaaBuffers;
         delete m_vikingRoom;
         delete m_vertexBuffer;
         delete m_indexBuffer;
@@ -131,7 +133,6 @@ namespace HWPT {
             delete m_MVPUniformBuffers[i];
         }
         delete m_sampler;
-        delete m_depthTexture;
 
         CleanUpImGui();
 
@@ -470,9 +471,6 @@ namespace HWPT {
         m_swapChain.Format = SurfaceFormat.format;
         m_swapChain.GetImages(m_device);
         m_swapChain.CreateImageViews(m_device);
-
-        delete m_depthTexture;
-        m_depthTexture = new Texture2D(Extent.width, Extent.height, TextureFormat::Depth32);
     }
 
     void VulkanBackendApp::CleanUpSwapChain() {
@@ -486,19 +484,19 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateRenderPass() {
-        VkAttachmentDescription ColorAttachment{};
-        ColorAttachment.format = m_swapChain.Format;
-        ColorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-        ColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        ColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        ColorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        ColorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        ColorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        ColorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;  // TODO ? For ImGui
+        VkAttachmentDescription MSAAColorAttachment{};
+        MSAAColorAttachment.format = m_swapChain.Format;
+        MSAAColorAttachment.samples = GetVKSampleCount(m_msaaSamples);
+        MSAAColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        MSAAColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        MSAAColorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        MSAAColorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        MSAAColorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        MSAAColorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;  // For resolve MSAA buffer
 
         VkAttachmentDescription DepthAttachment{};
         DepthAttachment.format = GetVKFormat(TextureFormat::Depth32);
-        DepthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+        DepthAttachment.samples = GetVKSampleCount(m_msaaSamples);
         DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         DepthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -506,18 +504,32 @@ namespace HWPT {
         DepthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         DepthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-        VkAttachmentReference ColorAttachmentRef{};
-        ColorAttachmentRef.attachment = 0;
-        ColorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        VkAttachmentDescription ResolvedColorAttachment{};
+        ResolvedColorAttachment.format = m_swapChain.Format;
+        ResolvedColorAttachment.samples = GetVKSampleCount(1u);
+        ResolvedColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        ResolvedColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        ResolvedColorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        ResolvedColorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        ResolvedColorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        ResolvedColorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+        VkAttachmentReference MSAAColorAttachmentRef{};
+        MSAAColorAttachmentRef.attachment = 0;
+        MSAAColorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         VkAttachmentReference DepthAttachmentRef{};
         DepthAttachmentRef.attachment = 1;
         DepthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        VkAttachmentReference ResolvedColorAttachmentRef{};
+        ResolvedColorAttachmentRef.attachment = 2;
+        ResolvedColorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
         VkSubpassDescription SubPass{};
         SubPass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
         SubPass.colorAttachmentCount = 1;
-        SubPass.pColorAttachments = &ColorAttachmentRef;
+        SubPass.pColorAttachments = &MSAAColorAttachmentRef;
         SubPass.pDepthStencilAttachment = &DepthAttachmentRef;
+        SubPass.pResolveAttachments = &ResolvedColorAttachmentRef;
 
         VkSubpassDependency Dependency{};
         Dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
@@ -527,9 +539,10 @@ namespace HWPT {
         Dependency.srcAccessMask = 0;
         Dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-        std::array<VkAttachmentDescription, 2> Attachments = {
-                ColorAttachment,
-                DepthAttachment
+        std::array<VkAttachmentDescription, 3> Attachments = {
+                MSAAColorAttachment,
+                DepthAttachment,
+                ResolvedColorAttachment
         };
         VkRenderPassCreateInfo CreateInfo{};
         CreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -547,9 +560,10 @@ namespace HWPT {
         m_swapChainFrameBuffers.resize(m_swapChain.SwapChainImages.size());
 
         for (size_t Index = 0; Index < m_swapChainFrameBuffers.size(); Index++) {
-            std::array<VkImageView, 2> Attachments = {
-                    m_swapChain.SwapChainImageViews[Index],
-                    m_depthTexture->CreateSRV()
+            std::array<VkImageView, 3> Attachments = {
+                    m_msaaBuffers->MSAAColorBuffer->CreateSRV(),
+                    m_msaaBuffers->MSAADepthBuffer->CreateSRV(),
+                    m_swapChain.SwapChainImageViews[Index]
             };
 
             VkFramebufferCreateInfo CreateInfo{};
@@ -725,7 +739,7 @@ namespace HWPT {
         VkPipelineMultisampleStateCreateInfo Multisampling{};
         Multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
         Multisampling.sampleShadingEnable = VK_FALSE;
-        Multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+        Multisampling.rasterizationSamples = GetVKSampleCount(m_msaaSamples);
         Multisampling.minSampleShading = 1.f;
         Multisampling.pSampleMask = nullptr;
         Multisampling.alphaToCoverageEnable = VK_FALSE;
@@ -1023,6 +1037,8 @@ namespace HWPT {
 
         CleanUpSwapChain();
         CreateSwapChain();
+        delete m_msaaBuffers;
+        CreateMSAABuffers();
         CreateFrameBuffers();
     }
 
@@ -1180,6 +1196,21 @@ namespace HWPT {
     void VulkanBackendApp::OnWindowResize() {
         RecreateSwapChain();
         m_imguiInfrastructure->RecreateFrameBuffer();
+    }
+
+    void VulkanBackendApp::CreateMSAABuffers() {
+        m_msaaBuffers = new MSAABuffer();
+
+        m_msaaBuffers->MSAAColorBuffer = new Texture2D(m_swapChain.Extent.width,
+                                                       m_swapChain.Extent.height,
+                                                       TextureFormat::RGBA,
+                                                       TextureUsage::ColorAttachmentMSAA,
+                                                       GetVKSampleCount(m_msaaSamples));
+        m_msaaBuffers->MSAADepthBuffer = new Texture2D(m_swapChain.Extent.width,
+                                                       m_swapChain.Extent.height,
+                                                       TextureFormat::Depth32,
+                                                       TextureUsage::DepthStencilAttachmentMSAA,
+                                                       GetVKSampleCount(m_msaaSamples));
     }
 
     void SwapChain::GetImages(VkDevice Device) {

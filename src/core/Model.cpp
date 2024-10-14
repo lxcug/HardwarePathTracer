@@ -14,7 +14,7 @@ namespace HWPT {
                  const std::filesystem::path &TexturePath, bool GenerateMips)
             : m_generateMips(GenerateMips) {
         LoadModel(ModelPath);
-        m_texture = new Texture2D(TexturePath, m_generateMips);
+        m_texture = new Texture2D(TexturePath, 1, m_generateMips);
     }
 
     void Model::LoadModel(const std::filesystem::path &ModelPath) {
