@@ -130,7 +130,6 @@ namespace HWPT {
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             delete m_MVPUniformBuffers[i];
         }
-        delete m_texture;
         delete m_sampler;
         delete m_depthTexture;
 
@@ -865,7 +864,12 @@ namespace HWPT {
     void VulkanBackendApp::CreateUniformBuffers() {
         MVPData MVP{};
         MVP.ModelTrans = glm::identity<glm::mat4>();
-        MVP.ViewTrans = glm::lookAt(glm::vec3(1.f, 1.f, 3.f), glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f));
+        glm::vec3 CameraPos = glm::vec3(0.f, 0.f, 2.f);
+        MVP.ViewTrans = glm::lookAt(CameraPos, CameraPos + glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f)) * mat4_cast(glm::quat(glm::vec3(
+                glm::radians(60.f),
+                glm::radians(-45.f),
+                glm::radians(0.f)
+        )));
         MVP.ProjTrans = glm::perspective(glm::radians(60.f),
                                          static_cast<float>(m_windowWidth) / static_cast<float>(m_windowHeight),
                                          1e-3f, 1000.f);
@@ -919,7 +923,6 @@ namespace HWPT {
 
             VkDescriptorImageInfo ImageInfo{};
             ImageInfo.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
-//            ImageInfo.imageView = m_texture->CreateSRV();
             ImageInfo.imageView = m_vikingRoom->GetTexture()->CreateSRV();
             ImageInfo.sampler = m_sampler->GetHandle();
             DescriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -977,7 +980,12 @@ namespace HWPT {
 
         MVPData MVP{};
         MVP.ModelTrans = glm::identity<glm::mat4>();
-        MVP.ViewTrans = glm::lookAt(glm::vec3(1.f, 1.f, 3.f), glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f));
+        glm::vec3 CameraPos = glm::vec3(0.f, 0.f, 2.f);
+        MVP.ViewTrans = glm::lookAt(CameraPos, CameraPos + glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f)) * mat4_cast(glm::quat(glm::vec3(
+                glm::radians(60.f),
+                glm::radians(-45.f),
+                glm::radians(0.f)
+                )));
         MVP.ProjTrans = glm::perspective(glm::radians(60.f),
                                          static_cast<float>(m_windowWidth) / static_cast<float>(m_windowHeight),
                                          1e-3f, 1000.f);
@@ -1020,11 +1028,9 @@ namespace HWPT {
 
     void VulkanBackendApp::CreateTextureAndSampler() {
         m_vikingRoom = new Model("../../asset/viking_room/viking_room.obj",
-                                 "../../asset/viking_room/viking_room.png");
+                                 "../../asset/viking_room/viking_room.png", true);
 
-        m_texture = new Texture2D("../../asset/texture.jpg");
         m_sampler = new Sampler();
-        m_sampler->CreateSampler();
     }
 
     void VulkanBackendApp::InitImGui() {
