@@ -2,10 +2,10 @@
 #include "core/application/VulkanBackendApp.h"
 
 auto main() -> int {
-    HWPT::VulkanBackendApp App;
-    App.Init();
+    auto* App = new HWPT::VulkanBackendApp();
+    App->Init();
+    App->Run();
 
-    App.Run();
-
+    delete App;
     return 0;
 }

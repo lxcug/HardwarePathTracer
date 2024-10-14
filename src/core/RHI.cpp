@@ -72,8 +72,8 @@ namespace HWPT::RHI {
         return std::make_tuple(StagingBuffer, StagingBufferMemory);
     }
 
-    void CreateTexture2D(uint Width, uint Height, uint NumMips, VkFormat Format,
-                         VkImageUsageFlags Usage, VkImageTiling Tiling,
+    void CreateTexture2D(uint Width, uint Height, uint NumMips, VkSampleCountFlagBits SampleCount,
+                         VkFormat Format, VkImageUsageFlags Usage, VkImageTiling Tiling,
                          VkImage &Texture, VkDeviceMemory &TextureMemory) {
         VkImageCreateInfo CreateInfo{};
         CreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -85,12 +85,12 @@ namespace HWPT::RHI {
         CreateInfo.arrayLayers = 1;
         CreateInfo.format = Format;
         CreateInfo.tiling = Tiling;
+        CreateInfo.samples = SampleCount;
         CreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         if (NumMips > 1) {
             Usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         }
         CreateInfo.usage = Usage;
-        CreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         CreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
         VK_CHECK(vkCreateImage(GetVKDevice(), &CreateInfo, nullptr, &Texture));

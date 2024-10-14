@@ -12,18 +12,19 @@
 
 namespace HWPT {
     // TODO
-    class Texture2DDesc {
-    public:
-        uint m_width, m_height;
-        TextureFormat m_format;
-        TextureUsage m_usage;
-    };
+//    class Texture2DDesc {
+//    public:
+//        uint m_width, m_height;
+//        TextureFormat m_format;
+//        TextureUsage m_usage;
+//    };
 
     class Texture2D {
     public:
-        explicit Texture2D(const std::filesystem::path& TexturePath, bool GenerateMips = false);
+        explicit Texture2D(const std::filesystem::path& TexturePath, uint MSAASamples = 1, bool GenerateMips = false);
 
-        Texture2D(uint Width, uint Height, TextureFormat Format, bool GenerateMips = false);
+        Texture2D(uint Width, uint Height, TextureFormat Format, TextureUsage Usage,
+                  uint MSAASample = 1, bool GenerateMips = false);
 
         ~Texture2D();
 
@@ -47,6 +48,8 @@ namespace HWPT {
         VkImageView m_textureView = VK_NULL_HANDLE;
         uint m_numMips = 1;
         bool m_generateMips = false;
+        uint m_msaaSamples = 1;
+        TextureUsage m_textureUsage = TextureUsage::None;
     };
 }  // namespace HWPT
 

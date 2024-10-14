@@ -24,9 +24,15 @@ namespace HWPT {
     auto GetVKFormat(TextureFormat Format) -> VkFormat;
 
     auto IsDepthStencilTexture(TextureFormat Format) -> bool;
+
+    auto GetVKSampleCount(uint SampleCount) -> VkSampleCountFlagBits;
   
     enum class TextureUsage : uint8_t {
         None = 0x0,
+        ColorAttachment,
+        DepthStencilAttachment,
+        ColorAttachmentMSAA,
+        DepthStencilAttachmentMSAA,
         RTV,
         SRV,
         UAV,
