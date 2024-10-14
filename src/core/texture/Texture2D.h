@@ -21,9 +21,9 @@ namespace HWPT {
 
     class Texture2D {
     public:
-        Texture2D(const std::filesystem::path& TexturePath);
+        explicit Texture2D(const std::filesystem::path& TexturePath, bool GenerateMips = false);
 
-        Texture2D(uint Width, uint Height, TextureFormat Format);
+        Texture2D(uint Width, uint Height, TextureFormat Format, bool GenerateMips = false);
 
         ~Texture2D();
 
@@ -36,6 +36,8 @@ namespace HWPT {
         }
 
     private:
+        static auto CalculateNumMips(uint Width, uint Height) -> uint;
+
         VkImage m_texture = VK_NULL_HANDLE;
         VkDeviceMemory m_textureMemory = VK_NULL_HANDLE;
         uint m_width = 0, m_height = 0;
@@ -43,6 +45,8 @@ namespace HWPT {
         void* m_mappedData = nullptr;
         bool IsSRVCreated = false;
         VkImageView m_textureView = VK_NULL_HANDLE;
+        uint m_numMips = 1;
+        bool m_generateMips = false;
     };
 }  // namespace HWPT
 

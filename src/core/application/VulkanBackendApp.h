@@ -247,7 +247,6 @@ namespace HWPT {
         VertexBuffer* m_vertexBuffer = nullptr;
         IndexBuffer* m_indexBuffer = nullptr;
         std::vector<UniformBuffer*> m_MVPUniformBuffers;
-        Texture2D* m_texture = nullptr;
         Sampler* m_sampler = nullptr;
 
         std::vector<VkSemaphore> m_imageAvailableSemaphores;

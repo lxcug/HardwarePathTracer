@@ -20,12 +20,17 @@ namespace HWPT::RHI {
 
     auto CreateStagingBuffer(VkDeviceSize Size) -> std::tuple<VkBuffer, VkDeviceMemory>;
 
-    void CreateTexture2D(uint Width, uint Height, VkFormat Format, VkImageUsageFlags Usage,
-                         VkImageTiling Tiling, VkImage& Texture, VkDeviceMemory& TextureMemory);
+    void CreateTexture2D(uint Width, uint Height, uint NumMips, VkFormat Format,
+                         VkImageUsageFlags Usage, VkImageTiling Tiling,
+                         VkImage& Texture, VkDeviceMemory& TextureMemory);
 
-    void TransitionTextureLayout(VkImage Image, VkFormat Format, VkImageLayout OldLayout, VkImageLayout NewLayout);
+    void TransitionTextureLayout(VkImage Image, uint NumMips, VkImageLayout OldLayout, VkImageLayout NewLayout);
 
     void CopyBufferToTexture(VkImage Image, VkBuffer Buffer, uint Width, uint Height);
+
+    void GenerateMips(VkImage Image, uint Width, uint Height, uint NumMips);
+
+    void GenerateMips(VkImage Image, uint Width, uint Height, uint NumMips, VkFormat Format);
 }  // namespace HWPT::RHI
 
 #endif //HARDWAREPATHTRACER_RHI_H

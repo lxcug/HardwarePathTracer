@@ -12,8 +12,26 @@
 
 namespace HWPT {
 
-    Texture2D::Texture2D(const std::filesystem::path &TexturePath) {
+    Texture2D::Texture2D(const std::filesystem::path &TexturePath, bool GenerateMips)
+            : m_generateMips(GenerateMips) {
         CreateTexture(TexturePath);
+    }
+
+    Texture2D::Texture2D(uint Width, uint Height, TextureFormat Format, bool GenerateMips)
+            : m_width(Width), m_height(Height), m_format(Format), m_generateMips(GenerateMips) {
+        if (m_generateMips) {
+            m_numMips = CalculateNumMips(m_width, m_height);
+        }
+        switch (m_format) {
+            case TextureFormat::Depth32:
+                RHI::CreateTexture2D(Width, Height, m_numMips, GetVKFormat(m_format),
+                                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                                     VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
+                break;
+            default:
+                Check(false);
+                break;
+        }
     }
 
     void Texture2D::CreateTexture(const std::filesystem::path &TexturePath) {
@@ -26,6 +44,10 @@ namespace HWPT {
         Check(Pixels);
         m_format = GetTextureFormat(Channels);
 
+        if (m_generateMips) {
+            m_numMips = CalculateNumMips(m_width, m_height);
+        }
+
         VkDeviceSize MemorySize = m_width * m_height * 4;  // TODO
         auto [StagingBuffer, StagingBufferMemory] = RHI::CreateStagingBuffer(MemorySize);
 
@@ -35,16 +57,21 @@ namespace HWPT {
         vkUnmapMemory(GetVKDevice(), StagingBufferMemory);
         stbi_image_free(Pixels);
 
-        RHI::CreateTexture2D(m_width, m_height, GetVKFormat(m_format),
+        RHI::CreateTexture2D(m_width, m_height, m_numMips, GetVKFormat(m_format),
                              VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                              VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
-        RHI::TransitionTextureLayout(m_texture, GetVKFormat(m_format),
+        RHI::TransitionTextureLayout(m_texture, m_numMips,
                                      VK_IMAGE_LAYOUT_UNDEFINED,
                                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         RHI::CopyBufferToTexture(m_texture, StagingBuffer, m_width, m_height);
-        RHI::TransitionTextureLayout(m_texture, GetVKFormat(m_format),
-                                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                     VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL);
+
+        if (m_generateMips) {
+            RHI::GenerateMips(m_texture, m_width, m_height, m_numMips);
+        } else {
+            RHI::TransitionTextureLayout(m_texture, m_numMips,
+                                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                         VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL);
+        }
 
         vkDestroyBuffer(GetVKDevice(), StagingBuffer, nullptr);
         vkFreeMemory(GetVKDevice(), StagingBufferMemory, nullptr);
@@ -74,7 +101,7 @@ namespace HWPT {
         }
         CreateInfo.subresourceRange.aspectMask = AspectFlags;
         CreateInfo.subresourceRange.baseMipLevel = 0;
-        CreateInfo.subresourceRange.levelCount = 1;
+        CreateInfo.subresourceRange.levelCount = m_numMips;
         CreateInfo.subresourceRange.baseArrayLayer = 0;
         CreateInfo.subresourceRange.layerCount = 1;
 
@@ -82,19 +109,9 @@ namespace HWPT {
         IsSRVCreated = true;
         return m_textureView;
     }
-  
-    Texture2D::Texture2D(uint Width, uint Height, TextureFormat Format)
-            : m_width(Width), m_height(Height), m_format(Format) {
 
-        switch (m_format) {
-            case TextureFormat::Depth32:
-                RHI::CreateTexture2D(Width, Height, GetVKFormat(m_format),
-                                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                                     VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
-                break;
-            default:
-                Check(false);
-                break;
-        }
+    auto Texture2D::CalculateNumMips(uint Width, uint Height) -> uint {
+        uint MaxResolution = std::max(Width, Height);
+        return static_cast<uint>(std::floor(std::log2(MaxResolution))) + 1;
     }
 }  // namespace HWPT
