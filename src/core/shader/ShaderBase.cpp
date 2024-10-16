@@ -8,6 +8,11 @@
 
 namespace HWPT {
 
+    ShaderBase::ShaderBase(ShaderType InShaderType, const std::filesystem::path &ShaderPath)
+            : m_shaderType(InShaderType) {
+        CreateShaderModule(ShaderPath);
+    }
+
     ShaderBase::~ShaderBase() {
         vkDestroyShaderModule(GetVKDevice(), m_shaderModule, nullptr);
     }
@@ -17,6 +22,7 @@ namespace HWPT {
     }
 
     void ShaderBase::CreateShaderModule(const std::vector<char> &ShaderSource) {
+        Check(m_shaderType != ShaderType::None);
         VkShaderModuleCreateInfo CreateInfo{};
         CreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
         CreateInfo.codeSize = ShaderSource.size();

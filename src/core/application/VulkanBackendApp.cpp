@@ -8,6 +8,7 @@
 #include <core/shader/ShaderBase.h>
 #include <core/buffer/VertexBuffer.h>
 #include "core/RHI.h"
+#include <random>
 
 
 namespace HWPT {
@@ -46,11 +47,11 @@ namespace HWPT {
 //            ImGui::Begin("Viewport");
 //            ImVec2 RegionSize = ImGui::GetContentRegionAvail();
 //            m_viewportSize = {RegionSize.x, RegionSize.y};
-////            std::cout << "Viewport Size: " << m_viewportSize.x << " " << m_viewportSize.y << std::endl;
-////            auto Texture = ImGui_ImplVulkan_AddTexture(m_sampler->GetHandle(),
-////                                                       m_swapChain.SwapChainImageViews[m_imageIndex],
-////                                                       VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL);
-////            ImGui::Image(Texture, ImVec2(m_viewportSize.x, m_viewportSize.y), ImVec2(0, -1), ImVec2(1, 0));
+//            std::cout << "Viewport Size: " << m_viewportSize.x << " " << m_viewportSize.y << std::endl;
+//            auto Texture = ImGui_ImplVulkan_AddTexture(m_sampler->GetHandle(),
+//                                                       m_swapChain.SwapChainImageViews[m_imageIndex],
+//                                                       VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL);
+//            ImGui::Image(Texture, ImVec2(m_viewportSize.x, m_viewportSize.y), ImVec2(0, -1), ImVec2(1, 0));
 //            ImGui::End();
 //        }
         {
@@ -66,8 +67,8 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::Init() {
-        Check(g_application == nullptr);
-        g_application = this;
+        Check(s_application == nullptr);
+        s_application = this;
         InitWindow();
         InitVulkan();
         InitImGui();
@@ -101,22 +102,25 @@ namespace HWPT {
         CreateCommandPool();
         CreateCommandBuffers();
 
-        CreateGraphicsDescriptorSetLayout();
-        CreateGraphicsPipeline();
-        CreateComputeDescriptorSetLayout();
-        CreateComputePipeline();
-
-        CreateTextureAndSampler();
+        CreateDescriptorPool();
 
         CreateUniformBuffers();
-        CreateDescriptorPool();
-        CreateDescriptorSets();
+        CreateModelAndSampler();
+
+        CreateGraphicsDescriptorSetLayout();
+        CreateGraphicsPipeline();
+        CreateParticleGraphicsPipeline();
+        CreateGraphicsDescriptorSets();
+
+        CreateParticleStorageBuffers();
+        CreateComputeDescriptorSetLayout();
+        CreateComputePipeline();
+        CreateComputeDescriptorSets();
 
         CreateVertexBuffer();
         CreateIndexBuffer();
         CreateSyncObjects();
     }
-
 
     void VulkanBackendApp::FrameBufferResizeCallback(GLFWwindow *Window, int Width, int Height) {
         auto App =
@@ -131,6 +135,7 @@ namespace HWPT {
         delete m_indexBuffer;
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             delete m_MVPUniformBuffers[i];
+            delete m_particleStorageBuffers[i];
         }
         delete m_sampler;
 
@@ -140,13 +145,16 @@ namespace HWPT {
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             vkDestroySemaphore(m_device, m_imageAvailableSemaphores[i], nullptr);
             vkDestroySemaphore(m_device, m_renderFinishedSemaphores[i], nullptr);
-            vkDestroyFence(m_device, m_inFlightFences[i], nullptr);
+            vkDestroyFence(m_device, m_graphicsInFlightFences[i], nullptr);
+            vkDestroyFence(m_device, m_computeInFlightFences[i], nullptr);
+            vkDestroySemaphore(m_device, m_computeFinishedSemaphores[i], nullptr);
         }
 
         vkDestroyDescriptorPool(m_device, m_descriptorPool, nullptr);
         vkDestroyDescriptorSetLayout(m_device, m_graphicsDescriptorSetLayout, nullptr);
         vkDestroyPipelineLayout(m_device, m_graphicsPipelineLayout, nullptr);
         vkDestroyPipeline(m_device, m_graphicsPipeline, nullptr);
+        vkDestroyPipeline(m_device, m_particleGraphicsPipeline, nullptr);
         vkDestroyDescriptorSetLayout(m_device, m_computeDescriptorSetLayout, nullptr);
         vkDestroyPipelineLayout(m_device, m_computePipelineLayout, nullptr);
         vkDestroyPipeline(m_device, m_computePipeline, nullptr);
@@ -162,7 +170,33 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::DrawFrame() {
-        vkWaitForFences(m_device, 1, &m_inFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
+        vkWaitForFences(m_device, 1, &m_computeInFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
+        vkResetFences(m_device, 1, &m_computeInFlightFences[m_currentFrame]);
+
+        auto ComputeCommandBuffer = m_computeCommandBuffers[m_currentFrame];
+        vkResetCommandBuffer(ComputeCommandBuffer, 0);
+
+        VkCommandBufferBeginInfo ComputeBeginInfo{};
+        ComputeBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        VK_CHECK(vkBeginCommandBuffer(ComputeCommandBuffer, &ComputeBeginInfo));
+        vkCmdBindPipeline(ComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipeline);
+        vkCmdBindDescriptorSets(ComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                m_computePipelineLayout, 0, 1, &m_computeDescriptorSets[m_currentFrame], 0, nullptr);
+        vkCmdDispatch(ComputeCommandBuffer, (s_particleCount + 255) / 256, 1, 1);
+        VK_CHECK(vkEndCommandBuffer(ComputeCommandBuffer));
+
+        VkSubmitInfo ComputeSubmitInfo{};
+        ComputeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        ComputeSubmitInfo.waitSemaphoreCount = 0;
+        ComputeSubmitInfo.commandBufferCount = 1;
+        ComputeSubmitInfo.pCommandBuffers = &ComputeCommandBuffer;
+        ComputeSubmitInfo.signalSemaphoreCount = 1;
+        ComputeSubmitInfo.pSignalSemaphores = &m_computeFinishedSemaphores[m_currentFrame];
+        VK_CHECK(vkQueueSubmit(m_queue.ComputeQueue, 1, &ComputeSubmitInfo, m_computeInFlightFences[m_currentFrame]));
+
+
+        vkWaitForFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
+        vkResetFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame]);
 
         if (m_frameBufferResized) {
             OnWindowResize();
@@ -179,24 +213,29 @@ namespace HWPT {
             throw std::runtime_error("Failed to acquire swap chain images");
         }
 
-        vkResetFences(m_device, 1, &m_inFlightFences[m_currentFrame]);
-        vkResetCommandBuffer(m_graphicsCommandBuffers[m_currentFrame], 0);
-        RecordCommandBuffer(m_graphicsCommandBuffers[m_currentFrame], m_imageIndex);
+        auto GraphicsCommandBuffer = m_graphicsCommandBuffers[m_currentFrame];
+        vkResetCommandBuffer(GraphicsCommandBuffer, 0);
 
-        VkSubmitInfo SubmitInfo{};
-        SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        SubmitInfo.waitSemaphoreCount = 1;
-        SubmitInfo.pWaitSemaphores = &m_imageAvailableSemaphores[m_currentFrame];
-        std::array<VkPipelineStageFlags, 1> WaitStages = {
-                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+        RecordCommandBuffer(GraphicsCommandBuffer, m_imageIndex);
+
+        VkSubmitInfo GraphicsSubmitInfo{};
+        GraphicsSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        std::array<VkSemaphore, 2> GraphicsWaitSemaphores = {
+                m_computeFinishedSemaphores[m_currentFrame],
+                m_imageAvailableSemaphores[m_currentFrame]
         };
-        SubmitInfo.pWaitDstStageMask = WaitStages.data();
-        SubmitInfo.commandBufferCount = 1;
-        SubmitInfo.pCommandBuffers = &m_graphicsCommandBuffers[m_currentFrame];
-        SubmitInfo.signalSemaphoreCount = 1;
-        SubmitInfo.pSignalSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
-
-        VK_CHECK(vkQueueSubmit(m_queue.GraphicsQueue, 1, &SubmitInfo, m_inFlightFences[m_currentFrame]));
+        GraphicsSubmitInfo.waitSemaphoreCount = GraphicsWaitSemaphores.size();
+        GraphicsSubmitInfo.pWaitSemaphores = GraphicsWaitSemaphores.data();
+        std::array<VkPipelineStageFlags, 2> WaitStages = {
+                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+        };
+        GraphicsSubmitInfo.pWaitDstStageMask = WaitStages.data();
+        GraphicsSubmitInfo.commandBufferCount = 1;
+        GraphicsSubmitInfo.pCommandBuffers = &GraphicsCommandBuffer;
+        GraphicsSubmitInfo.signalSemaphoreCount = 1;
+        GraphicsSubmitInfo.pSignalSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
+        VK_CHECK(vkQueueSubmit(m_queue.GraphicsQueue, 1, &GraphicsSubmitInfo, m_graphicsInFlightFences[m_currentFrame]));
     }
 
     void VulkanBackendApp::CreateVkInstance() {
@@ -278,6 +317,7 @@ namespace HWPT {
             if (QueueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
                 Indices.GraphicsFamily = Index;
             }
+            // TODO: Use Dedicated Compute Queue, !(QueueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
             if (QueueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) {
                 Indices.ComputeFamily = Index;
             }
@@ -373,6 +413,7 @@ namespace HWPT {
         CreateInfo.queueCreateInfoCount = 1;
         CreateInfo.pQueueCreateInfos = QueueCreateInfos.data();
         VkPhysicalDeviceFeatures DeviceFeatures{};
+        DeviceFeatures.sampleRateShading = VK_TRUE;
         CreateInfo.pEnabledFeatures = &DeviceFeatures;
         CreateInfo.enabledExtensionCount = DeviceExtensions.size();
         CreateInfo.ppEnabledExtensionNames = DeviceExtensions.data();
@@ -677,19 +718,18 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateGraphicsPipeline() {
-        ShaderBase VertexShader, FragmentShader;
-        VertexShader.CreateShaderModule("../../shader/Vert.spv");
-        FragmentShader.CreateShaderModule("../../shader/Frag.spv");
+        ShaderBase VertexShader(ShaderType::Vertex, "../../shader/Vert.spv");
+        ShaderBase FragmentShader(ShaderType::Fragment, "../../shader/Frag.spv");
 
         VkPipelineShaderStageCreateInfo VertShaderStageInfo{};
         VertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         VertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-        VertShaderStageInfo.module = VertexShader.m_shaderModule;
+        VertShaderStageInfo.module = VertexShader.GetHandle();
         VertShaderStageInfo.pName = "main";
         VkPipelineShaderStageCreateInfo FragShaderStageInfo{};
         FragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         FragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        FragShaderStageInfo.module = FragmentShader.m_shaderModule;
+        FragShaderStageInfo.module = FragmentShader.GetHandle();
         FragShaderStageInfo.pName = "main";
 
         std::array<VkPipelineShaderStageCreateInfo, 2> ShaderStages = {
@@ -744,6 +784,8 @@ namespace HWPT {
         Multisampling.pSampleMask = nullptr;
         Multisampling.alphaToCoverageEnable = VK_FALSE;
         Multisampling.alphaToOneEnable = VK_FALSE;
+        Multisampling.sampleShadingEnable = VK_TRUE;
+        Multisampling.minSampleShading = .2f;
 
         VkPipelineColorBlendAttachmentState ColorBlendAttachment{};
         ColorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
@@ -806,17 +848,150 @@ namespace HWPT {
         VK_CHECK(vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &PipelineInfo, nullptr, &m_graphicsPipeline));
     }
 
+    void VulkanBackendApp::CreateParticleGraphicsPipeline() {
+        ShaderBase VertexShader(ShaderType::Vertex, "../../shader/ParticleVert.spv");
+        ShaderBase FragmentShader(ShaderType::Fragment, "../../shader/ParticleFrag.spv");
+
+        VkPipelineShaderStageCreateInfo VertShaderStageInfo{};
+        VertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        VertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+        VertShaderStageInfo.module = VertexShader.GetHandle();
+        VertShaderStageInfo.pName = "main";
+        VkPipelineShaderStageCreateInfo FragShaderStageInfo{};
+        FragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        FragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        FragShaderStageInfo.module = FragmentShader.GetHandle();
+        FragShaderStageInfo.pName = "main";
+
+        std::array<VkPipelineShaderStageCreateInfo, 2> ShaderStages = {
+                VertShaderStageInfo, FragShaderStageInfo
+        };
+
+        // TODO: Use Particle Vertex Layout and Set Layout in VertexBuffer(Create VertexBufferLayout Class)
+        VkPipelineVertexInputStateCreateInfo VertexInputInfo{};
+        VertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+        auto bindingDescription = Vertex::GetBindingDescription();
+        auto attributeDescription = Vertex::GetAttributeDescriptions();
+        VertexInputInfo.vertexBindingDescriptionCount = 1;
+        VertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
+        VertexInputInfo.vertexAttributeDescriptionCount = attributeDescription.size();
+        VertexInputInfo.pVertexAttributeDescriptions = attributeDescription.data();
+
+        VkPipelineInputAssemblyStateCreateInfo InputAssemble{};
+        InputAssemble.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        InputAssemble.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+        InputAssemble.primitiveRestartEnable = VK_FALSE;
+
+        std::vector<VkDynamicState> DynamicStates = {
+                VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT,
+                VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT
+        };
+        VkPipelineDynamicStateCreateInfo DynamicState{};
+        DynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+        DynamicState.dynamicStateCount = DynamicStates.size();
+        DynamicState.pDynamicStates = DynamicStates.data();
+
+        VkPipelineViewportStateCreateInfo ViewportState{};
+        ViewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        ViewportState.viewportCount = 0;
+
+        VkPipelineRasterizationStateCreateInfo Rasterizer{};
+        Rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        Rasterizer.depthClampEnable = VK_FALSE;
+        Rasterizer.rasterizerDiscardEnable = VK_FALSE;
+        Rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+        Rasterizer.lineWidth = 1.f;
+        Rasterizer.cullMode = VK_CULL_MODE_NONE;
+        Rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+        Rasterizer.depthBiasEnable = VK_FALSE;
+        Rasterizer.depthBiasConstantFactor = 0.f;
+        Rasterizer.depthBiasClamp = 0.f;
+        Rasterizer.depthBiasSlopeFactor = 0.f;
+
+        VkPipelineMultisampleStateCreateInfo Multisampling{};
+        Multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        Multisampling.sampleShadingEnable = VK_FALSE;
+        Multisampling.rasterizationSamples = GetVKSampleCount(m_msaaSamples);
+        Multisampling.minSampleShading = 1.f;
+        Multisampling.pSampleMask = nullptr;
+        Multisampling.alphaToCoverageEnable = VK_FALSE;
+        Multisampling.alphaToOneEnable = VK_FALSE;
+        Multisampling.sampleShadingEnable = VK_TRUE;
+        Multisampling.minSampleShading = .2f;
+
+        VkPipelineColorBlendAttachmentState ColorBlendAttachment{};
+        ColorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+                                              VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        ColorBlendAttachment.blendEnable = VK_FALSE;
+        ColorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        ColorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        ColorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
+        ColorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
+        ColorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
+        ColorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
+
+        VkPipelineColorBlendStateCreateInfo ColorBlending{};
+        ColorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        ColorBlending.logicOpEnable = VK_FALSE;
+        ColorBlending.logicOp = VK_LOGIC_OP_COPY;
+        ColorBlending.attachmentCount = 1;
+        ColorBlending.pAttachments = &ColorBlendAttachment;
+
+        // Depth-Stencil Test
+        VkPipelineDepthStencilStateCreateInfo DepthStencil{};
+        DepthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        DepthStencil.depthTestEnable = VK_TRUE;
+        DepthStencil.depthWriteEnable = VK_TRUE;
+        DepthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+        DepthStencil.depthBoundsTestEnable = VK_FALSE;
+//        DepthStencil.minDepthBounds = 0.f;
+//        DepthStencil.maxDepthBounds = 1.f;
+        DepthStencil.stencilTestEnable = VK_FALSE;
+        DepthStencil.front = {};
+        DepthStencil.back = {};
+
+        VkGraphicsPipelineCreateInfo PipelineInfo{};
+        PipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        PipelineInfo.stageCount = ShaderStages.size();
+        PipelineInfo.pStages = ShaderStages.data();
+        PipelineInfo.pVertexInputState = &VertexInputInfo;
+        PipelineInfo.pInputAssemblyState = &InputAssemble;
+        PipelineInfo.pViewportState = &ViewportState;
+        PipelineInfo.pRasterizationState = &Rasterizer;
+        PipelineInfo.pMultisampleState = &Multisampling;
+        PipelineInfo.pDepthStencilState = &DepthStencil;
+        PipelineInfo.pColorBlendState = &ColorBlending;
+        PipelineInfo.pDynamicState = &DynamicState;
+        PipelineInfo.layout = m_graphicsPipelineLayout;
+        PipelineInfo.renderPass = m_renderPass;
+        PipelineInfo.subpass = 0;
+        PipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+        PipelineInfo.basePipelineIndex = -1;
+
+        VK_CHECK(vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &PipelineInfo, nullptr, &m_particleGraphicsPipeline));
+    }
+
     void VulkanBackendApp::CreateComputeDescriptorSetLayout() {
-        VkDescriptorSetLayoutBinding LayoutBinding{};
-        LayoutBinding.binding = 0;
-        LayoutBinding.descriptorCount = 1;
-        LayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        LayoutBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        std::array<VkDescriptorSetLayoutBinding, 3> LayoutBindings{};
+        LayoutBindings[0].binding = 0;
+        LayoutBindings[0].descriptorCount = 1;
+        LayoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        LayoutBindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        LayoutBindings[1].binding = 1;
+        LayoutBindings[1].descriptorCount = 1;
+        LayoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        LayoutBindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        LayoutBindings[2].binding = 2;
+        LayoutBindings[2].descriptorCount = 1;
+        LayoutBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        LayoutBindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
         VkDescriptorSetLayoutCreateInfo LayoutInfo{};
         LayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        LayoutInfo.bindingCount = 1;
-        LayoutInfo.pBindings = &LayoutBinding;
+        LayoutInfo.bindingCount = LayoutBindings.size();
+        LayoutInfo.pBindings = LayoutBindings.data();
 
         VK_CHECK(vkCreateDescriptorSetLayout(m_device, &LayoutInfo, nullptr, &m_computeDescriptorSetLayout));
     }
@@ -828,13 +1003,12 @@ namespace HWPT {
         PipelineLayoutInfo.pSetLayouts = &m_computeDescriptorSetLayout;
         VK_CHECK(vkCreatePipelineLayout(m_device, &PipelineLayoutInfo, nullptr, &m_computePipelineLayout));
 
-        ShaderBase ComputeShader;
-        ComputeShader.CreateShaderModule("../../shader/Example.spv");
+        ShaderBase ComputeShader(ShaderType::Compute, "../../shader/UpdateParticle.spv");
 
         VkPipelineShaderStageCreateInfo ComputeShaderStageInfo{};
         ComputeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         ComputeShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-        ComputeShaderStageInfo.module = ComputeShader.m_shaderModule;
+        ComputeShaderStageInfo.module = ComputeShader.GetHandle();
         ComputeShaderStageInfo.pName = "main";
 
         VkComputePipelineCreateInfo PipelineInfo{};
@@ -873,6 +1047,7 @@ namespace HWPT {
         glm::mat4 ViewTrans;
         glm::mat4 ProjTrans;
         glm::vec3 DebugColor;
+        float DeltaTime;
     };
 
     void VulkanBackendApp::CreateUniformBuffers() {
@@ -888,6 +1063,7 @@ namespace HWPT {
                                          static_cast<float>(m_windowWidth) / static_cast<float>(m_windowHeight),
                                          1e-3f, 1000.f);
         MVP.DebugColor = glm::vec3(.5f, .9f, .6f);
+        MVP.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
 
         m_MVPUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -896,21 +1072,23 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateDescriptorPool() {
-        std::array<VkDescriptorPoolSize, 2> PoolSizes{};
+        std::array<VkDescriptorPoolSize, 3> PoolSizes{};
         PoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         PoolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT;
         PoolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         PoolSizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT;
+        PoolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        PoolSizes[2].descriptorCount = MAX_FRAMES_IN_FLIGHT * 2;
 
         VkDescriptorPoolCreateInfo PoolInfo{};
         PoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         PoolInfo.poolSizeCount = PoolSizes.size();
         PoolInfo.pPoolSizes = PoolSizes.data();
-        PoolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
+        PoolInfo.maxSets = 4;
         VK_CHECK(vkCreateDescriptorPool(m_device, &PoolInfo, nullptr, &m_descriptorPool));
     }
 
-    void VulkanBackendApp::CreateDescriptorSets() {
+    void VulkanBackendApp::CreateGraphicsDescriptorSets() {
         std::vector<VkDescriptorSetLayout> Layouts(MAX_FRAMES_IN_FLIGHT, m_graphicsDescriptorSetLayout);
         VkDescriptorSetAllocateInfo AllocateInfo{};
         AllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -918,8 +1096,8 @@ namespace HWPT {
         AllocateInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
         AllocateInfo.pSetLayouts = Layouts.data();
 
-        m_descriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-        VK_CHECK(vkAllocateDescriptorSets(m_device, &AllocateInfo, m_descriptorSets.data()));
+        m_graphicsDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+        VK_CHECK(vkAllocateDescriptorSets(m_device, &AllocateInfo, m_graphicsDescriptorSets.data()));
 
         std::array<VkWriteDescriptorSet, 2> DescriptorWrites{};
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -928,7 +1106,7 @@ namespace HWPT {
             BufferInfo.offset = 0;
             BufferInfo.range = VK_WHOLE_SIZE;
             DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescriptorWrites[0].dstSet = m_descriptorSets[i];
+            DescriptorWrites[0].dstSet = m_graphicsDescriptorSets[i];
             DescriptorWrites[0].dstBinding = 0;
             DescriptorWrites[0].dstArrayElement = 0;
             DescriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -940,7 +1118,7 @@ namespace HWPT {
             ImageInfo.imageView = m_vikingRoom->GetTexture()->CreateSRV();
             ImageInfo.sampler = m_sampler->GetHandle();
             DescriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescriptorWrites[1].dstSet = m_descriptorSets[i];
+            DescriptorWrites[1].dstSet = m_graphicsDescriptorSets[i];
             DescriptorWrites[1].dstBinding = 1;
             DescriptorWrites[1].dstArrayElement = 0;
             DescriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -954,7 +1132,9 @@ namespace HWPT {
     void VulkanBackendApp::CreateSyncObjects() {
         m_imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         m_renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-        m_inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+        m_graphicsInFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+        m_computeInFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+        m_computeFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkSemaphoreCreateInfo SemaphoreInfo{};
@@ -966,7 +1146,9 @@ namespace HWPT {
 
             VK_CHECK(vkCreateSemaphore(m_device, &SemaphoreInfo, nullptr, &m_imageAvailableSemaphores[i]));
             VK_CHECK(vkCreateSemaphore(m_device, &SemaphoreInfo, nullptr, &m_renderFinishedSemaphores[i]));
-            VK_CHECK(vkCreateFence(m_device, &FenceInfo, nullptr, &m_inFlightFences[i]));
+            VK_CHECK(vkCreateFence(m_device, &FenceInfo, nullptr, &m_graphicsInFlightFences[i]));
+            VK_CHECK(vkCreateFence(m_device, &FenceInfo, nullptr, &m_computeInFlightFences[i]));
+            VK_CHECK(vkCreateSemaphore(m_device, &SemaphoreInfo, nullptr, &m_computeFinishedSemaphores[i]));
         }
     }
 
@@ -990,7 +1172,6 @@ namespace HWPT {
 
         vkCmdBeginRenderPass(CommandBuffer, &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
-        m_vikingRoom->Bind(CommandBuffer);
 
         MVPData MVP{};
         MVP.ModelTrans = glm::identity<glm::mat4>();
@@ -999,15 +1180,16 @@ namespace HWPT {
                 glm::radians(60.f),
                 glm::radians(-45.f),
                 glm::radians(0.f)
-                )));
+        )));
         MVP.ProjTrans = glm::perspective(glm::radians(60.f),
                                          static_cast<float>(m_windowWidth) / static_cast<float>(m_windowHeight),
                                          1e-3f, 1000.f);
         MVP.DebugColor = glm::vec3(.5f, .9f, .6f);
+        MVP.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
         m_MVPUniformBuffers[ImageIndex]->Update(&MVP);
 
         vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout,
-                                0, 1, m_descriptorSets.data(), 0, nullptr);
+                                0, 1, m_graphicsDescriptorSets.data(), 0, nullptr);
 
         VkViewport Viewport{};
         Viewport.x = 0.f;
@@ -1021,7 +1203,14 @@ namespace HWPT {
         Scissor.offset = {0, 0};
         Scissor.extent = m_swapChain.Extent;
         vkCmdSetScissorWithCount(CommandBuffer, 1, &Scissor);
-        vkCmdDrawIndexed(CommandBuffer, m_vikingRoom->GetIndexCount(), 1, 0, 0, 0);
+
+        m_vikingRoom->DrawIndexed(CommandBuffer);
+
+        vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_particleGraphicsPipeline);
+        VkDeviceSize Offsets = 0;
+        vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &(m_particleStorageBuffers[m_currentFrame]->GetHandle()), &Offsets);
+        vkCmdDraw(CommandBuffer, s_particleCount, 1, 0, 0);
+
         vkCmdEndRenderPass(CommandBuffer);
 
         VK_CHECK(vkEndCommandBuffer(CommandBuffer));
@@ -1042,7 +1231,7 @@ namespace HWPT {
         CreateFrameBuffers();
     }
 
-    void VulkanBackendApp::CreateTextureAndSampler() {
+    void VulkanBackendApp::CreateModelAndSampler() {
         m_vikingRoom = new Model("../../asset/viking_room/viking_room.obj",
                                  "../../asset/viking_room/viking_room.png", true);
 
@@ -1211,6 +1400,90 @@ namespace HWPT {
                                                        TextureFormat::Depth32,
                                                        TextureUsage::DepthStencilAttachmentMSAA,
                                                        GetVKSampleCount(m_msaaSamples));
+    }
+
+    void VulkanBackendApp::CreateParticleStorageBuffers() {
+        m_particleStorageBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+
+        std::default_random_engine RndEngine(static_cast<unsigned>(time(nullptr)));  // NOLINT
+        std::uniform_real_distribution<float> RndDist(0.0f, 1.0f);
+
+        // Init Particles
+        struct Particle {
+            glm::vec3 Pos;
+            glm::vec3 Color;
+            glm::vec2 Velocity;
+        };
+        std::vector<Particle> Particles(s_particleCount);
+        for (auto& Part : Particles) {
+            float r = 0.25f * sqrt(RndDist(RndEngine));
+            float theta = RndDist(RndEngine) * 2 * 3.14159265358979323846;  // NOLINT
+            float x = r * cos(theta) * static_cast<float>(m_windowHeight) / static_cast<float>(m_windowHeight);
+            float y = r * sin(theta);
+            float z = (RndDist(RndEngine) - .5f) * 2.f;
+            Part.Pos = glm::vec3(x, y, z);
+            Part.Velocity = glm::normalize(glm::vec2(x, y)) * 0.00025f;
+            Part.Color = glm::vec3(RndDist(RndEngine), RndDist(RndEngine), RndDist(RndEngine));
+        }
+
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            auto ParticleBuffer = new StorageBuffer(sizeof(Particle) * s_particleCount, Particles.data());
+            m_particleStorageBuffers[i] = ParticleBuffer;
+        }
+    }
+
+    void VulkanBackendApp::CreateComputeDescriptorSets() {
+        std::vector<VkDescriptorSetLayout> Layouts(MAX_FRAMES_IN_FLIGHT, m_computeDescriptorSetLayout);
+        VkDescriptorSetAllocateInfo AllocateInfo{};
+        AllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        AllocateInfo.descriptorPool = m_descriptorPool;
+        AllocateInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
+        AllocateInfo.pSetLayouts = Layouts.data();
+
+        m_computeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+        VK_CHECK(vkAllocateDescriptorSets(m_device, &AllocateInfo, m_computeDescriptorSets.data()));
+
+        std::array<VkWriteDescriptorSet, 3> DescriptorWrites{};
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            VkDescriptorBufferInfo BufferInfo{};
+            BufferInfo.buffer = m_MVPUniformBuffers[i]->GetHandle();
+            BufferInfo.offset = 0;
+            BufferInfo.range = VK_WHOLE_SIZE;
+            DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            DescriptorWrites[0].dstSet = m_computeDescriptorSets[i];
+            DescriptorWrites[0].dstBinding = 0;
+            DescriptorWrites[0].dstArrayElement = 0;
+            DescriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            DescriptorWrites[0].descriptorCount = 1;
+            DescriptorWrites[0].pBufferInfo = &BufferInfo;
+
+            VkDescriptorBufferInfo LastFrameStorageBufferInfo{};
+            int LastFrameIndex = i == 0 ? MAX_FRAMES_IN_FLIGHT - 1 : i - 1;
+            LastFrameStorageBufferInfo.buffer = m_particleStorageBuffers[LastFrameIndex]->GetHandle();
+            LastFrameStorageBufferInfo.offset = 0;
+            LastFrameStorageBufferInfo.range = VK_WHOLE_SIZE;
+            DescriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            DescriptorWrites[1].dstSet = m_computeDescriptorSets[i];
+            DescriptorWrites[1].dstBinding = 1;
+            DescriptorWrites[1].dstArrayElement = 0;
+            DescriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            DescriptorWrites[1].descriptorCount = 1;
+            DescriptorWrites[1].pBufferInfo = &LastFrameStorageBufferInfo;
+
+            VkDescriptorBufferInfo CurrentFrameStorageBufferInfo{};
+            CurrentFrameStorageBufferInfo.buffer = m_particleStorageBuffers[i]->GetHandle();
+            CurrentFrameStorageBufferInfo.offset = 0;
+            CurrentFrameStorageBufferInfo.range = VK_WHOLE_SIZE;
+            DescriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            DescriptorWrites[2].dstSet = m_computeDescriptorSets[i];
+            DescriptorWrites[2].dstBinding = 2;
+            DescriptorWrites[2].dstArrayElement = 0;
+            DescriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            DescriptorWrites[2].descriptorCount = 1;
+            DescriptorWrites[2].pBufferInfo = &CurrentFrameStorageBufferInfo;
+
+            vkUpdateDescriptorSets(m_device, 3, DescriptorWrites.data(), 0, nullptr);
+        }
     }
 
     void SwapChain::GetImages(VkDevice Device) {

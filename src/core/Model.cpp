@@ -70,4 +70,9 @@ namespace HWPT {
         m_vertexBuffer->Bind(CommandBuffer);
         m_indexBuffer->Bind(CommandBuffer);
     }
+
+    void Model::DrawIndexed(VkCommandBuffer CommandBuffer) {
+        this->Bind(CommandBuffer);
+        vkCmdDrawIndexed(CommandBuffer, GetIndexCount(), 1, 0, 0, 0);
+    }
 }  // namespace HWPT
