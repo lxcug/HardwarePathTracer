@@ -23,15 +23,21 @@ namespace HWPT {
 
     class ShaderBase {
     public:
+        ShaderBase(ShaderType InShaderType, const std::filesystem::path& ShaderPath);
+
         virtual ~ShaderBase();
 
         void CreateShaderModule(const std::filesystem::path& ShaderPath);
 
         void CreateShaderModule(const std::vector<char>& ShaderSource);
 
+        auto GetHandle() -> VkShaderModule {
+            return m_shaderModule;
+        }
+
 //        void BindShaderStage(const std::string& Entry);
 
-    public:
+    private:
         VkShaderModule m_shaderModule = VK_NULL_HANDLE;
         ShaderType m_shaderType = ShaderType::None;
     };
