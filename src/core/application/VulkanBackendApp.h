@@ -104,7 +104,7 @@ namespace HWPT {
         }
 
         static auto GetApplication() -> VulkanBackendApp* {
-            return g_application;
+            return s_application;
         }
 
         auto GetSwapChain() -> SwapChain {
@@ -176,13 +176,17 @@ namespace HWPT {
 
         void CreateGraphicsPipeline();
 
+        void CreateParticleGraphicsPipeline();
+
         void CreateComputeDescriptorSetLayout();
 
         void CreateComputePipeline();
 
         void CreateDescriptorPool();
 
-        void CreateDescriptorSets();
+        void CreateGraphicsDescriptorSets();
+
+        void CreateComputeDescriptorSets();
 
         void CreateSyncObjects();
 
@@ -194,7 +198,7 @@ namespace HWPT {
 
         void CreateUniformBuffers();
 
-        void CreateTextureAndSampler();
+        void CreateModelAndSampler();
 
         void OnWindowResize();
 
@@ -243,18 +247,20 @@ namespace HWPT {
         VkDescriptorSetLayout m_graphicsDescriptorSetLayout = VK_NULL_HANDLE;
         VkPipelineLayout m_graphicsPipelineLayout = VK_NULL_HANDLE;
         VkPipeline m_graphicsPipeline = VK_NULL_HANDLE;
+        VkPipeline m_particleGraphicsPipeline = VK_NULL_HANDLE;
         // Compute Pipeline
         VkDescriptorSetLayout m_computeDescriptorSetLayout = VK_NULL_HANDLE;
         VkPipelineLayout m_computePipelineLayout = VK_NULL_HANDLE;
         VkPipeline m_computePipeline = VK_NULL_HANDLE;
 
         VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
-        std::vector<VkDescriptorSet> m_descriptorSets;
+        std::vector<VkDescriptorSet> m_graphicsDescriptorSets;
+        std::vector<VkDescriptorSet> m_computeDescriptorSets;
 
         uint m_currentFrame = 0;
         uint m_imageIndex = 0;
 
-        inline static VulkanBackendApp* g_application = nullptr;
+        inline static VulkanBackendApp* s_application = nullptr;
 
         VertexBuffer* m_vertexBuffer = nullptr;
         IndexBuffer* m_indexBuffer = nullptr;
@@ -263,7 +269,9 @@ namespace HWPT {
 
         std::vector<VkSemaphore> m_imageAvailableSemaphores;
         std::vector<VkSemaphore> m_renderFinishedSemaphores;
-        std::vector<VkFence> m_inFlightFences;
+        std::vector<VkFence> m_graphicsInFlightFences;
+        std::vector<VkFence> m_computeInFlightFences;
+        std::vector<VkSemaphore> m_computeFinishedSemaphores;
 
         ImGuiInfrastructure* m_imguiInfrastructure = nullptr;
 
@@ -273,6 +281,11 @@ namespace HWPT {
         uint m_msaaSamples = 8;
 
         MSAABuffer* m_msaaBuffers = nullptr;
+
+        // For GPU Particles
+        inline static uint s_particleCount = 1024;
+        std::vector<StorageBuffer*> m_particleStorageBuffers;
+        void CreateParticleStorageBuffers();
     };
 }  // namespace HWPT
 

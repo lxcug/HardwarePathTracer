@@ -32,6 +32,8 @@ namespace HWPT {
             return m_indexBuffer->GetIndexCount();
         }
 
+        void DrawIndexed(VkCommandBuffer CommandBuffer);
+
     private:
         Texture2D* m_texture = nullptr;
         IndexBuffer* m_indexBuffer = nullptr;
