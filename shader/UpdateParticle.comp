@@ -1,0 +1,32 @@
+#version 450
+
+struct Particle {
+    vec3 Pos;
+    vec3 Color;
+    vec2 Velocity;
+};
+
+layout (binding = 0) uniform ViewUniformBuffer {
+    mat4 ModelTrans;
+    mat4 ViewTrans;
+    mat4 ProjTrans;
+    vec3 DebugColor;
+    float DeltaTime;
+};
+
+layout (std140, binding = 1) readonly buffer ParticleSSBOIn {
+    Particle ParticlesIn[];
+};
+
+layout (std140, binding = 2) buffer ParticleSSBOOut {
+    Particle ParticlesOut[];
+};
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+void main() {
+    uint ParticleIndex = gl_GlobalInvocationID.x;
+    ParticlesOut[ParticleIndex].Pos = ParticlesIn[ParticleIndex].Pos + vec3(ParticlesIn[ParticleIndex].Velocity, 0.f) * DeltaTime;
+    ParticlesOut[ParticleIndex].Velocity = ParticlesIn[ParticleIndex].Velocity;
+    ParticlesOut[ParticleIndex].Color = ParticlesIn[ParticleIndex].Color;
+}
