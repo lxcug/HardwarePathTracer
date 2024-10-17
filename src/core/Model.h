@@ -32,6 +32,14 @@ namespace HWPT {
             return m_indexBuffer->GetIndexCount();
         }
 
+        auto GetVertexBuffer() -> VertexBuffer* {
+            return m_vertexBuffer;
+        }
+
+        auto GetVertexBufferLayout() -> VertexBufferLayout* {
+            return m_vertexBuffer->GetLayout();
+        }
+
         void DrawIndexed(VkCommandBuffer CommandBuffer);
 
     private:

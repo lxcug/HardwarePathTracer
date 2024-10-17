@@ -45,6 +45,8 @@ add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/application/ImGuiIntegration.h
         src/core/Model.cpp
         src/core/Model.h
+        src/core/buffer/VertexBufferLayout.cpp
+        src/core/buffer/VertexBufferLayout.h
 )
 
 include_directories(
