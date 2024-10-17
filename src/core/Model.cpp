@@ -57,6 +57,11 @@ namespace HWPT {
         }
 
         m_vertexBuffer = new VertexBuffer(sizeof(Vertex) * Vertices.size(), Vertices.data());
+        m_vertexBuffer->SetLayout({
+                                          {VertexAttributeDataType::Float3, "Pos"},
+                                          {VertexAttributeDataType::Float3, "Color"},
+                                          {VertexAttributeDataType::Float2, "TexCoord"}
+                                  });
         m_indexBuffer = new IndexBuffer(Indices.size(), Indices.data());
     }
 
