@@ -8,7 +8,6 @@
 
 
 namespace HWPT {
-
     VertexBuffer::VertexBuffer(VkDeviceSize Size, const void *Data) {
         auto [StagingBuffer, StagingBufferMemory] = RHI::CreateStagingBuffer(Size);
 
@@ -29,6 +28,7 @@ namespace HWPT {
     }
 
     VertexBuffer::~VertexBuffer() {
+        delete m_layout;
         vkFreeMemory(GetVKDevice(), m_vertexBufferMemory, nullptr);
         vkDestroyBuffer(GetVKDevice(), m_vertexBuffer, nullptr);
     }
@@ -40,6 +40,12 @@ namespace HWPT {
 
     VertexBuffer::VertexBuffer(VkDeviceSize Size, const Vertex *Data)
             : VertexBuffer(Size, static_cast<const void *>(Data)) {}
+
+    void VertexBuffer::SetLayout(const std::initializer_list<VertexAttribute> &Attributes) {
+        Check(m_layout == nullptr);
+
+        m_layout = new VertexBufferLayout(Attributes);
+    }
 
     auto Vertex::GetBindingDescription() -> VkVertexInputBindingDescription {
         VkVertexInputBindingDescription BindingDescription{};

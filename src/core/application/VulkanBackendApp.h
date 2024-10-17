@@ -192,10 +192,6 @@ namespace HWPT {
 
         void RecordCommandBuffer(VkCommandBuffer CommandBuffer, uint ImageIndex);
 
-        void CreateVertexBuffer();
-
-        void CreateIndexBuffer();
-
         void CreateUniformBuffers();
 
         void CreateModelAndSampler();
@@ -262,8 +258,6 @@ namespace HWPT {
 
         inline static VulkanBackendApp* s_application = nullptr;
 
-        VertexBuffer* m_vertexBuffer = nullptr;
-        IndexBuffer* m_indexBuffer = nullptr;
         std::vector<UniformBuffer*> m_MVPUniformBuffers;
         Sampler* m_sampler = nullptr;
 
@@ -283,9 +277,10 @@ namespace HWPT {
         MSAABuffer* m_msaaBuffers = nullptr;
 
         // For GPU Particles
-        inline static uint s_particleCount = 1024;
+        inline static uint s_particleCount = 81920;
         std::vector<StorageBuffer*> m_particleStorageBuffers;
         void CreateParticleStorageBuffers();
+        std::shared_ptr<VertexBufferLayout> m_particleVertexBufferLayout;
     };
 }  // namespace HWPT
 
