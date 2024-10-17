@@ -95,6 +95,7 @@ namespace HWPT {
         SelectPhysicalDevice();
         CreateLogicalDevice();
         CreateSwapChain();
+
         CreateRenderPass();
         CreateMSAABuffers();
         CreateFrameBuffers();
@@ -117,22 +118,18 @@ namespace HWPT {
         CreateComputePipeline();
         CreateComputeDescriptorSets();
 
-        CreateVertexBuffer();
-        CreateIndexBuffer();
         CreateSyncObjects();
     }
 
     void VulkanBackendApp::FrameBufferResizeCallback(GLFWwindow *Window, int Width, int Height) {
         auto App =
-                reinterpret_cast<VulkanBackendApp*>(glfwGetWindowUserPointer(Window));
+                reinterpret_cast<VulkanBackendApp *>(glfwGetWindowUserPointer(Window));
         App->m_frameBufferResized = true;
     }
 
     void VulkanBackendApp::CleanUp() {
         delete m_msaaBuffers;
         delete m_vikingRoom;
-        delete m_vertexBuffer;
-        delete m_indexBuffer;
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             delete m_MVPUniformBuffers[i];
             delete m_particleStorageBuffers[i];
@@ -181,7 +178,8 @@ namespace HWPT {
         VK_CHECK(vkBeginCommandBuffer(ComputeCommandBuffer, &ComputeBeginInfo));
         vkCmdBindPipeline(ComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipeline);
         vkCmdBindDescriptorSets(ComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                m_computePipelineLayout, 0, 1, &m_computeDescriptorSets[m_currentFrame], 0, nullptr);
+                                m_computePipelineLayout, 0, 1,
+                                &m_computeDescriptorSets[m_currentFrame], 0, nullptr);
         vkCmdDispatch(ComputeCommandBuffer, (s_particleCount + 255) / 256, 1, 1);
         VK_CHECK(vkEndCommandBuffer(ComputeCommandBuffer));
 
@@ -192,10 +190,12 @@ namespace HWPT {
         ComputeSubmitInfo.pCommandBuffers = &ComputeCommandBuffer;
         ComputeSubmitInfo.signalSemaphoreCount = 1;
         ComputeSubmitInfo.pSignalSemaphores = &m_computeFinishedSemaphores[m_currentFrame];
-        VK_CHECK(vkQueueSubmit(m_queue.ComputeQueue, 1, &ComputeSubmitInfo, m_computeInFlightFences[m_currentFrame]));
+        VK_CHECK(vkQueueSubmit(m_queue.ComputeQueue, 1, &ComputeSubmitInfo,
+                               m_computeInFlightFences[m_currentFrame]));
 
 
-        vkWaitForFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
+        vkWaitForFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame], VK_TRUE,
+                        UINT64_MAX);
         vkResetFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame]);
 
         if (m_frameBufferResized) {
@@ -208,8 +208,7 @@ namespace HWPT {
                                                 VK_NULL_HANDLE, &m_imageIndex);
         if (Result == VK_ERROR_OUT_OF_DATE_KHR || Result == VK_SUBOPTIMAL_KHR) {
             OnWindowResize();
-        }
-        else if (Result != VK_SUCCESS) {
+        } else if (Result != VK_SUCCESS) {
             throw std::runtime_error("Failed to acquire swap chain images");
         }
 
@@ -235,7 +234,8 @@ namespace HWPT {
         GraphicsSubmitInfo.pCommandBuffers = &GraphicsCommandBuffer;
         GraphicsSubmitInfo.signalSemaphoreCount = 1;
         GraphicsSubmitInfo.pSignalSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
-        VK_CHECK(vkQueueSubmit(m_queue.GraphicsQueue, 1, &GraphicsSubmitInfo, m_graphicsInFlightFences[m_currentFrame]));
+        VK_CHECK(vkQueueSubmit(m_queue.GraphicsQueue, 1, &GraphicsSubmitInfo,
+                               m_graphicsInFlightFences[m_currentFrame]));
     }
 
     void VulkanBackendApp::CreateVkInstance() {
@@ -263,16 +263,16 @@ namespace HWPT {
 
     auto VulkanBackendApp::GetRequiredExtensions() -> std::vector<const char *> {
         uint glfwExtensionCount = 0;
-        const char** glfwExtensions;
+        const char **glfwExtensions;
         glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-        std::vector<const char*> Extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+        std::vector<const char *> Extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
 #if !BUILD_RELEASE && !BUILD_SHIPPING
         Extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #endif
 
         std::cout << "Enabled Extensions:\n";
-        for (const auto& ExtensionName : Extensions) {
+        for (const auto &ExtensionName: Extensions) {
             std::cout << "\t" << ExtensionName << std::endl;
         }
         std::cout.flush();
@@ -290,7 +290,7 @@ namespace HWPT {
         std::vector<VkPhysicalDevice> Devices(DeviceCount);
         vkEnumeratePhysicalDevices(m_instance, &DeviceCount, Devices.data());
 
-        for (auto Device : Devices) {
+        for (auto Device: Devices) {
             if (IsSuitableDevice(Device)) {
                 m_physicalDevice = Device;
                 break;
@@ -304,16 +304,18 @@ namespace HWPT {
         std::cout.flush();
     }
 
-    auto VulkanBackendApp::FindQueueFamilies(VkPhysicalDevice PhysicalDevice) -> QueueFamilyIndices {
+    auto
+    VulkanBackendApp::FindQueueFamilies(VkPhysicalDevice PhysicalDevice) -> QueueFamilyIndices {
         QueueFamilyIndices Indices;
 
         uint QueueFamilyCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount, nullptr);
         std::vector<VkQueueFamilyProperties> QueueFamilies(QueueFamilyCount);
-        vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount, QueueFamilies.data());
+        vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount,
+                                                 QueueFamilies.data());
 
         int Index = 0;
-        for (const auto& QueueFamily : QueueFamilies) {
+        for (const auto &QueueFamily: QueueFamilies) {
             if (QueueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
                 Indices.GraphicsFamily = Index;
             }
@@ -343,8 +345,9 @@ namespace HWPT {
         vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr,
                                              &ExtensionCount, AvailableExtensions.data());
 
-        std::unordered_set<std::string> RequiredExtensionsCopy(DeviceExtensions.begin(), DeviceExtensions.end());
-        for (const auto& SupportExtension : AvailableExtensions) {
+        std::unordered_set<std::string> RequiredExtensionsCopy(DeviceExtensions.begin(),
+                                                               DeviceExtensions.end());
+        for (const auto &SupportExtension: AvailableExtensions) {
             RequiredExtensionsCopy.erase(SupportExtension.extensionName);
         }
 
@@ -352,7 +355,8 @@ namespace HWPT {
     }
 
     auto
-    VulkanBackendApp::QuerySwapChainSupport(VkPhysicalDevice PhysicalDevice) -> SwapChainSupportDetails {
+    VulkanBackendApp::QuerySwapChainSupport(
+            VkPhysicalDevice PhysicalDevice) -> SwapChainSupportDetails {
         SwapChainSupportDetails Details;
 
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(PhysicalDevice, m_surface, &Details.Capabilities);
@@ -366,12 +370,14 @@ namespace HWPT {
         }
 
         uint PresentModeCount = 0;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, m_surface, &PresentModeCount, nullptr);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, m_surface, &PresentModeCount,
+                                                  nullptr);
 
         if (PresentModeCount > 0) {
             Details.PresentModes.resize(PresentModeCount);
             vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, m_surface,
-                                                      &PresentModeCount, Details.PresentModes.data());
+                                                      &PresentModeCount,
+                                                      Details.PresentModes.data());
         }
 
         return Details;
@@ -399,7 +405,7 @@ namespace HWPT {
         QueueCreateInfos.reserve(QueueCreateInfos.size());
 
         float QueuePriority = 1.f;
-        for (uint QueueFamily : UniqueQueueFamilies) {
+        for (uint QueueFamily: UniqueQueueFamilies) {
             VkDeviceQueueCreateInfo QueueCreateInfo{};
             QueueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
             QueueCreateInfo.queueFamilyIndex = QueueFamily;
@@ -439,7 +445,7 @@ namespace HWPT {
         SwapChainSupportDetails SwapChainSupport = QuerySwapChainSupport(m_physicalDevice);
 
         VkSurfaceFormatKHR SurfaceFormat;
-        for (auto Format : SwapChainSupport.Formats) {
+        for (auto Format: SwapChainSupport.Formats) {
             if (Format.format == VK_FORMAT_R8G8B8A8_SRGB &&
                 Format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
                 SurfaceFormat = Format;
@@ -447,7 +453,7 @@ namespace HWPT {
             }
         }
         VkPresentModeKHR PresentMode;
-        for (auto PreMode : SwapChainSupport.PresentModes) {
+        for (auto PreMode: SwapChainSupport.PresentModes) {
             if (PreMode == VK_PRESENT_MODE_MAILBOX_KHR) {
                 PresentMode = PreMode;
                 break;
@@ -456,13 +462,12 @@ namespace HWPT {
         VkExtent2D Extent;
         if (SwapChainSupport.Capabilities.currentExtent.width != UINT_MAX) {
             Extent = SwapChainSupport.Capabilities.currentExtent;
-        }
-        else {
+        } else {
             int Width, Height;
             glfwGetFramebufferSize(m_window, &Width, &Height);
             Extent = {static_cast<uint>(Width), static_cast<uint>(Height)};
-            VkExtent2D& MinExtent = SwapChainSupport.Capabilities.minImageExtent;
-            VkExtent2D& MaxExtent = SwapChainSupport.Capabilities.maxImageExtent;
+            VkExtent2D &MinExtent = SwapChainSupport.Capabilities.minImageExtent;
+            VkExtent2D &MaxExtent = SwapChainSupport.Capabilities.maxImageExtent;
             Extent.width = std::clamp(Extent.width, MinExtent.width, MaxExtent.width);
             Extent.height = std::clamp(Extent.height, MinExtent.height, MaxExtent.height);
         }
@@ -491,12 +496,11 @@ namespace HWPT {
         };
         if (QueueFamilySet.size() == 1) {
             CreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        }
-        else {
+        } else {
             CreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
             CreateInfo.queueFamilyIndexCount = QueueFamilySet.size();
             std::vector<uint> QueueIndices(QueueFamilySet.size());
-            for (auto Index : QueueFamilySet) {
+            for (auto Index: QueueFamilySet) {
                 QueueIndices.push_back(Index);
             }
             CreateInfo.pQueueFamilyIndices = QueueIndices.data();
@@ -507,7 +511,8 @@ namespace HWPT {
         CreateInfo.clipped = VK_TRUE;
         CreateInfo.oldSwapchain = VK_NULL_HANDLE;
 
-        VK_CHECK(vkCreateSwapchainKHR(m_device, &CreateInfo, nullptr, &m_swapChain.SwapChainHandle));
+        VK_CHECK(
+                vkCreateSwapchainKHR(m_device, &CreateInfo, nullptr, &m_swapChain.SwapChainHandle));
         m_swapChain.Extent = Extent;
         m_swapChain.Format = SurfaceFormat.format;
         m_swapChain.GetImages(m_device);
@@ -515,10 +520,10 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CleanUpSwapChain() {
-        for (auto& FrameBuffer : m_swapChainFrameBuffers) {
+        for (auto &FrameBuffer: m_swapChainFrameBuffers) {
             vkDestroyFramebuffer(m_device, FrameBuffer, nullptr);
         }
-        for (auto& ImageView : m_swapChain.SwapChainImageViews) {
+        for (auto &ImageView: m_swapChain.SwapChainImageViews) {
             vkDestroyImageView(m_device, ImageView, nullptr);
         }
         vkDestroySwapchainKHR(m_device, m_swapChain.SwapChainHandle, nullptr);
@@ -575,10 +580,13 @@ namespace HWPT {
         VkSubpassDependency Dependency{};
         Dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
         Dependency.dstSubpass = 0;
-        Dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        Dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        Dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                                  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        Dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
+                                  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
         Dependency.srcAccessMask = 0;
-        Dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+        Dependency.dstAccessMask =
+                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
         std::array<VkAttachmentDescription, 3> Attachments = {
                 MSAAColorAttachment,
@@ -616,7 +624,8 @@ namespace HWPT {
             CreateInfo.attachmentCount = Attachments.size();
             CreateInfo.pAttachments = Attachments.data();
 
-            VK_CHECK(vkCreateFramebuffer(m_device, &CreateInfo, nullptr, &m_swapChainFrameBuffers[Index]));
+            VK_CHECK(vkCreateFramebuffer(m_device, &CreateInfo, nullptr,
+                                         &m_swapChainFrameBuffers[Index]));
         }
     }
 
@@ -648,7 +657,8 @@ namespace HWPT {
         GraphicsAllocateInfo.commandPool = m_commandPool.GraphicsPool;
         GraphicsAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         GraphicsAllocateInfo.commandBufferCount = m_graphicsCommandBuffers.size();
-        VK_CHECK(vkAllocateCommandBuffers(m_device, &GraphicsAllocateInfo, m_graphicsCommandBuffers.data()));
+        VK_CHECK(vkAllocateCommandBuffers(m_device, &GraphicsAllocateInfo,
+                                          m_graphicsCommandBuffers.data()));
 
         VkCommandBufferAllocateInfo ComputeAllocateInfo{};
         ComputeAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -656,7 +666,8 @@ namespace HWPT {
         ComputeAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         ComputeAllocateInfo.commandBufferCount = m_computeCommandBuffers.size();
 
-        VK_CHECK(vkAllocateCommandBuffers(m_device, &ComputeAllocateInfo, m_computeCommandBuffers.data()));
+        VK_CHECK(vkAllocateCommandBuffers(m_device, &ComputeAllocateInfo,
+                                          m_computeCommandBuffers.data()));
     }
 
     auto VulkanBackendApp::BeginIntermediateCommand() -> VkCommandBuffer {
@@ -714,7 +725,8 @@ namespace HWPT {
         LayoutInfo.bindingCount = Bindings.size();
         LayoutInfo.pBindings = Bindings.data();
 
-        VK_CHECK(vkCreateDescriptorSetLayout(m_device, &LayoutInfo, nullptr, &m_graphicsDescriptorSetLayout));
+        VK_CHECK(vkCreateDescriptorSetLayout(m_device, &LayoutInfo, nullptr,
+                                             &m_graphicsDescriptorSetLayout));
     }
 
     void VulkanBackendApp::CreateGraphicsPipeline() {
@@ -738,8 +750,8 @@ namespace HWPT {
 
         VkPipelineVertexInputStateCreateInfo VertexInputInfo{};
         VertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        auto bindingDescription = Vertex::GetBindingDescription();
-        auto attributeDescription = Vertex::GetAttributeDescriptions();
+        auto bindingDescription = m_vikingRoom->GetVertexBufferLayout()->GetBindingDescription();
+        auto attributeDescription = m_vikingRoom->GetVertexBufferLayout()->GetAttributeDescriptions();
         VertexInputInfo.vertexBindingDescriptionCount = 1;
         VertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
         VertexInputInfo.vertexAttributeDescriptionCount = attributeDescription.size();
@@ -812,7 +824,8 @@ namespace HWPT {
         PipelineLayoutInfo.pushConstantRangeCount = 0;
         PipelineLayoutInfo.pPushConstantRanges = nullptr;
 
-        VK_CHECK(vkCreatePipelineLayout(m_device, &PipelineLayoutInfo, nullptr, &m_graphicsPipelineLayout));
+        VK_CHECK(vkCreatePipelineLayout(m_device, &PipelineLayoutInfo, nullptr,
+                                        &m_graphicsPipelineLayout));
 
         // Depth-Stencil Test
         VkPipelineDepthStencilStateCreateInfo DepthStencil{};
@@ -845,7 +858,8 @@ namespace HWPT {
         PipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
         PipelineInfo.basePipelineIndex = -1;
 
-        VK_CHECK(vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &PipelineInfo, nullptr, &m_graphicsPipeline));
+        VK_CHECK(vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &PipelineInfo, nullptr,
+                                           &m_graphicsPipeline));
     }
 
     void VulkanBackendApp::CreateParticleGraphicsPipeline() {
@@ -870,8 +884,15 @@ namespace HWPT {
         // TODO: Use Particle Vertex Layout and Set Layout in VertexBuffer(Create VertexBufferLayout Class)
         VkPipelineVertexInputStateCreateInfo VertexInputInfo{};
         VertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        auto bindingDescription = Vertex::GetBindingDescription();
-        auto attributeDescription = Vertex::GetAttributeDescriptions();
+        m_particleVertexBufferLayout = std::make_shared<VertexBufferLayout>(
+                std::initializer_list<VertexAttribute>(
+                        {
+                                VertexAttribute(VertexAttributeDataType::Float3, "Pos"),
+                                VertexAttribute(VertexAttributeDataType::Float3, "PlaceHolder"),
+                                VertexAttribute(VertexAttributeDataType::Float3, "Color")
+                        }));
+        auto bindingDescription = m_particleVertexBufferLayout->GetBindingDescription();
+        auto attributeDescription = m_particleVertexBufferLayout->GetAttributeDescriptions();
         VertexInputInfo.vertexBindingDescriptionCount = 1;
         VertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
         VertexInputInfo.vertexAttributeDescriptionCount = attributeDescription.size();
@@ -968,7 +989,8 @@ namespace HWPT {
         PipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
         PipelineInfo.basePipelineIndex = -1;
 
-        VK_CHECK(vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &PipelineInfo, nullptr, &m_particleGraphicsPipeline));
+        VK_CHECK(vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &PipelineInfo, nullptr,
+                                           &m_particleGraphicsPipeline));
     }
 
     void VulkanBackendApp::CreateComputeDescriptorSetLayout() {
@@ -993,7 +1015,8 @@ namespace HWPT {
         LayoutInfo.bindingCount = LayoutBindings.size();
         LayoutInfo.pBindings = LayoutBindings.data();
 
-        VK_CHECK(vkCreateDescriptorSetLayout(m_device, &LayoutInfo, nullptr, &m_computeDescriptorSetLayout));
+        VK_CHECK(vkCreateDescriptorSetLayout(m_device, &LayoutInfo, nullptr,
+                                             &m_computeDescriptorSetLayout));
     }
 
     void VulkanBackendApp::CreateComputePipeline() {
@@ -1001,7 +1024,8 @@ namespace HWPT {
         PipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         PipelineLayoutInfo.setLayoutCount = 1;
         PipelineLayoutInfo.pSetLayouts = &m_computeDescriptorSetLayout;
-        VK_CHECK(vkCreatePipelineLayout(m_device, &PipelineLayoutInfo, nullptr, &m_computePipelineLayout));
+        VK_CHECK(vkCreatePipelineLayout(m_device, &PipelineLayoutInfo, nullptr,
+                                        &m_computePipelineLayout));
 
         ShaderBase ComputeShader(ShaderType::Compute, "../../shader/UpdateParticle.spv");
 
@@ -1016,30 +1040,8 @@ namespace HWPT {
         PipelineInfo.stage = ComputeShaderStageInfo;
         PipelineInfo.layout = m_computePipelineLayout;
 
-        VK_CHECK(vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &PipelineInfo, nullptr, &m_computePipeline));
-    }
-
-    void VulkanBackendApp::CreateVertexBuffer() {
-        const std::vector<Vertex> Vertices = {
-                {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-                {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-                {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-                {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-
-                {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-                {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-                {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-                {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
-        };
-        m_vertexBuffer = new VertexBuffer(sizeof(Vertex) * Vertices.size(), Vertices.data());
-    }
-
-    void VulkanBackendApp::CreateIndexBuffer() {
-        const std::vector<uint> Indices = {
-                0, 1, 2, 2, 3, 0,
-                4, 5, 6, 6, 7, 4
-        };
-        m_indexBuffer = new IndexBuffer(Indices.size(), Indices.data());
+        VK_CHECK(vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &PipelineInfo, nullptr,
+                                          &m_computePipeline));
     }
 
     struct MVPData {
@@ -1054,13 +1056,15 @@ namespace HWPT {
         MVPData MVP{};
         MVP.ModelTrans = glm::identity<glm::mat4>();
         glm::vec3 CameraPos = glm::vec3(0.f, 0.f, 2.f);
-        MVP.ViewTrans = glm::lookAt(CameraPos, CameraPos + glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f)) * mat4_cast(glm::quat(glm::vec3(
-                glm::radians(60.f),
-                glm::radians(-45.f),
+        MVP.ViewTrans = glm::lookAt(CameraPos, CameraPos + glm::vec3(0.f, 0.f, -1.f),
+                                    glm::vec3(0.f, 1.f, 0.f)) * mat4_cast(glm::quat(glm::vec3(
+                glm::radians(0.f),
+                glm::radians(0.f),
                 glm::radians(0.f)
         )));
         MVP.ProjTrans = glm::perspective(glm::radians(60.f),
-                                         static_cast<float>(m_windowWidth) / static_cast<float>(m_windowHeight),
+                                         static_cast<float>(m_windowWidth) /
+                                         static_cast<float>(m_windowHeight),
                                          1e-3f, 1000.f);
         MVP.DebugColor = glm::vec3(.5f, .9f, .6f);
         MVP.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
@@ -1089,7 +1093,8 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateGraphicsDescriptorSets() {
-        std::vector<VkDescriptorSetLayout> Layouts(MAX_FRAMES_IN_FLIGHT, m_graphicsDescriptorSetLayout);
+        std::vector<VkDescriptorSetLayout> Layouts(MAX_FRAMES_IN_FLIGHT,
+                                                   m_graphicsDescriptorSetLayout);
         VkDescriptorSetAllocateInfo AllocateInfo{};
         AllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         AllocateInfo.descriptorPool = m_descriptorPool;
@@ -1097,7 +1102,8 @@ namespace HWPT {
         AllocateInfo.pSetLayouts = Layouts.data();
 
         m_graphicsDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-        VK_CHECK(vkAllocateDescriptorSets(m_device, &AllocateInfo, m_graphicsDescriptorSets.data()));
+        VK_CHECK(
+                vkAllocateDescriptorSets(m_device, &AllocateInfo, m_graphicsDescriptorSets.data()));
 
         std::array<VkWriteDescriptorSet, 2> DescriptorWrites{};
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -1144,11 +1150,14 @@ namespace HWPT {
             FenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
             FenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-            VK_CHECK(vkCreateSemaphore(m_device, &SemaphoreInfo, nullptr, &m_imageAvailableSemaphores[i]));
-            VK_CHECK(vkCreateSemaphore(m_device, &SemaphoreInfo, nullptr, &m_renderFinishedSemaphores[i]));
+            VK_CHECK(vkCreateSemaphore(m_device, &SemaphoreInfo, nullptr,
+                                       &m_imageAvailableSemaphores[i]));
+            VK_CHECK(vkCreateSemaphore(m_device, &SemaphoreInfo, nullptr,
+                                       &m_renderFinishedSemaphores[i]));
             VK_CHECK(vkCreateFence(m_device, &FenceInfo, nullptr, &m_graphicsInFlightFences[i]));
             VK_CHECK(vkCreateFence(m_device, &FenceInfo, nullptr, &m_computeInFlightFences[i]));
-            VK_CHECK(vkCreateSemaphore(m_device, &SemaphoreInfo, nullptr, &m_computeFinishedSemaphores[i]));
+            VK_CHECK(vkCreateSemaphore(m_device, &SemaphoreInfo, nullptr,
+                                       &m_computeFinishedSemaphores[i]));
         }
     }
 
@@ -1176,19 +1185,22 @@ namespace HWPT {
         MVPData MVP{};
         MVP.ModelTrans = glm::identity<glm::mat4>();
         glm::vec3 CameraPos = glm::vec3(0.f, 0.f, 2.f);
-        MVP.ViewTrans = glm::lookAt(CameraPos, CameraPos + glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, 1.f, 0.f)) * mat4_cast(glm::quat(glm::vec3(
-                glm::radians(60.f),
-                glm::radians(-45.f),
+        MVP.ViewTrans = glm::lookAt(CameraPos, CameraPos + glm::vec3(0.f, 0.f, -1.f),
+                                    glm::vec3(0.f, 1.f, 0.f)) * mat4_cast(glm::quat(glm::vec3(
+                glm::radians(0.f),
+                glm::radians(0.f),
                 glm::radians(0.f)
         )));
         MVP.ProjTrans = glm::perspective(glm::radians(60.f),
-                                         static_cast<float>(m_windowWidth) / static_cast<float>(m_windowHeight),
+                                         static_cast<float>(m_windowWidth) /
+                                         static_cast<float>(m_windowHeight),
                                          1e-3f, 1000.f);
         MVP.DebugColor = glm::vec3(.5f, .9f, .6f);
         MVP.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
         m_MVPUniformBuffers[ImageIndex]->Update(&MVP);
 
-        vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipelineLayout,
+        vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                m_graphicsPipelineLayout,
                                 0, 1, m_graphicsDescriptorSets.data(), 0, nullptr);
 
         VkViewport Viewport{};
@@ -1206,9 +1218,11 @@ namespace HWPT {
 
         m_vikingRoom->DrawIndexed(CommandBuffer);
 
-        vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_particleGraphicsPipeline);
+        vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          m_particleGraphicsPipeline);
         VkDeviceSize Offsets = 0;
-        vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &(m_particleStorageBuffers[m_currentFrame]->GetHandle()), &Offsets);
+        vkCmdBindVertexBuffers(CommandBuffer, 0, 1,
+                               &(m_particleStorageBuffers[m_currentFrame]->GetHandle()), &Offsets);
         vkCmdDraw(CommandBuffer, s_particleCount, 1, 0, 0);
 
         vkCmdEndRenderPass(CommandBuffer);
@@ -1217,9 +1231,11 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::RecreateSwapChain() {
-        glfwGetFramebufferSize(m_window, reinterpret_cast<int*>(&m_windowWidth), reinterpret_cast<int*>(&m_windowHeight));
+        glfwGetFramebufferSize(m_window, reinterpret_cast<int *>(&m_windowWidth),
+                               reinterpret_cast<int *>(&m_windowHeight));
         while (m_windowWidth == 0 || m_windowHeight == 0) {
-            glfwGetFramebufferSize(m_window, reinterpret_cast<int*>(&m_windowWidth), reinterpret_cast<int*>(&m_windowHeight));
+            glfwGetFramebufferSize(m_window, reinterpret_cast<int *>(&m_windowWidth),
+                                   reinterpret_cast<int *>(&m_windowHeight));
             glfwWaitEvents();
         }
         vkDeviceWaitIdle(m_device);
@@ -1245,7 +1261,7 @@ namespace HWPT {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImGui::StyleColorsDark();
-        ImGuiIO& IO = ImGui::GetIO();
+        ImGuiIO &IO = ImGui::GetIO();
 
         auto Consolas = IO.Fonts->AddFontFromFileTTF("../../asset/font/Consolas-Regular.ttf", 16.f);
         IO.Fonts->Build();
@@ -1324,8 +1340,7 @@ namespace HWPT {
         VkResult Result = vkQueuePresentKHR(m_queue.PresentQueue, &PresentInfo);
         if (Result == VK_ERROR_OUT_OF_DATE_KHR || Result == VK_SUBOPTIMAL_KHR) {
             OnWindowResize();
-        }
-        else if (Result != VK_SUCCESS) {
+        } else if (Result != VK_SUCCESS) {
             throw std::runtime_error("Failed to present swap chain images");
         }
 
@@ -1342,13 +1357,14 @@ namespace HWPT {
         // because it would be confusing to have two docking targets within each others.
         ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
         if (opt_fullscreen) {
-            ImGuiViewport* viewport = ImGui::GetMainViewport();
+            ImGuiViewport *viewport = ImGui::GetMainViewport();
             ImGui::SetNextWindowPos(viewport->Pos);
             ImGui::SetNextWindowSize(viewport->Size);
             ImGui::SetNextWindowViewport(viewport->ID);
             ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
             ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-            window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+            window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
+                            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
             window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
         }
 
@@ -1369,12 +1385,12 @@ namespace HWPT {
             ImGui::PopStyleVar(2);
 
         // DockSpace
-        ImGuiIO& io = ImGui::GetIO();
-        ImGuiStyle& style = ImGui::GetStyle();
+        ImGuiIO &io = ImGui::GetIO();
+        ImGuiStyle &style = ImGui::GetStyle();
         float minWinSizeX = style.WindowMinSize.x;
         style.WindowMinSize.x = 370.0f;
 
-        if(io.ConfigFlags & ImGuiConfigFlags_DockingEnable) {
+        if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable) {
             ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
             ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
         }
@@ -1411,29 +1427,31 @@ namespace HWPT {
         // Init Particles
         struct Particle {
             glm::vec3 Pos;
+            glm::vec3 Velocity;
             glm::vec3 Color;
-            glm::vec2 Velocity;
         };
         std::vector<Particle> Particles(s_particleCount);
-        for (auto& Part : Particles) {
-            float r = 0.25f * sqrt(RndDist(RndEngine));
-            float theta = RndDist(RndEngine) * 2 * 3.14159265358979323846;  // NOLINT
-            float x = r * cos(theta) * static_cast<float>(m_windowHeight) / static_cast<float>(m_windowHeight);
-            float y = r * sin(theta);
-            float z = (RndDist(RndEngine) - .5f) * 2.f;
-            Part.Pos = glm::vec3(x, y, z);
-            Part.Velocity = glm::normalize(glm::vec2(x, y)) * 0.00025f;
+        for (auto &Part: Particles) {
+            float Theta = std::acos(1 - 2.f * RndDist(RndEngine));
+            float Phi = RndDist(RndEngine) * 2 * 3.14159265358979323846;  // NOLINT
+            float X = sin(Theta) * cos(Phi);
+            float Y = sin(Theta) * sin(Phi);
+            float Z = cos(Theta);
+            Part.Pos = glm::vec3(0.f, 0.f, 0.f);
+            Part.Velocity = glm::vec3(X, Y, Z);
             Part.Color = glm::vec3(RndDist(RndEngine), RndDist(RndEngine), RndDist(RndEngine));
         }
 
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            auto ParticleBuffer = new StorageBuffer(sizeof(Particle) * s_particleCount, Particles.data());
+            auto ParticleBuffer = new StorageBuffer(sizeof(Particle) * s_particleCount,
+                                                    Particles.data());
             m_particleStorageBuffers[i] = ParticleBuffer;
         }
     }
 
     void VulkanBackendApp::CreateComputeDescriptorSets() {
-        std::vector<VkDescriptorSetLayout> Layouts(MAX_FRAMES_IN_FLIGHT, m_computeDescriptorSetLayout);
+        std::vector<VkDescriptorSetLayout> Layouts(MAX_FRAMES_IN_FLIGHT,
+                                                   m_computeDescriptorSetLayout);
         VkDescriptorSetAllocateInfo AllocateInfo{};
         AllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         AllocateInfo.descriptorPool = m_descriptorPool;
@@ -1509,7 +1527,8 @@ namespace HWPT {
             ViewCreateInfo.subresourceRange.levelCount = 1;
             ViewCreateInfo.subresourceRange.baseArrayLayer = 0;
             ViewCreateInfo.subresourceRange.layerCount = 1;
-            VK_CHECK(vkCreateImageView(Device, &ViewCreateInfo, nullptr, &SwapChainImageViews[Index]));
+            VK_CHECK(vkCreateImageView(Device, &ViewCreateInfo, nullptr,
+                                       &SwapChainImageViews[Index]));
         }
     }
 

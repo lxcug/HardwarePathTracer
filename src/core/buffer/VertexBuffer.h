@@ -9,8 +9,13 @@
 #include "vulkan/vulkan.h"
 #include <glm/glm.hpp>
 #include <array>
+
 #define GLM_ENABLE_EXPERIMENTAL
+
 #include <glm/gtx/hash.hpp>
+#include <unordered_map>
+#include <utility>
+#include "VertexBufferLayout.h"
 
 
 namespace HWPT {
@@ -21,13 +26,13 @@ namespace HWPT {
 
         Vertex() = default;
 
-        Vertex(const glm::vec3& Pos, const glm::vec3 &Color, const glm::vec2& TexCoord):
-        Pos(Pos), Color(Color), TexCoord(TexCoord) {}
-      
-        auto operator==(const Vertex& Other) const -> bool {
+        Vertex(const glm::vec3 &Pos, const glm::vec3 &Color, const glm::vec2 &TexCoord) :
+                Pos(Pos), Color(Color), TexCoord(TexCoord) {}
+
+        auto operator==(const Vertex &Other) const -> bool {
             return Pos == Other.Pos;
         }
-      
+
         static auto GetBindingDescription() -> VkVertexInputBindingDescription;
 
         static auto GetAttributeDescriptions() -> std::array<VkVertexInputAttributeDescription, 3>;
@@ -35,30 +40,38 @@ namespace HWPT {
 
     class VertexBuffer {
     public:
-        VertexBuffer(VkDeviceSize Size, const void* Data);
+        VertexBuffer(VkDeviceSize Size, const void *Data);
 
-        VertexBuffer(VkDeviceSize Size, const Vertex* Data);
+        VertexBuffer(VkDeviceSize Size, const Vertex *Data);
+
+        void SetLayout(const std::initializer_list<VertexAttribute> &Attributes);
+
+        auto GetLayout() -> VertexBufferLayout* {
+            return m_layout;
+        }
 
         ~VertexBuffer();
 
         void Bind(VkCommandBuffer CommandBuffer);
 
-        auto GetHandle() -> VkBuffer& {
+        auto GetHandle() -> VkBuffer & {
             return m_vertexBuffer;
         }
 
     private:
         VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
+        VertexBufferLayout *m_layout = nullptr;
     };
 }  // namespace HWPT
 
 namespace std {
-    template<> struct hash<HWPT::Vertex> {
-        auto operator()(HWPT::Vertex const& _Vertex) const -> size_t {
+    template<>
+    struct hash<HWPT::Vertex> {
+        auto operator()(HWPT::Vertex const &_Vertex) const -> size_t {
             return ((hash<glm::vec3>()(_Vertex.Pos) ^
-                    (hash<glm::vec3>()(_Vertex.Color) << 1)) >> 1) ^
-                    (hash<glm::vec2>()(_Vertex.TexCoord) << 1);
+                     (hash<glm::vec3>()(_Vertex.Color) << 1)) >> 1) ^
+                   (hash<glm::vec2>()(_Vertex.TexCoord) << 1);
         }
     };
 }  // namespace std
