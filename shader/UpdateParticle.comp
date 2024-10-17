@@ -26,6 +26,7 @@ layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 void main() {
     uint ParticleIndex = gl_GlobalInvocationID.x;
+
     ParticlesOut[ParticleIndex].Pos = ParticlesIn[ParticleIndex].Pos + ParticlesIn[ParticleIndex].Velocity * DeltaTime * .1f;
     ParticlesOut[ParticleIndex].Velocity = ParticlesIn[ParticleIndex].Velocity;
     ParticlesOut[ParticleIndex].Color = ParticlesIn[ParticleIndex].Color;
