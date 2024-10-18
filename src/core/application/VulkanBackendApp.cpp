@@ -420,6 +420,7 @@ namespace HWPT {
         CreateInfo.pQueueCreateInfos = QueueCreateInfos.data();
         VkPhysicalDeviceFeatures DeviceFeatures{};
         DeviceFeatures.sampleRateShading = VK_TRUE;
+        DeviceFeatures.geometryShader = VK_TRUE;
         CreateInfo.pEnabledFeatures = &DeviceFeatures;
         CreateInfo.enabledExtensionCount = DeviceExtensions.size();
         CreateInfo.ppEnabledExtensionNames = DeviceExtensions.data();
@@ -730,19 +731,19 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateGraphicsPipeline() {
-        ShaderBase VertexShader(ShaderType::Vertex, "../../shader/Vert.spv");
-        ShaderBase FragmentShader(ShaderType::Fragment, "../../shader/Frag.spv");
+        ShaderBase VertexShader(ShaderType::Vertex, "../../shader/HLSL/Vert.spv");
+        ShaderBase FragmentShader(ShaderType::Fragment, "../../shader/HLSL/Frag.spv");
 
         VkPipelineShaderStageCreateInfo VertShaderStageInfo{};
         VertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         VertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
         VertShaderStageInfo.module = VertexShader.GetHandle();
-        VertShaderStageInfo.pName = "main";
+        VertShaderStageInfo.pName = "VSMain";
         VkPipelineShaderStageCreateInfo FragShaderStageInfo{};
         FragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         FragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
         FragShaderStageInfo.module = FragmentShader.GetHandle();
-        FragShaderStageInfo.pName = "main";
+        FragShaderStageInfo.pName = "PSMain";
 
         std::array<VkPipelineShaderStageCreateInfo, 2> ShaderStages = {
                 VertShaderStageInfo, FragShaderStageInfo
@@ -863,19 +864,19 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateParticleGraphicsPipeline() {
-        ShaderBase VertexShader(ShaderType::Vertex, "../../shader/ParticleVert.spv");
-        ShaderBase FragmentShader(ShaderType::Fragment, "../../shader/ParticleFrag.spv");
+        ShaderBase VertexShader(ShaderType::Vertex, "../../shader/HLSL/ParticleVert.spv");
+        ShaderBase FragmentShader(ShaderType::Fragment, "../../shader/HLSL/ParticleFrag.spv");
 
         VkPipelineShaderStageCreateInfo VertShaderStageInfo{};
         VertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         VertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
         VertShaderStageInfo.module = VertexShader.GetHandle();
-        VertShaderStageInfo.pName = "main";
+        VertShaderStageInfo.pName = "VSMain";
         VkPipelineShaderStageCreateInfo FragShaderStageInfo{};
         FragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         FragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
         FragShaderStageInfo.module = FragmentShader.GetHandle();
-        FragShaderStageInfo.pName = "main";
+        FragShaderStageInfo.pName = "PSMain";
 
         std::array<VkPipelineShaderStageCreateInfo, 2> ShaderStages = {
                 VertShaderStageInfo, FragShaderStageInfo
@@ -1027,13 +1028,13 @@ namespace HWPT {
         VK_CHECK(vkCreatePipelineLayout(m_device, &PipelineLayoutInfo, nullptr,
                                         &m_computePipelineLayout));
 
-        ShaderBase ComputeShader(ShaderType::Compute, "../../shader/UpdateParticle.spv");
+        ShaderBase ComputeShader(ShaderType::Compute, "../../shader/HLSL/UpdateParticle.spv");
 
         VkPipelineShaderStageCreateInfo ComputeShaderStageInfo{};
         ComputeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         ComputeShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
         ComputeShaderStageInfo.module = ComputeShader.GetHandle();
-        ComputeShaderStageInfo.pName = "main";
+        ComputeShaderStageInfo.pName = "UpdateParticles";
 
         VkComputePipelineCreateInfo PipelineInfo{};
         PipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
