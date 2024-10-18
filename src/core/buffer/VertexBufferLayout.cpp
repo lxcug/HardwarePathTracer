@@ -6,7 +6,7 @@
 
 
 namespace HWPT {
-    auto GetVertexAttributeDataTypeSize(VertexAttributeDataType DataType) -> uint {
+    static auto GetVertexAttributeDataTypeSize(VertexAttributeDataType DataType) -> uint {
         switch (DataType) {
             case VertexAttributeDataType::Float: [[fallthrough]];
             case VertexAttributeDataType::Int: [[fallthrough]];

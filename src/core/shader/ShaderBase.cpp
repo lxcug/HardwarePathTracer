@@ -8,9 +8,11 @@
 
 namespace HWPT {
 
-    ShaderBase::ShaderBase(ShaderType InShaderType, const std::filesystem::path &ShaderPath)
-            : m_shaderType(InShaderType) {
-        CreateShaderModule(ShaderPath);
+
+    ShaderBase::ShaderBase(ShaderType ShaderType, const std::filesystem::path &ShaderPath,
+                           const char *Entry)
+                           : m_shaderType(ShaderType), m_entryName(Entry) {
+        CreateShaderModule(LoadShaderFile(ShaderPath));
     }
 
     ShaderBase::~ShaderBase() {
@@ -31,27 +33,19 @@ namespace HWPT {
         VK_CHECK(vkCreateShaderModule(GetVKDevice(), &CreateInfo, nullptr, &m_shaderModule));
     }
 
-//    void ShaderBase::BindShaderStage(const std::string &Entry) {
-//        VkPipelineShaderStageCreateInfo ShaderStageInfo{};
-//
-//        ShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-//        switch (m_shaderType) {
-//            case ShaderType::Vertex:
-//                ShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-//                break;
-//            case ShaderType::Geometry:
-//                ShaderStageInfo.stage = VK_SHADER_STAGE_GEOMETRY_BIT;
-//                break;
-//            case ShaderType::Fragment:
-//                ShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-//                break;
-//            case ShaderType::Compute:
-//                ShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-//                break;
-//            default:
-//                Check(false);
-//        }
-//        ShaderStageInfo.module = m_shaderModule;
-//        ShaderStageInfo.pName = Entry.c_str();
-//    }
+    static auto LoadShaderFile(const std::filesystem::path& ShaderPath) -> std::vector<char> {
+        std::ifstream ShaderFile(ShaderPath, std::ios::ate | std::ios::binary);
+
+        if (!ShaderFile.is_open()) {
+            throw std::runtime_error("Failed to open file!");
+        }
+
+        size_t fileSize = ShaderFile.tellg();
+        std::vector<char> Buffer(fileSize);
+        ShaderFile.seekg(0);
+        ShaderFile.read(Buffer.data(), static_cast<int64_t>(fileSize));
+        ShaderFile.close();
+
+        return Buffer;
+    }
 }  // namespace HWPT

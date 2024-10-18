@@ -96,7 +96,8 @@ namespace HWPT {
         CreateLogicalDevice();
         CreateSwapChain();
 
-        CreateRenderPass();
+        CreateRasterPass();
+
         CreateMSAABuffers();
         CreateFrameBuffers();
 
@@ -108,9 +109,6 @@ namespace HWPT {
         CreateUniformBuffers();
         CreateModelAndSampler();
 
-        CreateGraphicsDescriptorSetLayout();
-        CreateGraphicsPipeline();
-        CreateParticleGraphicsPipeline();
         CreateGraphicsDescriptorSets();
 
         CreateParticleStorageBuffers();
@@ -128,6 +126,8 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CleanUp() {
+        delete m_rasterPass;
+        delete m_particlePass;
         delete m_msaaBuffers;
         delete m_vikingRoom;
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -146,18 +146,13 @@ namespace HWPT {
             vkDestroyFence(m_device, m_computeInFlightFences[i], nullptr);
             vkDestroySemaphore(m_device, m_computeFinishedSemaphores[i], nullptr);
         }
-
         vkDestroyDescriptorPool(m_device, m_descriptorPool, nullptr);
-        vkDestroyDescriptorSetLayout(m_device, m_graphicsDescriptorSetLayout, nullptr);
-        vkDestroyPipelineLayout(m_device, m_graphicsPipelineLayout, nullptr);
-        vkDestroyPipeline(m_device, m_graphicsPipeline, nullptr);
         vkDestroyPipeline(m_device, m_particleGraphicsPipeline, nullptr);
         vkDestroyDescriptorSetLayout(m_device, m_computeDescriptorSetLayout, nullptr);
         vkDestroyPipelineLayout(m_device, m_computePipelineLayout, nullptr);
         vkDestroyPipeline(m_device, m_computePipeline, nullptr);
         vkDestroyCommandPool(m_device, m_commandPool.GraphicsPool, nullptr);
         vkDestroyCommandPool(m_device, m_commandPool.ComputePool, nullptr);
-        vkDestroyRenderPass(m_device, m_renderPass, nullptr);
         vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
         vkDestroyDevice(m_device, nullptr);
         vkDestroyInstance(m_instance, nullptr);
@@ -530,82 +525,6 @@ namespace HWPT {
         vkDestroySwapchainKHR(m_device, m_swapChain.SwapChainHandle, nullptr);
     }
 
-    void VulkanBackendApp::CreateRenderPass() {
-        VkAttachmentDescription MSAAColorAttachment{};
-        MSAAColorAttachment.format = m_swapChain.Format;
-        MSAAColorAttachment.samples = GetVKSampleCount(m_msaaSamples);
-        MSAAColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        MSAAColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        MSAAColorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        MSAAColorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        MSAAColorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        MSAAColorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;  // For resolve MSAA buffer
-
-        VkAttachmentDescription DepthAttachment{};
-        DepthAttachment.format = GetVKFormat(TextureFormat::Depth32);
-        DepthAttachment.samples = GetVKSampleCount(m_msaaSamples);
-        DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        DepthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        DepthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        DepthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        DepthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-        VkAttachmentDescription ResolvedColorAttachment{};
-        ResolvedColorAttachment.format = m_swapChain.Format;
-        ResolvedColorAttachment.samples = GetVKSampleCount(1u);
-        ResolvedColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        ResolvedColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        ResolvedColorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        ResolvedColorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        ResolvedColorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        ResolvedColorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-        VkAttachmentReference MSAAColorAttachmentRef{};
-        MSAAColorAttachmentRef.attachment = 0;
-        MSAAColorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        VkAttachmentReference DepthAttachmentRef{};
-        DepthAttachmentRef.attachment = 1;
-        DepthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-        VkAttachmentReference ResolvedColorAttachmentRef{};
-        ResolvedColorAttachmentRef.attachment = 2;
-        ResolvedColorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-        VkSubpassDescription SubPass{};
-        SubPass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-        SubPass.colorAttachmentCount = 1;
-        SubPass.pColorAttachments = &MSAAColorAttachmentRef;
-        SubPass.pDepthStencilAttachment = &DepthAttachmentRef;
-        SubPass.pResolveAttachments = &ResolvedColorAttachmentRef;
-
-        VkSubpassDependency Dependency{};
-        Dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
-        Dependency.dstSubpass = 0;
-        Dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-                                  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        Dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT |
-                                  VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-        Dependency.srcAccessMask = 0;
-        Dependency.dstAccessMask =
-                VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-
-        std::array<VkAttachmentDescription, 3> Attachments = {
-                MSAAColorAttachment,
-                DepthAttachment,
-                ResolvedColorAttachment
-        };
-        VkRenderPassCreateInfo CreateInfo{};
-        CreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-        CreateInfo.attachmentCount = Attachments.size();
-        CreateInfo.pAttachments = Attachments.data();
-        CreateInfo.subpassCount = 1;
-        CreateInfo.pSubpasses = &SubPass;
-        CreateInfo.dependencyCount = 1;
-        CreateInfo.pDependencies = &Dependency;
-
-        VK_CHECK(vkCreateRenderPass(m_device, &CreateInfo, nullptr, &m_renderPass));
-    }
-
     void VulkanBackendApp::CreateFrameBuffers() {
         m_swapChainFrameBuffers.resize(m_swapChain.SwapChainImages.size());
 
@@ -618,7 +537,7 @@ namespace HWPT {
 
             VkFramebufferCreateInfo CreateInfo{};
             CreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-            CreateInfo.renderPass = m_renderPass;
+            CreateInfo.renderPass = m_rasterPass->GetRenderPass();
             CreateInfo.width = m_swapChain.Extent.width;
             CreateInfo.height = m_swapChain.Extent.height;
             CreateInfo.layers = 1;
@@ -703,297 +622,6 @@ namespace HWPT {
         vkFreeCommandBuffers(m_device, m_commandPool.GraphicsPool, 1, &CommandBuffer);
     }
 
-    void VulkanBackendApp::CreateGraphicsDescriptorSetLayout() {
-        VkDescriptorSetLayoutBinding UBOLayoutBinding{};
-        UBOLayoutBinding.binding = 0;
-        UBOLayoutBinding.descriptorCount = 1;
-        UBOLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        UBOLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-        UBOLayoutBinding.pImmutableSamplers = nullptr;
-
-        VkDescriptorSetLayoutBinding SamplerLayoutBinding{};
-        SamplerLayoutBinding.binding = 1;
-        SamplerLayoutBinding.descriptorCount = 1;
-        SamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        SamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-        std::array<VkDescriptorSetLayoutBinding, 2> Bindings = {
-                UBOLayoutBinding, SamplerLayoutBinding
-        };
-
-        VkDescriptorSetLayoutCreateInfo LayoutInfo{};
-        LayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        LayoutInfo.bindingCount = Bindings.size();
-        LayoutInfo.pBindings = Bindings.data();
-
-        VK_CHECK(vkCreateDescriptorSetLayout(m_device, &LayoutInfo, nullptr,
-                                             &m_graphicsDescriptorSetLayout));
-    }
-
-    void VulkanBackendApp::CreateGraphicsPipeline() {
-        ShaderBase VertexShader(ShaderType::Vertex, "../../shader/HLSL/Vert.spv");
-        ShaderBase FragmentShader(ShaderType::Fragment, "../../shader/HLSL/Frag.spv");
-
-        VkPipelineShaderStageCreateInfo VertShaderStageInfo{};
-        VertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        VertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-        VertShaderStageInfo.module = VertexShader.GetHandle();
-        VertShaderStageInfo.pName = "VSMain";
-        VkPipelineShaderStageCreateInfo FragShaderStageInfo{};
-        FragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        FragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        FragShaderStageInfo.module = FragmentShader.GetHandle();
-        FragShaderStageInfo.pName = "PSMain";
-
-        std::array<VkPipelineShaderStageCreateInfo, 2> ShaderStages = {
-                VertShaderStageInfo, FragShaderStageInfo
-        };
-
-        VkPipelineVertexInputStateCreateInfo VertexInputInfo{};
-        VertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        auto bindingDescription = m_vikingRoom->GetVertexBufferLayout()->GetBindingDescription();
-        auto attributeDescription = m_vikingRoom->GetVertexBufferLayout()->GetAttributeDescriptions();
-        VertexInputInfo.vertexBindingDescriptionCount = 1;
-        VertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-        VertexInputInfo.vertexAttributeDescriptionCount = attributeDescription.size();
-        VertexInputInfo.pVertexAttributeDescriptions = attributeDescription.data();
-
-        VkPipelineInputAssemblyStateCreateInfo InputAssemble{};
-        InputAssemble.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-        InputAssemble.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-        InputAssemble.primitiveRestartEnable = VK_FALSE;
-
-        std::vector<VkDynamicState> DynamicStates = {
-                VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT,
-                VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT
-        };
-        VkPipelineDynamicStateCreateInfo DynamicState{};
-        DynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-        DynamicState.dynamicStateCount = DynamicStates.size();
-        DynamicState.pDynamicStates = DynamicStates.data();
-
-        VkPipelineViewportStateCreateInfo ViewportState{};
-        ViewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-        ViewportState.viewportCount = 0;
-
-        VkPipelineRasterizationStateCreateInfo Rasterizer{};
-        Rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-        Rasterizer.depthClampEnable = VK_FALSE;
-        Rasterizer.rasterizerDiscardEnable = VK_FALSE;
-        Rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-        Rasterizer.lineWidth = 1.f;
-        Rasterizer.cullMode = VK_CULL_MODE_NONE;
-        Rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-        Rasterizer.depthBiasEnable = VK_FALSE;
-        Rasterizer.depthBiasConstantFactor = 0.f;
-        Rasterizer.depthBiasClamp = 0.f;
-        Rasterizer.depthBiasSlopeFactor = 0.f;
-
-        VkPipelineMultisampleStateCreateInfo Multisampling{};
-        Multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-        Multisampling.sampleShadingEnable = VK_FALSE;
-        Multisampling.rasterizationSamples = GetVKSampleCount(m_msaaSamples);
-        Multisampling.minSampleShading = 1.f;
-        Multisampling.pSampleMask = nullptr;
-        Multisampling.alphaToCoverageEnable = VK_FALSE;
-        Multisampling.alphaToOneEnable = VK_FALSE;
-        Multisampling.sampleShadingEnable = VK_TRUE;
-        Multisampling.minSampleShading = .2f;
-
-        VkPipelineColorBlendAttachmentState ColorBlendAttachment{};
-        ColorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                              VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-        ColorBlendAttachment.blendEnable = VK_FALSE;
-        ColorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-        ColorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-        ColorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-        ColorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-        ColorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-        ColorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-
-        VkPipelineColorBlendStateCreateInfo ColorBlending{};
-        ColorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-        ColorBlending.logicOpEnable = VK_FALSE;
-        ColorBlending.logicOp = VK_LOGIC_OP_COPY;
-        ColorBlending.attachmentCount = 1;
-        ColorBlending.pAttachments = &ColorBlendAttachment;
-
-        VkPipelineLayoutCreateInfo PipelineLayoutInfo{};
-        PipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        PipelineLayoutInfo.setLayoutCount = 1;
-        PipelineLayoutInfo.pSetLayouts = &m_graphicsDescriptorSetLayout;
-        PipelineLayoutInfo.pushConstantRangeCount = 0;
-        PipelineLayoutInfo.pPushConstantRanges = nullptr;
-
-        VK_CHECK(vkCreatePipelineLayout(m_device, &PipelineLayoutInfo, nullptr,
-                                        &m_graphicsPipelineLayout));
-
-        // Depth-Stencil Test
-        VkPipelineDepthStencilStateCreateInfo DepthStencil{};
-        DepthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-        DepthStencil.depthTestEnable = VK_TRUE;
-        DepthStencil.depthWriteEnable = VK_TRUE;
-        DepthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
-        DepthStencil.depthBoundsTestEnable = VK_FALSE;
-//        DepthStencil.minDepthBounds = 0.f;
-//        DepthStencil.maxDepthBounds = 1.f;
-        DepthStencil.stencilTestEnable = VK_FALSE;
-        DepthStencil.front = {};
-        DepthStencil.back = {};
-
-        VkGraphicsPipelineCreateInfo PipelineInfo{};
-        PipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-        PipelineInfo.stageCount = ShaderStages.size();
-        PipelineInfo.pStages = ShaderStages.data();
-        PipelineInfo.pVertexInputState = &VertexInputInfo;
-        PipelineInfo.pInputAssemblyState = &InputAssemble;
-        PipelineInfo.pViewportState = &ViewportState;
-        PipelineInfo.pRasterizationState = &Rasterizer;
-        PipelineInfo.pMultisampleState = &Multisampling;
-        PipelineInfo.pDepthStencilState = &DepthStencil;
-        PipelineInfo.pColorBlendState = &ColorBlending;
-        PipelineInfo.pDynamicState = &DynamicState;
-        PipelineInfo.layout = m_graphicsPipelineLayout;
-        PipelineInfo.renderPass = m_renderPass;
-        PipelineInfo.subpass = 0;
-        PipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-        PipelineInfo.basePipelineIndex = -1;
-
-        VK_CHECK(vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &PipelineInfo, nullptr,
-                                           &m_graphicsPipeline));
-    }
-
-    void VulkanBackendApp::CreateParticleGraphicsPipeline() {
-        ShaderBase VertexShader(ShaderType::Vertex, "../../shader/HLSL/ParticleVert.spv");
-        ShaderBase FragmentShader(ShaderType::Fragment, "../../shader/HLSL/ParticleFrag.spv");
-
-        VkPipelineShaderStageCreateInfo VertShaderStageInfo{};
-        VertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        VertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-        VertShaderStageInfo.module = VertexShader.GetHandle();
-        VertShaderStageInfo.pName = "VSMain";
-        VkPipelineShaderStageCreateInfo FragShaderStageInfo{};
-        FragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        FragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        FragShaderStageInfo.module = FragmentShader.GetHandle();
-        FragShaderStageInfo.pName = "PSMain";
-
-        std::array<VkPipelineShaderStageCreateInfo, 2> ShaderStages = {
-                VertShaderStageInfo, FragShaderStageInfo
-        };
-
-        // TODO: Use Particle Vertex Layout and Set Layout in VertexBuffer(Create VertexBufferLayout Class)
-        VkPipelineVertexInputStateCreateInfo VertexInputInfo{};
-        VertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        m_particleVertexBufferLayout = std::make_shared<VertexBufferLayout>(
-                std::initializer_list<VertexAttribute>(
-                        {
-                                VertexAttribute(VertexAttributeDataType::Float3, "Pos"),
-                                VertexAttribute(VertexAttributeDataType::Float3, "PlaceHolder"),
-                                VertexAttribute(VertexAttributeDataType::Float3, "Color")
-                        }));
-        auto bindingDescription = m_particleVertexBufferLayout->GetBindingDescription();
-        auto attributeDescription = m_particleVertexBufferLayout->GetAttributeDescriptions();
-        VertexInputInfo.vertexBindingDescriptionCount = 1;
-        VertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
-        VertexInputInfo.vertexAttributeDescriptionCount = attributeDescription.size();
-        VertexInputInfo.pVertexAttributeDescriptions = attributeDescription.data();
-
-        VkPipelineInputAssemblyStateCreateInfo InputAssemble{};
-        InputAssemble.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-        InputAssemble.topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
-        InputAssemble.primitiveRestartEnable = VK_FALSE;
-
-        std::vector<VkDynamicState> DynamicStates = {
-                VK_DYNAMIC_STATE_VIEWPORT_WITH_COUNT,
-                VK_DYNAMIC_STATE_SCISSOR_WITH_COUNT
-        };
-        VkPipelineDynamicStateCreateInfo DynamicState{};
-        DynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-        DynamicState.dynamicStateCount = DynamicStates.size();
-        DynamicState.pDynamicStates = DynamicStates.data();
-
-        VkPipelineViewportStateCreateInfo ViewportState{};
-        ViewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-        ViewportState.viewportCount = 0;
-
-        VkPipelineRasterizationStateCreateInfo Rasterizer{};
-        Rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-        Rasterizer.depthClampEnable = VK_FALSE;
-        Rasterizer.rasterizerDiscardEnable = VK_FALSE;
-        Rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-        Rasterizer.lineWidth = 1.f;
-        Rasterizer.cullMode = VK_CULL_MODE_NONE;
-        Rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-        Rasterizer.depthBiasEnable = VK_FALSE;
-        Rasterizer.depthBiasConstantFactor = 0.f;
-        Rasterizer.depthBiasClamp = 0.f;
-        Rasterizer.depthBiasSlopeFactor = 0.f;
-
-        VkPipelineMultisampleStateCreateInfo Multisampling{};
-        Multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-        Multisampling.sampleShadingEnable = VK_FALSE;
-        Multisampling.rasterizationSamples = GetVKSampleCount(m_msaaSamples);
-        Multisampling.minSampleShading = 1.f;
-        Multisampling.pSampleMask = nullptr;
-        Multisampling.alphaToCoverageEnable = VK_FALSE;
-        Multisampling.alphaToOneEnable = VK_FALSE;
-        Multisampling.sampleShadingEnable = VK_TRUE;
-        Multisampling.minSampleShading = .2f;
-
-        VkPipelineColorBlendAttachmentState ColorBlendAttachment{};
-        ColorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-                                              VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-        ColorBlendAttachment.blendEnable = VK_FALSE;
-        ColorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-        ColorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-        ColorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;
-        ColorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-        ColorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-        ColorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;
-
-        VkPipelineColorBlendStateCreateInfo ColorBlending{};
-        ColorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-        ColorBlending.logicOpEnable = VK_FALSE;
-        ColorBlending.logicOp = VK_LOGIC_OP_COPY;
-        ColorBlending.attachmentCount = 1;
-        ColorBlending.pAttachments = &ColorBlendAttachment;
-
-        // Depth-Stencil Test
-        VkPipelineDepthStencilStateCreateInfo DepthStencil{};
-        DepthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-        DepthStencil.depthTestEnable = VK_TRUE;
-        DepthStencil.depthWriteEnable = VK_TRUE;
-        DepthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
-        DepthStencil.depthBoundsTestEnable = VK_FALSE;
-//        DepthStencil.minDepthBounds = 0.f;
-//        DepthStencil.maxDepthBounds = 1.f;
-        DepthStencil.stencilTestEnable = VK_FALSE;
-        DepthStencil.front = {};
-        DepthStencil.back = {};
-
-        VkGraphicsPipelineCreateInfo PipelineInfo{};
-        PipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-        PipelineInfo.stageCount = ShaderStages.size();
-        PipelineInfo.pStages = ShaderStages.data();
-        PipelineInfo.pVertexInputState = &VertexInputInfo;
-        PipelineInfo.pInputAssemblyState = &InputAssemble;
-        PipelineInfo.pViewportState = &ViewportState;
-        PipelineInfo.pRasterizationState = &Rasterizer;
-        PipelineInfo.pMultisampleState = &Multisampling;
-        PipelineInfo.pDepthStencilState = &DepthStencil;
-        PipelineInfo.pColorBlendState = &ColorBlending;
-        PipelineInfo.pDynamicState = &DynamicState;
-        PipelineInfo.layout = m_graphicsPipelineLayout;
-        PipelineInfo.renderPass = m_renderPass;
-        PipelineInfo.subpass = 0;
-        PipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
-        PipelineInfo.basePipelineIndex = -1;
-
-        VK_CHECK(vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &PipelineInfo, nullptr,
-                                           &m_particleGraphicsPipeline));
-    }
-
     void VulkanBackendApp::CreateComputeDescriptorSetLayout() {
         std::array<VkDescriptorSetLayoutBinding, 3> LayoutBindings{};
         LayoutBindings[0].binding = 0;
@@ -1028,13 +656,13 @@ namespace HWPT {
         VK_CHECK(vkCreatePipelineLayout(m_device, &PipelineLayoutInfo, nullptr,
                                         &m_computePipelineLayout));
 
-        ShaderBase ComputeShader(ShaderType::Compute, "../../shader/HLSL/UpdateParticle.spv");
+        ShaderBase ComputeShader(ShaderType::Compute, "../../shader/HLSL/UpdateParticle.spv", "UpdateParticles");
 
         VkPipelineShaderStageCreateInfo ComputeShaderStageInfo{};
         ComputeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         ComputeShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
         ComputeShaderStageInfo.module = ComputeShader.GetHandle();
-        ComputeShaderStageInfo.pName = "UpdateParticles";
+        ComputeShaderStageInfo.pName = ComputeShader.GetEntryName();
 
         VkComputePipelineCreateInfo PipelineInfo{};
         PipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
@@ -1095,7 +723,7 @@ namespace HWPT {
 
     void VulkanBackendApp::CreateGraphicsDescriptorSets() {
         std::vector<VkDescriptorSetLayout> Layouts(MAX_FRAMES_IN_FLIGHT,
-                                                   m_graphicsDescriptorSetLayout);
+                                                   m_rasterPass->GetDescriptorSetLayout());
         VkDescriptorSetAllocateInfo AllocateInfo{};
         AllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         AllocateInfo.descriptorPool = m_descriptorPool;
@@ -1170,7 +798,7 @@ namespace HWPT {
 
         VkRenderPassBeginInfo RenderPassInfo{};
         RenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        RenderPassInfo.renderPass = m_renderPass;
+        RenderPassInfo.renderPass = m_rasterPass->GetRenderPass();
         RenderPassInfo.framebuffer = m_swapChainFrameBuffers[ImageIndex];
         RenderPassInfo.renderArea.offset = {0, 0};
         RenderPassInfo.renderArea.extent = m_swapChain.Extent;
@@ -1181,7 +809,6 @@ namespace HWPT {
         RenderPassInfo.pClearValues = ClearValues.data();
 
         vkCmdBeginRenderPass(CommandBuffer, &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-        vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
 
         MVPData MVP{};
         MVP.ModelTrans = glm::identity<glm::mat4>();
@@ -1201,7 +828,7 @@ namespace HWPT {
         m_MVPUniformBuffers[ImageIndex]->Update(&MVP);
 
         vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                m_graphicsPipelineLayout,
+                                m_rasterPass->GetPipelineLayout(),
                                 0, 1, m_graphicsDescriptorSets.data(), 0, nullptr);
 
         VkViewport Viewport{};
@@ -1217,13 +844,13 @@ namespace HWPT {
         Scissor.extent = m_swapChain.Extent;
         vkCmdSetScissorWithCount(CommandBuffer, 1, &Scissor);
 
+        m_rasterPass->BindRenderPipeline(CommandBuffer);
         m_vikingRoom->DrawIndexed(CommandBuffer);
 
-        vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          m_particleGraphicsPipeline);
         VkDeviceSize Offsets = 0;
         vkCmdBindVertexBuffers(CommandBuffer, 0, 1,
                                &(m_particleStorageBuffers[m_currentFrame]->GetHandle()), &Offsets);
+        m_particlePass->BindRenderPipeline(CommandBuffer);
         vkCmdDraw(CommandBuffer, s_particleCount, 1, 0, 0);
 
         vkCmdEndRenderPass(CommandBuffer);
@@ -1505,6 +1132,22 @@ namespace HWPT {
         }
     }
 
+    void VulkanBackendApp::CreateRasterPass() {
+        m_rasterPass = new RasterPass("MeshRaster", PassFlag::Raster,
+                                      "../../shader/HLSL/Vert.spv", "VSMain",
+                                      "../../shader/HLSL/Frag.spv", "PSMain");
+        m_rasterPass->CreateRenderPipeline();
+        m_particlePass = new RasterPass("ParticleRaster", PassFlag::Raster,
+                                        "../../shader/HLSL/ParticleVert.spv", "VSMain",
+                                        "../../shader/HLSL/ParticleFrag.spv", "PSMain",
+                                        PrimitiveType::Point);
+        m_particlePass->SetVertexBufferLayout({
+                        {VertexAttributeDataType::Float3, "Pos"},
+                        {VertexAttributeDataType::Float3, "PlaceHolder"},
+                        {VertexAttributeDataType::Float3, "Color"}});
+        m_particlePass->CreateRenderPipeline();
+    }
+
     void SwapChain::GetImages(VkDevice Device) {
         uint ImageCount = 0;
         vkGetSwapchainImagesKHR(Device, SwapChainHandle, &ImageCount, nullptr);
@@ -1532,5 +1175,4 @@ namespace HWPT {
                                        &SwapChainImageViews[Index]));
         }
     }
-
 }  // namespace HWPT

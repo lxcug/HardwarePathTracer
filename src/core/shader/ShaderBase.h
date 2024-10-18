@@ -23,7 +23,7 @@ namespace HWPT {
 
     class ShaderBase {
     public:
-        ShaderBase(ShaderType InShaderType, const std::filesystem::path& ShaderPath);
+        ShaderBase(ShaderType ShaderType, const std::filesystem::path& ShaderPath, const char* Entry);
 
         virtual ~ShaderBase();
 
@@ -35,29 +35,20 @@ namespace HWPT {
             return m_shaderModule;
         }
 
+        [[nodiscard]] auto GetEntryName() const -> const char* {
+            return m_entryName;
+        }
+
 //        void BindShaderStage(const std::string& Entry);
 
     private:
         VkShaderModule m_shaderModule = VK_NULL_HANDLE;
         ShaderType m_shaderType = ShaderType::None;
+        const char* m_entryName;
     };
 
 
-    static auto LoadShaderFile(const std::filesystem::path& ShaderPath) -> std::vector<char> {
-        std::ifstream ShaderFile(ShaderPath, std::ios::ate | std::ios::binary);
-
-        if (!ShaderFile.is_open()) {
-            throw std::runtime_error("Failed to open file!");
-        }
-
-        size_t fileSize = ShaderFile.tellg();
-        std::vector<char> Buffer(fileSize);
-        ShaderFile.seekg(0);
-        ShaderFile.read(Buffer.data(), static_cast<int64_t>(fileSize));
-        ShaderFile.close();
-
-        return Buffer;
-    }
+    static auto LoadShaderFile(const std::filesystem::path& ShaderPath) -> std::vector<char>;
 }  // namespace HWPT
 
 #endif //HARDWAREPATHTRACER_SHADERBASE_H

@@ -47,6 +47,16 @@ add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/Model.h
         src/core/buffer/VertexBufferLayout.cpp
         src/core/buffer/VertexBufferLayout.h
+        src/core/renderGraph/RenderGraph.cpp
+        src/core/renderGraph/RenderGraph.h
+        src/core/renderGraph/RenderPassCommon.cpp
+        src/core/renderGraph/RenderPassCommon.h
+        src/core/renderGraph/RasterPass.cpp
+        src/core/renderGraph/RasterPass.h
+        src/core/renderGraph/ComputePass.cpp
+        src/core/renderGraph/ComputePass.h
+        src/core/renderGraph/ShaderParameters.cpp
+        src/core/renderGraph/ShaderParameters.h
 )
 
 include_directories(

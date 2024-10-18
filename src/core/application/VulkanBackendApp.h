@@ -23,6 +23,7 @@
 #include "core/texture/Sampler.h"
 #include "ImGuiIntegration.h"
 #include "core/Model.h"
+#include "core/renderGraph/RasterPass.h"
 
 
 namespace HWPT {
@@ -111,6 +112,10 @@ namespace HWPT {
             return m_swapChain;
         }
 
+        [[nodiscard]] auto GetMSAASampleCount() const -> uint {
+            return m_msaaSamples;
+        }
+
     private:
         // Init GLFW Windows
         void InitWindow();
@@ -164,19 +169,11 @@ namespace HWPT {
 
         void CleanUpSwapChain();
 
-        void CreateRenderPass();
-
         void CreateFrameBuffers();
 
         void CreateCommandPool();
 
         void CreateCommandBuffers();
-
-        void CreateGraphicsDescriptorSetLayout();
-
-        void CreateGraphicsPipeline();
-
-        void CreateParticleGraphicsPipeline();
 
         void CreateComputeDescriptorSetLayout();
 
@@ -197,6 +194,8 @@ namespace HWPT {
         void CreateModelAndSampler();
 
         void OnWindowResize();
+
+        void CreateRasterPass();
 
     protected:
         VkDevice m_device = VK_NULL_HANDLE;
@@ -235,14 +234,15 @@ namespace HWPT {
         std::vector<VkFramebuffer> m_swapChainFrameBuffers;
 //        SwapChain m_viewportSwapChain;  // TODO
 //        std::vector<VkFramebuffer> m_viewportFrameBuffer;
-        VkRenderPass m_renderPass = VK_NULL_HANDLE;
         CommandPool m_commandPool;
         std::vector<VkCommandBuffer> m_graphicsCommandBuffers;
         std::vector<VkCommandBuffer> m_computeCommandBuffers;
+
         // Graphics Pipeline
-        VkDescriptorSetLayout m_graphicsDescriptorSetLayout = VK_NULL_HANDLE;
-        VkPipelineLayout m_graphicsPipelineLayout = VK_NULL_HANDLE;
-        VkPipeline m_graphicsPipeline = VK_NULL_HANDLE;
+//        VkDescriptorSetLayout m_graphicsDescriptorSetLayout = VK_NULL_HANDLE;
+//        VkPipelineLayout m_graphicsPipelineLayout = VK_NULL_HANDLE;
+//        VkPipeline m_graphicsPipeline = VK_NULL_HANDLE;
+
         VkPipeline m_particleGraphicsPipeline = VK_NULL_HANDLE;
         // Compute Pipeline
         VkDescriptorSetLayout m_computeDescriptorSetLayout = VK_NULL_HANDLE;
@@ -281,6 +281,9 @@ namespace HWPT {
         std::vector<StorageBuffer*> m_particleStorageBuffers;
         void CreateParticleStorageBuffers();
         std::shared_ptr<VertexBufferLayout> m_particleVertexBufferLayout;
+
+        RasterPass* m_rasterPass = nullptr;
+        RasterPass* m_particlePass = nullptr;
     };
 }  // namespace HWPT
 
