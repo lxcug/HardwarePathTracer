@@ -67,3 +67,16 @@ target_link_libraries(
         PRIVATE imgui
         PRIVATE tinyobjloader::tinyobjloader
 )
+
+add_executable(
+        CompileHLSL src/core/shaderCompiler/CompilerHLSL.cpp
+)
+
+target_link_libraries(
+        CompileHLSL
+        PRIVATE Vulkan::Vulkan
+        PRIVATE glfw
+        PRIVATE glm::glm
+        PRIVATE imgui
+        PRIVATE tinyobjloader::tinyobjloader
+)
