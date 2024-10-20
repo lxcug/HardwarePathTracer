@@ -28,10 +28,9 @@ namespace HWPT {
     }
 
     RenderPassBase::~RenderPassBase() {
-        delete m_parameters;
-        vkDestroyRenderPass(GetVKDevice(), m_renderPass, nullptr);
         vkDestroyPipelineLayout(GetVKDevice(), m_pipelineLayout, nullptr);
         vkDestroyPipeline(GetVKDevice(), m_pipeline, nullptr);
+        delete m_parameters;
     }
 
     void RenderPassBase::SetShaderParameters(ShaderParameters *PassParameters) {

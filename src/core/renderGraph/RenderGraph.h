@@ -24,7 +24,7 @@ namespace HWPT {
 //        void AddPass();
 
     private:
-        std::vector<RenderPassMetaData> m_passMetaDatas;
+        std::vector<RenderPassMetaData> m_passMetaData;
     };
 }  // namespace HWPT
 

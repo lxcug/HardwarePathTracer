@@ -47,18 +47,19 @@ namespace HWPT {
 
         void CreatePipelineLayout();
 
-        virtual void BindRenderPipeline(VkCommandBuffer CommandBuffer) const = 0;
+        virtual void BindRenderPass(VkCommandBuffer CommandBuffer) const = 0;
 
         virtual void OnRenderPassSetupFinish() = 0;
 
+    public:
         void SetShaderParameters(ShaderParameters* PassParameters);
-
-        auto GetPassFlag() -> PassFlag {
-            return m_passFlag;
-        }
 
         [[nodiscard]] auto GetPassName() const -> const std::string & {
             return m_passName;
+        }
+
+        auto GetPassFlag() -> PassFlag {
+            return m_passFlag;
         }
 
         auto GetPipelineLayout() -> VkPipelineLayout {
@@ -68,10 +69,6 @@ namespace HWPT {
         auto GetPipeline() -> VkPipeline {
             return m_pipeline;
         }
-
-        auto GetRenderPass() -> VkRenderPass {
-            return m_renderPass;
-        };
 
         auto GetShaderParameters() -> ShaderParameters* {
             return m_parameters;
@@ -85,7 +82,6 @@ namespace HWPT {
 
         VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
 
-        VkRenderPass m_renderPass = VK_NULL_HANDLE;  // TODO: sub-pass support
         VkPipeline m_pipeline = VK_NULL_HANDLE;
     };
 }  // namespace HWPT

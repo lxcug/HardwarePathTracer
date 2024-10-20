@@ -10,6 +10,9 @@
 #include "core/shader/ShaderBase.h"
 #include "core/buffer/VertexBufferLayout.h"
 #include "ShaderParameters.h"
+#include "core/buffer/VertexBuffer.h"
+#include "core/buffer/IndexBuffer.h"
+#include "core/Model.h"
 
 
 namespace HWPT {
@@ -55,23 +58,35 @@ namespace HWPT {
 
         void OnRenderPassSetupFinish() override;
 
-        void BindRenderPipeline(VkCommandBuffer CommandBuffer) const override;
+        void BindRenderPass(VkCommandBuffer CommandBuffer) const override;
 
         [[nodiscard]] auto HasGeometryShader() const -> bool {
             return m_shaders.GeometryShader.has_value();
         }
 
-    private:
-        void Init();
+        auto GetRenderPass() -> VkRenderPass& {
+            return m_renderPass;
+        }
 
+        // TODO
+        void Execute(const VertexBuffer& InVertexBuffer);
+
+        void Execute(const IndexBuffer& InIndexBuffer);
+
+        void Execute(const Model& InModel);
+
+    private:
         void CreateDefaultVertexBufferLayout();
 
         void CreateRenderPass();
+
+        void CreateRenderPipeline();
 
     private:
         RasterPassShaders m_shaders;
         VertexBufferLayout* m_vertexBufferLayout = nullptr;
         PrimitiveType m_primitiveType = PrimitiveType::None;
+        VkRenderPass m_renderPass = VK_NULL_HANDLE;  // TODO: sub-pass support
     };
 }  // namespace HWPT
 

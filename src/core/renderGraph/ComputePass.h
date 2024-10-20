@@ -13,17 +13,24 @@ namespace HWPT {
     class ComputePass : public RenderPassBase {
     public:
         ComputePass(std::string PassName, PassFlag Flag,
-                    const std::string& ComputeSPVPath,
-                    const char* ComputeEntry);
+                    const std::string &ComputeSPVPath,
+                    const char *ComputeEntry);
 
         ~ComputePass() override;
 
         void OnRenderPassSetupFinish() override;
 
-        void BindRenderPipeline(VkCommandBuffer CommandBuffer) const override;
+        void BindRenderPass(VkCommandBuffer CommandBuffer) const override;
+
+        // TODO: Get ThreadGroupSize From Shader
+        void Execute(VkCommandBuffer CommandBuffer, uint NumThreadGroupX, uint NumThreadGroupY,
+                     uint NumThreadGroupZ);
 
     private:
-        ShaderBase* m_computeShader = nullptr;
+        void CreateRenderPipeline();
+
+    private:
+        ShaderBase *m_computeShader = nullptr;
     };
 }  // namespace HWPT
 

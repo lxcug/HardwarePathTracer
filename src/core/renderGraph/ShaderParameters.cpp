@@ -93,15 +93,15 @@ namespace HWPT {
     }
 
     void ShaderParameters::CreateDescriptorSets() {
-        VkDescriptorSetAllocateInfo AllocateInfo{};
-        AllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        AllocateInfo.descriptorPool = VulkanBackendApp::GetApplication()->GetGlobalDescriptorPool();
-        AllocateInfo.descriptorSetCount = 1;
-        AllocateInfo.pSetLayouts = &m_descriptorSetLayout;
-        if (m_descriptorSet != VK_NULL_HANDLE) {
-            vkFreeDescriptorSets(GetVKDevice(), VulkanBackendApp::GetApplication()->GetGlobalDescriptorPool(), 1, &m_descriptorSet);
+        if (!m_descriptorSetsAllocated) {
+            VkDescriptorSetAllocateInfo AllocateInfo{};
+            AllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+            AllocateInfo.descriptorPool = VulkanBackendApp::GetApplication()->GetGlobalDescriptorPool();
+            AllocateInfo.descriptorSetCount = 1;
+            AllocateInfo.pSetLayouts = &m_descriptorSetLayout;
+            VK_CHECK(vkAllocateDescriptorSets(GetVKDevice(), &AllocateInfo, &m_descriptorSet));
+            m_descriptorSetsAllocated = true;
         }
-        VK_CHECK(vkAllocateDescriptorSets(GetVKDevice(), &AllocateInfo, &m_descriptorSet));
 
         std::vector<VkWriteDescriptorSet> DescriptorWrites;
         uint BindingIndex = 0;
@@ -157,12 +157,26 @@ namespace HWPT {
                     DescriptorWrites.push_back(MetaData.ParameterDescriptorSet);
                     break;
                 }
-                case ShaderParameterType::StorageBuffer:
-                    [[fallthrough]];
+                case ShaderParameterType::StorageBuffer: {  // TODO: Why Fallthrough fails
+                    Check(MetaData.Parameter != nullptr);
+                    VkDescriptorBufferInfo BufferInfo{};
+                    BufferInfo.buffer = static_cast<StorageBuffer *>(MetaData.Parameter)->GetHandle();
+                    BufferInfo.offset = 0;
+                    BufferInfo.range = VK_WHOLE_SIZE;
+                    MetaData.ParameterDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                    MetaData.ParameterDescriptorSet.dstSet = m_descriptorSet;
+                    MetaData.ParameterDescriptorSet.dstBinding = BindingIndex++;
+                    MetaData.ParameterDescriptorSet.dstArrayElement = 0;
+                    MetaData.ParameterDescriptorSet.descriptorCount = 1;
+                    MetaData.ParameterDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                    MetaData.ParameterDescriptorSet.pBufferInfo = &BufferInfo;
+                    DescriptorWrites.push_back(MetaData.ParameterDescriptorSet);
+                    break;
+                }
                 case ShaderParameterType::RWStorageBuffer : {
                     Check(MetaData.Parameter != nullptr);
                     VkDescriptorBufferInfo BufferInfo{};
-                    BufferInfo.buffer = static_cast<UniformBuffer *>(MetaData.Parameter)->GetHandle();
+                    BufferInfo.buffer = static_cast<StorageBuffer *>(MetaData.Parameter)->GetHandle();
                     BufferInfo.offset = 0;
                     BufferInfo.range = VK_WHOLE_SIZE;
                     MetaData.ParameterDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -227,12 +241,12 @@ namespace HWPT {
 
     void ShaderParameters::AddParameters(
             const std::initializer_list<std::pair<std::string, ShaderParameterType>> &InitList) {
-        for (auto& Elem : InitList) {
+        for (auto &Elem: InitList) {
             AddParameter(Elem.first, Elem.second);
         }
     }
 
-    void ShaderParameters::OnRenderPassBegin() {
+    void ShaderParameters::OnRenderPassBegin(uint Index) {
         CreateDescriptorSets();
     }
 
@@ -244,4 +258,5 @@ namespace HWPT {
 //                           VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 //                           0, ConstantSize, &MetaData.Parameter);
 //    }
+
 }  // namespace HWPT

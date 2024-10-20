@@ -104,10 +104,6 @@ namespace HWPT {
         CreateMSAABuffers();
         CreateFrameBuffers();
 
-        CreateComputeDescriptorSetLayout();
-        CreateComputePipeline();
-        CreateComputeDescriptorSets();
-
         CreateSyncObjects();
     }
 
@@ -174,11 +170,14 @@ namespace HWPT {
         VkCommandBufferBeginInfo ComputeBeginInfo{};
         ComputeBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         VK_CHECK(vkBeginCommandBuffer(ComputeCommandBuffer, &ComputeBeginInfo));
-        vkCmdBindPipeline(ComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipeline);
-        vkCmdBindDescriptorSets(ComputeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                m_computePipelineLayout, 0, 1,
-                                &m_computeDescriptorSets[m_currentFrame], 0, nullptr);
-        vkCmdDispatch(ComputeCommandBuffer, (s_particleCount + 255) / 256, 1, 1);
+
+        uint LastFrameIndex = m_currentFrame == 0 ? MAX_FRAMES_IN_FLIGHT - 1 : m_currentFrame - 1;
+        m_updateParticlePass->GetShaderParameters()->SetParameter("ViewUniformBuffer", m_MVPUniformBuffers[0]);
+        m_updateParticlePass->GetShaderParameters()->SetParameter("ParticlesIn", m_particleStorageBuffers[LastFrameIndex]);
+        m_updateParticlePass->GetShaderParameters()->SetParameter("ParticlesOut", m_particleStorageBuffers[m_currentFrame]);
+        m_updateParticlePass->BindRenderPass(ComputeCommandBuffer);
+        m_updateParticlePass->Execute(ComputeCommandBuffer, (s_particleCount + 255) / 256, 1, 1);
+
         VK_CHECK(vkEndCommandBuffer(ComputeCommandBuffer));
 
         VkSubmitInfo ComputeSubmitInfo{};
@@ -190,7 +189,6 @@ namespace HWPT {
         ComputeSubmitInfo.pSignalSemaphores = &m_computeFinishedSemaphores[m_currentFrame];
         VK_CHECK(vkQueueSubmit(m_queue.ComputeQueue, 1, &ComputeSubmitInfo,
                                m_computeInFlightFences[m_currentFrame]));
-
 
         vkWaitForFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame], VK_TRUE,
                         UINT64_MAX);
@@ -625,58 +623,6 @@ namespace HWPT {
         vkFreeCommandBuffers(m_device, m_commandPool.GraphicsPool, 1, &CommandBuffer);
     }
 
-    void VulkanBackendApp::CreateComputeDescriptorSetLayout() {
-        std::array<VkDescriptorSetLayoutBinding, 3> LayoutBindings{};
-        LayoutBindings[0].binding = 0;
-        LayoutBindings[0].descriptorCount = 1;
-        LayoutBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        LayoutBindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-        LayoutBindings[1].binding = 1;
-        LayoutBindings[1].descriptorCount = 1;
-        LayoutBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        LayoutBindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-        LayoutBindings[2].binding = 2;
-        LayoutBindings[2].descriptorCount = 1;
-        LayoutBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        LayoutBindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-        VkDescriptorSetLayoutCreateInfo LayoutInfo{};
-        LayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        LayoutInfo.bindingCount = LayoutBindings.size();
-        LayoutInfo.pBindings = LayoutBindings.data();
-
-        VK_CHECK(vkCreateDescriptorSetLayout(m_device, &LayoutInfo, nullptr,
-                                             &m_computeDescriptorSetLayout));
-    }
-
-    void VulkanBackendApp::CreateComputePipeline() {
-        VkPipelineLayoutCreateInfo PipelineLayoutInfo{};
-        PipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        PipelineLayoutInfo.setLayoutCount = 1;
-        PipelineLayoutInfo.pSetLayouts = &m_computeDescriptorSetLayout;
-        VK_CHECK(vkCreatePipelineLayout(m_device, &PipelineLayoutInfo, nullptr,
-                                        &m_computePipelineLayout));
-
-        ShaderBase ComputeShader(ShaderType::Compute, "../../shader/HLSL/UpdateParticle.spv",
-                                 "UpdateParticles");
-
-        VkPipelineShaderStageCreateInfo ComputeShaderStageInfo{};
-        ComputeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        ComputeShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-        ComputeShaderStageInfo.module = ComputeShader.GetHandle();
-        ComputeShaderStageInfo.pName = ComputeShader.GetEntryName();
-
-        VkComputePipelineCreateInfo PipelineInfo{};
-        PipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-        PipelineInfo.stage = ComputeShaderStageInfo;
-        PipelineInfo.layout = m_computePipelineLayout;
-
-        VK_CHECK(vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &PipelineInfo, nullptr,
-                                          &m_computePipeline));
-    }
-
     struct MVPData {
         glm::mat4 ModelTrans;
         glm::mat4 ViewTrans;
@@ -808,7 +754,7 @@ namespace HWPT {
         m_rasterPass->GetShaderParameters()->SetParameter<UniformBuffer *>("ViewUniformBuffer",
                                                                 m_MVPUniformBuffers[0]);
         m_rasterPass->GetShaderParameters()->SetParameter<Texture2D *>("Texture", m_vikingRoom->GetTexture());
-        m_rasterPass->BindRenderPipeline(CommandBuffer);
+        m_rasterPass->BindRenderPass(CommandBuffer);
         m_vikingRoom->DrawIndexed(CommandBuffer);
 
         VkDeviceSize Offsets = 0;
@@ -817,7 +763,7 @@ namespace HWPT {
 
         m_particlePass->GetShaderParameters()->SetParameter<UniformBuffer *>("ViewUniformBuffer",
                                                                              m_MVPUniformBuffers[0]);
-        m_particlePass->BindRenderPipeline(CommandBuffer);
+        m_particlePass->BindRenderPass(CommandBuffer);
         vkCmdDraw(CommandBuffer, s_particleCount, 1, 0, 0);
 
         vkCmdEndRenderPass(CommandBuffer);
@@ -1044,61 +990,6 @@ namespace HWPT {
         }
     }
 
-    void VulkanBackendApp::CreateComputeDescriptorSets() {
-        std::vector<VkDescriptorSetLayout> Layouts(MAX_FRAMES_IN_FLIGHT,
-                                                   m_computeDescriptorSetLayout);
-        VkDescriptorSetAllocateInfo AllocateInfo{};
-        AllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        AllocateInfo.descriptorPool = m_descriptorPool;
-        AllocateInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
-        AllocateInfo.pSetLayouts = Layouts.data();
-
-        m_computeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-        VK_CHECK(vkAllocateDescriptorSets(m_device, &AllocateInfo, m_computeDescriptorSets.data()));
-
-        std::array<VkWriteDescriptorSet, 3> DescriptorWrites{};
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            VkDescriptorBufferInfo BufferInfo{};
-            BufferInfo.buffer = m_MVPUniformBuffers[i]->GetHandle();
-            BufferInfo.offset = 0;
-            BufferInfo.range = VK_WHOLE_SIZE;
-            DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescriptorWrites[0].dstSet = m_computeDescriptorSets[i];
-            DescriptorWrites[0].dstBinding = 0;
-            DescriptorWrites[0].dstArrayElement = 0;
-            DescriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            DescriptorWrites[0].descriptorCount = 1;
-            DescriptorWrites[0].pBufferInfo = &BufferInfo;
-
-            VkDescriptorBufferInfo LastFrameStorageBufferInfo{};
-            int LastFrameIndex = i == 0 ? MAX_FRAMES_IN_FLIGHT - 1 : i - 1;
-            LastFrameStorageBufferInfo.buffer = m_particleStorageBuffers[LastFrameIndex]->GetHandle();
-            LastFrameStorageBufferInfo.offset = 0;
-            LastFrameStorageBufferInfo.range = VK_WHOLE_SIZE;
-            DescriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescriptorWrites[1].dstSet = m_computeDescriptorSets[i];
-            DescriptorWrites[1].dstBinding = 1;
-            DescriptorWrites[1].dstArrayElement = 0;
-            DescriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            DescriptorWrites[1].descriptorCount = 1;
-            DescriptorWrites[1].pBufferInfo = &LastFrameStorageBufferInfo;
-
-            VkDescriptorBufferInfo CurrentFrameStorageBufferInfo{};
-            CurrentFrameStorageBufferInfo.buffer = m_particleStorageBuffers[i]->GetHandle();
-            CurrentFrameStorageBufferInfo.offset = 0;
-            CurrentFrameStorageBufferInfo.range = VK_WHOLE_SIZE;
-            DescriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescriptorWrites[2].dstSet = m_computeDescriptorSets[i];
-            DescriptorWrites[2].dstBinding = 2;
-            DescriptorWrites[2].dstArrayElement = 0;
-            DescriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            DescriptorWrites[2].descriptorCount = 1;
-            DescriptorWrites[2].pBufferInfo = &CurrentFrameStorageBufferInfo;
-
-            vkUpdateDescriptorSets(m_device, 3, DescriptorWrites.data(), 0, nullptr);
-        }
-    }
-
     void VulkanBackendApp::CreateRasterPass() {
         m_rasterPass = new RasterPass("MeshRaster", PassFlag::Raster,
                                       "../../shader/HLSL/Vert.spv", "VSMain",
@@ -1130,18 +1021,17 @@ namespace HWPT {
 
 
     void VulkanBackendApp::CreateComputePass() {
-//        m_updateParticlePass = new ComputePass("UpdateParticle", PassFlag::Compute,
-//                                               "../../shader/HLSL/UpdateParticle.spv",
-//                                               "UpdateParticles");
-//        auto *PassParameters = new ShaderParameters(m_updateParticlePass);
-//        PassParameters->AddParameters({
-//                                              {"ViewUniformBuffer", ShaderParameterType::UniformBuffer},
-//                                              {"ParticlesIn",       ShaderParameterType::StorageBuffer},
-//                                              {"ParticlesOut",      ShaderParameterType::RWStorageBuffer}
-//                                      });
-//        PassParameters->SetParameter("ViewUniformBuffer", m_MVPUniformBuffers[0]);
-//        m_updateParticlePass->SetShaderParameters(PassParameters);
-//        m_updateParticlePass->CreateRenderPipeline();
+        m_updateParticlePass = new ComputePass("UpdateParticle", PassFlag::Compute,
+                                               "../../shader/HLSL/UpdateParticle.spv",
+                                               "UpdateParticles");
+        auto *PassParameters = new ShaderParameters(m_updateParticlePass);
+        PassParameters->AddParameters({
+                                              {"ViewUniformBuffer", ShaderParameterType::UniformBuffer},
+                                              {"ParticlesIn",       ShaderParameterType::StorageBuffer},
+                                              {"ParticlesOut",      ShaderParameterType::RWStorageBuffer}
+                                      });
+        m_updateParticlePass->SetShaderParameters(PassParameters);
+        m_updateParticlePass->OnRenderPassSetupFinish();
     }
 
     void SwapChain::GetImages(VkDevice Device) {

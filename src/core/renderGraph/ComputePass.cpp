@@ -21,16 +21,19 @@ namespace HWPT {
 
     void ComputePass::OnRenderPassSetupFinish() {
         Check(m_parameters != nullptr);
-        m_parameters->OnShaderParameterSetFinish();
+        m_parameters->OnShaderParameterSetFinish();  // Create DescriptorSetLayout
         CreatePipelineLayout();
+        CreateRenderPipeline();
+    }
 
-        VkPipelineLayoutCreateInfo PipelineLayoutInfo{};
-        PipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        PipelineLayoutInfo.setLayoutCount = 1;
-        PipelineLayoutInfo.pSetLayouts = &m_parameters->GetDescriptorSetLayout();
-        VK_CHECK(vkCreatePipelineLayout(GetVKDevice(), &PipelineLayoutInfo, nullptr,
-                                        &m_pipelineLayout));
+    void ComputePass::BindRenderPass(VkCommandBuffer CommandBuffer) const {
+        m_parameters->OnRenderPassBegin();
+        vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout, 0,
+                                1, &m_parameters->GetDescriptorSets(), 0, nullptr);
+        vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
+    }
 
+    void ComputePass::CreateRenderPipeline() {
         VkPipelineShaderStageCreateInfo ComputeShaderStageInfo{};
         ComputeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         ComputeShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -46,10 +49,9 @@ namespace HWPT {
                                           &m_pipeline));
     }
 
-    void ComputePass::BindRenderPipeline(VkCommandBuffer CommandBuffer) const {
-        vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout
-                , 0, 1, &m_parameters->GetDescriptorSets(), 0, nullptr);
-        vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
+    void
+    ComputePass::Execute(VkCommandBuffer CommandBuffer, uint NumThreadGroupX, uint NumThreadGroupY,
+                         uint NumThreadGroupZ) {
+        vkCmdDispatch(CommandBuffer, NumThreadGroupX, NumThreadGroupY, NumThreadGroupZ);
     }
-
 }  // namespace HWPT

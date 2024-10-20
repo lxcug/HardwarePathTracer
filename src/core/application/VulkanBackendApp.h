@@ -186,13 +186,7 @@ namespace HWPT {
 
         void CreateCommandBuffers();
 
-        void CreateComputeDescriptorSetLayout();
-
-        void CreateComputePipeline();
-
         void CreateDescriptorPool();
-
-        void CreateComputeDescriptorSets();
 
         void CreateSyncObjects();
 

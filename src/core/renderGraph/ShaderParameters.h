@@ -92,7 +92,7 @@ namespace HWPT {
             return m_descriptorSet;
         }
 
-        void OnRenderPassBegin();
+        void OnRenderPassBegin(uint Index = 0);
 
     private:
         void CreateDescriptorSetLayout();
@@ -108,8 +108,9 @@ namespace HWPT {
         std::unordered_map<std::string, ShaderParameterMetaData> m_parameterMetaData;
         RenderPassBase* m_renderPass = nullptr;
         VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
-        VkDescriptorSet m_descriptorSet = VK_NULL_HANDLE;
         bool m_parameterSetFinish = false;
+        VkDescriptorSet m_descriptorSet;
+        bool m_descriptorSetsAllocated = false;
     };
 }  // namespace HWPT
 
