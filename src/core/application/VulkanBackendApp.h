@@ -24,6 +24,7 @@
 #include "ImGuiIntegration.h"
 #include "core/Model.h"
 #include "core/renderGraph/RasterPass.h"
+#include "core/renderGraph/ComputePass.h"
 
 
 namespace HWPT {
@@ -116,12 +117,22 @@ namespace HWPT {
             return m_msaaSamples;
         }
 
+        auto GetGlobalSampler() -> Sampler* {
+            return m_sampler;
+        }
+
+        auto GetGlobalDescriptorPool() -> VkDescriptorPool& {
+            return m_descriptorPool;
+        }
+
     private:
         // Init GLFW Windows
         void InitWindow();
 
         // Init Vulkan Backend
         void InitVulkan();
+
+        void InitVulkanInfrastructure();
 
         void CleanUp();
 
@@ -181,8 +192,6 @@ namespace HWPT {
 
         void CreateDescriptorPool();
 
-        void CreateGraphicsDescriptorSets();
-
         void CreateComputeDescriptorSets();
 
         void CreateSyncObjects();
@@ -196,6 +205,8 @@ namespace HWPT {
         void OnWindowResize();
 
         void CreateRasterPass();
+
+        void CreateComputePass();
 
     protected:
         VkDevice m_device = VK_NULL_HANDLE;
@@ -238,11 +249,6 @@ namespace HWPT {
         std::vector<VkCommandBuffer> m_graphicsCommandBuffers;
         std::vector<VkCommandBuffer> m_computeCommandBuffers;
 
-        // Graphics Pipeline
-//        VkDescriptorSetLayout m_graphicsDescriptorSetLayout = VK_NULL_HANDLE;
-//        VkPipelineLayout m_graphicsPipelineLayout = VK_NULL_HANDLE;
-//        VkPipeline m_graphicsPipeline = VK_NULL_HANDLE;
-
         VkPipeline m_particleGraphicsPipeline = VK_NULL_HANDLE;
         // Compute Pipeline
         VkDescriptorSetLayout m_computeDescriptorSetLayout = VK_NULL_HANDLE;
@@ -250,7 +256,6 @@ namespace HWPT {
         VkPipeline m_computePipeline = VK_NULL_HANDLE;
 
         VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
-        std::vector<VkDescriptorSet> m_graphicsDescriptorSets;
         std::vector<VkDescriptorSet> m_computeDescriptorSets;
 
         uint m_currentFrame = 0;
@@ -284,6 +289,7 @@ namespace HWPT {
 
         RasterPass* m_rasterPass = nullptr;
         RasterPass* m_particlePass = nullptr;
+        ComputePass* m_updateParticlePass = nullptr;
     };
 }  // namespace HWPT
 

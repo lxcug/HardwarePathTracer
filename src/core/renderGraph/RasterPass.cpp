@@ -35,20 +35,11 @@ namespace HWPT {
 
     void RasterPass::Init() {
         CreateDefaultVertexBufferLayout();
-        CreatePipelineDescriptorSetLayouts();
-        CreatePipelineLayout();
         CreateRenderPass();
     }
 
     RasterPass::~RasterPass() {
         delete m_vertexBufferLayout;
-        delete m_parameters;
-        for (auto &m_descriptorSetLayout: m_descriptorSetLayouts) {
-            vkDestroyDescriptorSetLayout(GetVKDevice(), m_descriptorSetLayout, nullptr);
-        }
-        vkDestroyRenderPass(GetVKDevice(), m_renderPass, nullptr);
-        vkDestroyPipelineLayout(GetVKDevice(), m_pipelineLayout, nullptr);
-        vkDestroyPipeline(GetVKDevice(), m_pipeline, nullptr);
     }
 
     void RasterPass::CreateDefaultVertexBufferLayout() {
@@ -56,47 +47,6 @@ namespace HWPT {
                 {VertexAttribute(VertexAttributeDataType::Float3, "Pos"),
                  VertexAttribute(VertexAttributeDataType::Float3, "Color"),
                  VertexAttribute(VertexAttributeDataType::Float2, "TexCoord")});
-    }
-
-    void RasterPass::CreatePipelineDescriptorSetLayouts() {
-        m_descriptorSetLayouts.resize(1);
-
-        VkDescriptorSetLayoutBinding UBOLayoutBinding{};
-        UBOLayoutBinding.binding = 0;
-        UBOLayoutBinding.descriptorCount = 1;
-        UBOLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        UBOLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-        UBOLayoutBinding.pImmutableSamplers = nullptr;
-
-        VkDescriptorSetLayoutBinding SamplerLayoutBinding{};
-        SamplerLayoutBinding.binding = 1;
-        SamplerLayoutBinding.descriptorCount = 1;
-        SamplerLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        SamplerLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-        std::array<VkDescriptorSetLayoutBinding, 2> Bindings = {
-                UBOLayoutBinding, SamplerLayoutBinding
-        };
-
-        VkDescriptorSetLayoutCreateInfo LayoutInfo{};
-        LayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        LayoutInfo.bindingCount = Bindings.size();
-        LayoutInfo.pBindings = Bindings.data();
-
-        VK_CHECK(vkCreateDescriptorSetLayout(GetVKDevice(), &LayoutInfo, nullptr,
-                                             &m_descriptorSetLayouts[0]));
-    }
-
-    void RasterPass::CreatePipelineLayout() {
-        VkPipelineLayoutCreateInfo PipelineLayoutInfo{};
-        PipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        PipelineLayoutInfo.setLayoutCount = 1;
-        PipelineLayoutInfo.pSetLayouts = &m_descriptorSetLayouts[0];
-        PipelineLayoutInfo.pushConstantRangeCount = 0;
-        PipelineLayoutInfo.pPushConstantRanges = nullptr;
-
-        VK_CHECK(vkCreatePipelineLayout(GetVKDevice(), &PipelineLayoutInfo, nullptr,
-                                        &m_pipelineLayout));
     }
 
     void RasterPass::CreateRenderPass() {
@@ -178,6 +128,9 @@ namespace HWPT {
     }
 
     void RasterPass::BindRenderPipeline(VkCommandBuffer CommandBuffer) const {
+        m_parameters->OnRenderPassBegin();
+        vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout
+                                , 0, 1, &m_parameters->GetDescriptorSets(), 0, nullptr);
         vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
     }
 
@@ -188,22 +141,37 @@ namespace HWPT {
         m_vertexBufferLayout = new VertexBufferLayout(VertexAttributes);
     }
 
-    void RasterPass::CreateRenderPipeline() {
+    void RasterPass::OnRenderPassSetupFinish() {
+        Check(m_parameters != nullptr);
+        Check(m_renderPass != VK_NULL_HANDLE);
+
+        m_parameters->OnShaderParameterSetFinish();
+        CreatePipelineLayout();
+
         VkPipelineShaderStageCreateInfo VertShaderStageInfo{};
         VertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         VertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
-        VertShaderStageInfo.module = m_shaders.VertexShader->GetHandle();
-        VertShaderStageInfo.pName = m_shaders.VertexShader->GetEntryName();
+        VertShaderStageInfo.module = m_shaders.VertexShader.value()->GetHandle();
+        VertShaderStageInfo.pName = m_shaders.VertexShader.value()->GetEntryName();
 
         VkPipelineShaderStageCreateInfo FragShaderStageInfo{};
         FragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         FragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        FragShaderStageInfo.module = m_shaders.FragmentShader->GetHandle();
-        FragShaderStageInfo.pName = m_shaders.FragmentShader->GetEntryName();
+        FragShaderStageInfo.module = m_shaders.FragmentShader.value()->GetHandle();
+        FragShaderStageInfo.pName = m_shaders.FragmentShader.value()->GetEntryName();
 
-        std::array<VkPipelineShaderStageCreateInfo, 2> ShaderStages = {
+        std::vector<VkPipelineShaderStageCreateInfo> ShaderStages = {
                 VertShaderStageInfo, FragShaderStageInfo
         };
+        bool HasGeometryStage = m_shaders.GeometryShader.has_value();
+        if (HasGeometryStage) {
+            VkPipelineShaderStageCreateInfo GeometryShaderStageInfo{};
+            GeometryShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+            GeometryShaderStageInfo.stage = VK_SHADER_STAGE_GEOMETRY_BIT;
+            GeometryShaderStageInfo.module = m_shaders.GeometryShader.value()->GetHandle();
+            GeometryShaderStageInfo.pName = m_shaders.GeometryShader.value()->GetEntryName();
+            ShaderStages.push_back(GeometryShaderStageInfo);
+        }
 
         VkPipelineVertexInputStateCreateInfo VertexInputInfo{};
         VertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -307,11 +275,4 @@ namespace HWPT {
         VK_CHECK(vkCreateGraphicsPipelines(GetVKDevice(), VK_NULL_HANDLE, 1, &PipelineInfo,
                                            nullptr, &m_pipeline));
     }
-
-//    void
-//    RasterPass::BindDescriptorSets(VkCommandBuffer CommandBuffer, VkDescriptorSet &DescriptorSet) {
-//        vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-//                                m_pipelineLayout, 0, 1, &DescriptorSet, 0, nullptr);
-//    }
-
 }  // namespace HWPT

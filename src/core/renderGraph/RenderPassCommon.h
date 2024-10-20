@@ -6,6 +6,7 @@
 #define HARDWAREPATHTRACER_RENDERPASSCOMMON_H
 
 #include "core/Core.h"
+#include <vector>
 
 
 namespace HWPT {
@@ -33,12 +34,24 @@ namespace HWPT {
 
     auto GetVKPrimitiveType(PrimitiveType Type) -> VkPrimitiveTopology;
 
+    class ShaderParameters;
+
     class RenderPassBase {
     public:
+        friend class ShaderParameters;
+
         explicit RenderPassBase(std::string PassName, PassFlag Flag)
                 : m_passName(std::move(PassName)), m_passFlag(Flag) {}
 
-        virtual ~RenderPassBase() = default;
+        virtual ~RenderPassBase();
+
+        void CreatePipelineLayout();
+
+        virtual void BindRenderPipeline(VkCommandBuffer CommandBuffer) const = 0;
+
+        virtual void OnRenderPassSetupFinish() = 0;
+
+        void SetShaderParameters(ShaderParameters* PassParameters);
 
         auto GetPassFlag() -> PassFlag {
             return m_passFlag;
@@ -48,9 +61,32 @@ namespace HWPT {
             return m_passName;
         }
 
+        auto GetPipelineLayout() -> VkPipelineLayout {
+            return m_pipelineLayout;
+        }
+
+        auto GetPipeline() -> VkPipeline {
+            return m_pipeline;
+        }
+
+        auto GetRenderPass() -> VkRenderPass {
+            return m_renderPass;
+        };
+
+        auto GetShaderParameters() -> ShaderParameters* {
+            return m_parameters;
+        }
+
     protected:
         std::string m_passName = "Uninitialized";
         PassFlag m_passFlag = PassFlag::None;
+
+        ShaderParameters* m_parameters = nullptr;  // TODO
+
+        VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
+
+        VkRenderPass m_renderPass = VK_NULL_HANDLE;  // TODO: sub-pass support
+        VkPipeline m_pipeline = VK_NULL_HANDLE;
     };
 }  // namespace HWPT
 

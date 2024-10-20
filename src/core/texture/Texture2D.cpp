@@ -116,7 +116,7 @@ namespace HWPT {
         vkFreeMemory(GetVKDevice(), m_textureMemory, nullptr);
     }
 
-    auto Texture2D::CreateSRV() -> VkImageView {
+    auto Texture2D::CreateSRV() -> VkImageView& {
         if (IsSRVCreated) {
             return m_textureView;
         }

@@ -30,7 +30,7 @@ namespace HWPT {
 
         void CreateTexture(const std::filesystem::path& TexturePath);
 
-        auto CreateSRV() -> VkImageView;
+        auto CreateSRV() -> VkImageView&;
 
         auto GetHandle() -> VkImage& {
             return m_texture;

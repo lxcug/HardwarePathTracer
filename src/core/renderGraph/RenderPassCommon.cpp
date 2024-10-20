@@ -3,6 +3,7 @@
 //
 
 #include "RenderPassCommon.h"
+#include "ShaderParameters.h"
 
 
 namespace HWPT {
@@ -24,5 +25,39 @@ namespace HWPT {
                 throw std::runtime_error("Unsupported PrimitiveType");
                 return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         }
+    }
+
+    RenderPassBase::~RenderPassBase() {
+        delete m_parameters;
+        vkDestroyRenderPass(GetVKDevice(), m_renderPass, nullptr);
+        vkDestroyPipelineLayout(GetVKDevice(), m_pipelineLayout, nullptr);
+        vkDestroyPipeline(GetVKDevice(), m_pipeline, nullptr);
+    }
+
+    void RenderPassBase::SetShaderParameters(ShaderParameters *PassParameters) {
+        if (PassParameters->m_renderPass != this) {
+            throw std::runtime_error("ShaderParameters::RenderPass is nullptr or mismatch");
+        }
+        m_parameters = PassParameters;
+    }
+
+    void RenderPassBase::CreatePipelineLayout() {
+        VkPipelineLayoutCreateInfo PipelineLayoutInfo{};
+        PipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        PipelineLayoutInfo.setLayoutCount = 1;
+        PipelineLayoutInfo.pSetLayouts = &m_parameters->GetDescriptorSetLayout();
+        VkShaderStageFlags ShaderStage = VK_SHADER_STAGE_ALL_GRAPHICS;
+        if (m_passFlag == PassFlag::Compute) {
+            ShaderStage = VK_SHADER_STAGE_COMPUTE_BIT;
+        }
+        // TODO: PushConstant Support
+        VkPushConstantRange ConstantRange{};
+        ConstantRange.stageFlags = ShaderStage;
+        ConstantRange.offset = 0;
+        ConstantRange.size = 0;
+        PipelineLayoutInfo.pushConstantRangeCount = 0;
+
+        VK_CHECK(vkCreatePipelineLayout(GetVKDevice(), &PipelineLayoutInfo, nullptr,
+                                        &m_pipelineLayout));
     }
 }  // namespace HWPT

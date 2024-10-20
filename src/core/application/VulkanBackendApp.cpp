@@ -90,33 +90,35 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::InitVulkan() {
-        CreateVkInstance();
-        CreateSurface();
-        SelectPhysicalDevice();
-        CreateLogicalDevice();
+        InitVulkanInfrastructure();
+
         CreateSwapChain();
 
+        CreateUniformBuffers();
+        CreateModelAndSampler();
+        CreateParticleStorageBuffers();
+
         CreateRasterPass();
+        CreateComputePass();
 
         CreateMSAABuffers();
         CreateFrameBuffers();
 
-        CreateCommandPool();
-        CreateCommandBuffers();
-
-        CreateDescriptorPool();
-
-        CreateUniformBuffers();
-        CreateModelAndSampler();
-
-        CreateGraphicsDescriptorSets();
-
-        CreateParticleStorageBuffers();
         CreateComputeDescriptorSetLayout();
         CreateComputePipeline();
         CreateComputeDescriptorSets();
 
         CreateSyncObjects();
+    }
+
+    void VulkanBackendApp::InitVulkanInfrastructure() {
+        CreateVkInstance();
+        CreateSurface();
+        SelectPhysicalDevice();
+        CreateLogicalDevice();
+        CreateCommandPool();
+        CreateCommandBuffers();
+        CreateDescriptorPool();
     }
 
     void VulkanBackendApp::FrameBufferResizeCallback(GLFWwindow *Window, int Width, int Height) {
@@ -128,6 +130,7 @@ namespace HWPT {
     void VulkanBackendApp::CleanUp() {
         delete m_rasterPass;
         delete m_particlePass;
+        delete m_updateParticlePass;
         delete m_msaaBuffers;
         delete m_vikingRoom;
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -656,7 +659,8 @@ namespace HWPT {
         VK_CHECK(vkCreatePipelineLayout(m_device, &PipelineLayoutInfo, nullptr,
                                         &m_computePipelineLayout));
 
-        ShaderBase ComputeShader(ShaderType::Compute, "../../shader/HLSL/UpdateParticle.spv", "UpdateParticles");
+        ShaderBase ComputeShader(ShaderType::Compute, "../../shader/HLSL/UpdateParticle.spv",
+                                 "UpdateParticles");
 
         VkPipelineShaderStageCreateInfo ComputeShaderStageInfo{};
         ComputeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -705,63 +709,23 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateDescriptorPool() {
-        std::array<VkDescriptorPoolSize, 3> PoolSizes{};
+        std::array<VkDescriptorPoolSize, 4> PoolSizes{};
         PoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        PoolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT;
+        PoolSizes[0].descriptorCount = 10;
         PoolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        PoolSizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT;
+        PoolSizes[1].descriptorCount = 10;
         PoolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        PoolSizes[2].descriptorCount = MAX_FRAMES_IN_FLIGHT * 2;
+        PoolSizes[2].descriptorCount = 10;
+        PoolSizes[3].type = VK_DESCRIPTOR_TYPE_SAMPLER;
+        PoolSizes[3].descriptorCount = 10;
 
         VkDescriptorPoolCreateInfo PoolInfo{};
         PoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         PoolInfo.poolSizeCount = PoolSizes.size();
         PoolInfo.pPoolSizes = PoolSizes.data();
-        PoolInfo.maxSets = 4;
+        PoolInfo.maxSets = 40;
+        PoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
         VK_CHECK(vkCreateDescriptorPool(m_device, &PoolInfo, nullptr, &m_descriptorPool));
-    }
-
-    void VulkanBackendApp::CreateGraphicsDescriptorSets() {
-        std::vector<VkDescriptorSetLayout> Layouts(MAX_FRAMES_IN_FLIGHT,
-                                                   m_rasterPass->GetDescriptorSetLayout());
-        VkDescriptorSetAllocateInfo AllocateInfo{};
-        AllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-        AllocateInfo.descriptorPool = m_descriptorPool;
-        AllocateInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
-        AllocateInfo.pSetLayouts = Layouts.data();
-
-        m_graphicsDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-        VK_CHECK(
-                vkAllocateDescriptorSets(m_device, &AllocateInfo, m_graphicsDescriptorSets.data()));
-
-        std::array<VkWriteDescriptorSet, 2> DescriptorWrites{};
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            VkDescriptorBufferInfo BufferInfo{};
-            BufferInfo.buffer = m_MVPUniformBuffers[i]->GetHandle();
-            BufferInfo.offset = 0;
-            BufferInfo.range = VK_WHOLE_SIZE;
-            DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescriptorWrites[0].dstSet = m_graphicsDescriptorSets[i];
-            DescriptorWrites[0].dstBinding = 0;
-            DescriptorWrites[0].dstArrayElement = 0;
-            DescriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            DescriptorWrites[0].descriptorCount = 1;
-            DescriptorWrites[0].pBufferInfo = &BufferInfo;
-
-            VkDescriptorImageInfo ImageInfo{};
-            ImageInfo.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
-            ImageInfo.imageView = m_vikingRoom->GetTexture()->CreateSRV();
-            ImageInfo.sampler = m_sampler->GetHandle();
-            DescriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescriptorWrites[1].dstSet = m_graphicsDescriptorSets[i];
-            DescriptorWrites[1].dstBinding = 1;
-            DescriptorWrites[1].dstArrayElement = 0;
-            DescriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            DescriptorWrites[1].descriptorCount = 1;
-            DescriptorWrites[1].pImageInfo = &ImageInfo;
-
-            vkUpdateDescriptorSets(m_device, 2, DescriptorWrites.data(), 0, nullptr);
-        }
     }
 
     void VulkanBackendApp::CreateSyncObjects() {
@@ -796,19 +760,19 @@ namespace HWPT {
 
         VK_CHECK(vkBeginCommandBuffer(CommandBuffer, &BeginInfo));
 
-        VkRenderPassBeginInfo RenderPassInfo{};
-        RenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        RenderPassInfo.renderPass = m_rasterPass->GetRenderPass();
-        RenderPassInfo.framebuffer = m_swapChainFrameBuffers[ImageIndex];
-        RenderPassInfo.renderArea.offset = {0, 0};
-        RenderPassInfo.renderArea.extent = m_swapChain.Extent;
+        VkRenderPassBeginInfo MeshRasterPassInfo{};
+        MeshRasterPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        MeshRasterPassInfo.renderPass = m_rasterPass->GetRenderPass();
+        MeshRasterPassInfo.framebuffer = m_swapChainFrameBuffers[ImageIndex];
+        MeshRasterPassInfo.renderArea.offset = {0, 0};
+        MeshRasterPassInfo.renderArea.extent = m_swapChain.Extent;
         std::array<VkClearValue, 2> ClearValues{};
         ClearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
         ClearValues[1].depthStencil = {1.0f, 0};
-        RenderPassInfo.clearValueCount = ClearValues.size();
-        RenderPassInfo.pClearValues = ClearValues.data();
+        MeshRasterPassInfo.clearValueCount = ClearValues.size();
+        MeshRasterPassInfo.pClearValues = ClearValues.data();
 
-        vkCmdBeginRenderPass(CommandBuffer, &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        vkCmdBeginRenderPass(CommandBuffer, &MeshRasterPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
         MVPData MVP{};
         MVP.ModelTrans = glm::identity<glm::mat4>();
@@ -827,10 +791,6 @@ namespace HWPT {
         MVP.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
         m_MVPUniformBuffers[ImageIndex]->Update(&MVP);
 
-        vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                m_rasterPass->GetPipelineLayout(),
-                                0, 1, m_graphicsDescriptorSets.data(), 0, nullptr);
-
         VkViewport Viewport{};
         Viewport.x = 0.f;
         Viewport.y = 0.f;
@@ -844,12 +804,19 @@ namespace HWPT {
         Scissor.extent = m_swapChain.Extent;
         vkCmdSetScissorWithCount(CommandBuffer, 1, &Scissor);
 
+
+        m_rasterPass->GetShaderParameters()->SetParameter<UniformBuffer *>("ViewUniformBuffer",
+                                                                m_MVPUniformBuffers[0]);
+        m_rasterPass->GetShaderParameters()->SetParameter<Texture2D *>("Texture", m_vikingRoom->GetTexture());
         m_rasterPass->BindRenderPipeline(CommandBuffer);
         m_vikingRoom->DrawIndexed(CommandBuffer);
 
         VkDeviceSize Offsets = 0;
         vkCmdBindVertexBuffers(CommandBuffer, 0, 1,
                                &(m_particleStorageBuffers[m_currentFrame]->GetHandle()), &Offsets);
+
+        m_particlePass->GetShaderParameters()->SetParameter<UniformBuffer *>("ViewUniformBuffer",
+                                                                             m_MVPUniformBuffers[0]);
         m_particlePass->BindRenderPipeline(CommandBuffer);
         vkCmdDraw(CommandBuffer, s_particleCount, 1, 0, 0);
 
@@ -1136,16 +1103,45 @@ namespace HWPT {
         m_rasterPass = new RasterPass("MeshRaster", PassFlag::Raster,
                                       "../../shader/HLSL/Vert.spv", "VSMain",
                                       "../../shader/HLSL/Frag.spv", "PSMain");
-        m_rasterPass->CreateRenderPipeline();
+        auto *MeshRasterPassParameters = new ShaderParameters(m_rasterPass);
+        MeshRasterPassParameters->AddParameters({
+            {"ViewUniformBuffer", ShaderParameterType::UniformBuffer},
+            {"Texture", ShaderParameterType::Texture2D}
+        });
+        m_rasterPass->SetShaderParameters(MeshRasterPassParameters);
+        m_rasterPass->OnRenderPassSetupFinish();
+
         m_particlePass = new RasterPass("ParticleRaster", PassFlag::Raster,
                                         "../../shader/HLSL/ParticleVert.spv", "VSMain",
                                         "../../shader/HLSL/ParticleFrag.spv", "PSMain",
                                         PrimitiveType::Point);
+        auto *ParticleRasterPassParameters = new ShaderParameters(m_particlePass);
+        ParticleRasterPassParameters->AddParameters({
+            {"ViewUniformBuffer", ShaderParameterType::UniformBuffer},
+            });
         m_particlePass->SetVertexBufferLayout({
-                        {VertexAttributeDataType::Float3, "Pos"},
-                        {VertexAttributeDataType::Float3, "PlaceHolder"},
-                        {VertexAttributeDataType::Float3, "Color"}});
-        m_particlePass->CreateRenderPipeline();
+            {VertexAttributeDataType::Float3, "Pos"},
+            {VertexAttributeDataType::Float3, "PlaceHolder"},
+            {VertexAttributeDataType::Float3, "Color"}
+        });
+        m_particlePass->SetShaderParameters(ParticleRasterPassParameters);
+        m_particlePass->OnRenderPassSetupFinish();
+    }
+
+
+    void VulkanBackendApp::CreateComputePass() {
+//        m_updateParticlePass = new ComputePass("UpdateParticle", PassFlag::Compute,
+//                                               "../../shader/HLSL/UpdateParticle.spv",
+//                                               "UpdateParticles");
+//        auto *PassParameters = new ShaderParameters(m_updateParticlePass);
+//        PassParameters->AddParameters({
+//                                              {"ViewUniformBuffer", ShaderParameterType::UniformBuffer},
+//                                              {"ParticlesIn",       ShaderParameterType::StorageBuffer},
+//                                              {"ParticlesOut",      ShaderParameterType::RWStorageBuffer}
+//                                      });
+//        PassParameters->SetParameter("ViewUniformBuffer", m_MVPUniformBuffers[0]);
+//        m_updateParticlePass->SetShaderParameters(PassParameters);
+//        m_updateParticlePass->CreateRenderPipeline();
     }
 
     void SwapChain::GetImages(VkDevice Device) {

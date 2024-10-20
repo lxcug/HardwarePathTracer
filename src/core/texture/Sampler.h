@@ -17,7 +17,7 @@ namespace HWPT {
 
         void CreateSampler();
 
-        auto GetHandle() -> VkSampler {
+        auto GetHandle() -> VkSampler& {
             return m_sampler;
         }
 

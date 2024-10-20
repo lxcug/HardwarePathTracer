@@ -14,14 +14,20 @@
 
 namespace HWPT {
     struct RasterPassShaders {
-        ShaderBase* VertexShader = nullptr;
-        ShaderBase* GeometryShader = nullptr;
-        ShaderBase* FragmentShader = nullptr;
+        std::optional<ShaderBase*> VertexShader = std::nullopt;
+        std::optional<ShaderBase*> GeometryShader = std::nullopt;
+        std::optional<ShaderBase*> FragmentShader = std::nullopt;
 
         ~RasterPassShaders() {
-            delete VertexShader;
-            delete GeometryShader;
-            delete FragmentShader;
+            if (VertexShader.has_value()) {
+                delete VertexShader.value();
+            }
+            if (GeometryShader.has_value()) {
+                delete GeometryShader.value();
+            }
+            if (FragmentShader.has_value()) {
+                delete FragmentShader.value();
+            }
         }
     };
 
@@ -47,48 +53,24 @@ namespace HWPT {
 
         void SetVertexBufferLayout(const std::initializer_list<VertexAttribute>& VertexAttributes);
 
-        void CreateRenderPipeline();
+        void OnRenderPassSetupFinish() override;
 
-        void BindRenderPipeline(VkCommandBuffer CommandBuffer) const;
+        void BindRenderPipeline(VkCommandBuffer CommandBuffer) const override;
 
-//        void BindDescriptorSets(VkCommandBuffer CommandBuffer, VkDescriptorSet& DescriptorSet);
-
-        auto GetDescriptorSetLayout() -> VkDescriptorSetLayout {
-            return m_descriptorSetLayouts[0];
+        [[nodiscard]] auto HasGeometryShader() const -> bool {
+            return m_shaders.GeometryShader.has_value();
         }
-
-        auto GetPipelineLayout() -> VkPipelineLayout {
-            return m_pipelineLayout;
-        }
-
-        auto GetPipeline() -> VkPipeline {
-            return m_pipeline;
-        }
-
-        auto GetRenderPass() -> VkRenderPass {
-            return m_renderPass;
-        };
 
     private:
         void Init();
 
         void CreateDefaultVertexBufferLayout();
 
-        // TODO: Shader Parameters
-        void CreatePipelineDescriptorSetLayouts();
-
-        void CreatePipelineLayout();
-
         void CreateRenderPass();
 
     private:
         RasterPassShaders m_shaders;
-        VkPipeline m_pipeline = VK_NULL_HANDLE;
         VertexBufferLayout* m_vertexBufferLayout = nullptr;
-        std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
-        VkPipelineLayout m_pipelineLayout = VK_NULL_HANDLE;
-        ShaderParameters* m_parameters = nullptr;  // TODO
-        VkRenderPass m_renderPass = VK_NULL_HANDLE;  // TODO: sub-pass support
         PrimitiveType m_primitiveType = PrimitiveType::None;
     };
 }  // namespace HWPT
