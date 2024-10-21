@@ -20,11 +20,10 @@ namespace HWPT {
 
         void OnRenderPassSetupFinish() override;
 
-        void BindRenderPass(VkCommandBuffer CommandBuffer) const override;
+        void BindRenderPass(VkCommandBuffer CommandBuffer) override;
 
         // TODO: Get ThreadGroupSize From Shader
-        void Execute(VkCommandBuffer CommandBuffer, uint NumThreadGroupX, uint NumThreadGroupY,
-                     uint NumThreadGroupZ);
+        void Execute(uint NumThreadGroupX, uint NumThreadGroupY, uint NumThreadGroupZ);
 
     private:
         void CreateRenderPipeline();

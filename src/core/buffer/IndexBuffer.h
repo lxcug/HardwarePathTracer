@@ -17,7 +17,7 @@ namespace HWPT {
 
         ~IndexBuffer();
 
-        void Bind(VkCommandBuffer CommandBuffer);
+        void Bind(VkCommandBuffer CommandBuffer) const;
 
         auto GetHandle() -> VkBuffer& {
             return m_indexBuffer;

@@ -33,7 +33,7 @@ namespace HWPT {
         vkDestroyBuffer(GetVKDevice(), m_indexBuffer, nullptr);
     }
 
-    void IndexBuffer::Bind(VkCommandBuffer CommandBuffer) {
+    void IndexBuffer::Bind(VkCommandBuffer CommandBuffer) const {
         vkCmdBindIndexBuffer(CommandBuffer, m_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
     }
 

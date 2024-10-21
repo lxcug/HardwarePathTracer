@@ -25,7 +25,12 @@ namespace HWPT {
 
         vkDestroyBuffer(GetVKDevice(), StagingBuffer, nullptr);
         vkFreeMemory(GetVKDevice(), StagingBufferMemory, nullptr);
+
+        m_vertexCount = Size / sizeof(Vertex);
     }
+
+    VertexBuffer::VertexBuffer(VkDeviceSize Size, const Vertex *Data)
+            : VertexBuffer(Size, static_cast<const void *>(Data)) {}
 
     VertexBuffer::~VertexBuffer() {
         delete m_layout;
@@ -33,13 +38,10 @@ namespace HWPT {
         vkDestroyBuffer(GetVKDevice(), m_vertexBuffer, nullptr);
     }
 
-    void VertexBuffer::Bind(VkCommandBuffer CommandBuffer) {
+    void VertexBuffer::Bind(VkCommandBuffer CommandBuffer) const {
         VkDeviceSize Offset = 0;
         vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &m_vertexBuffer, &Offset);
     }
-
-    VertexBuffer::VertexBuffer(VkDeviceSize Size, const Vertex *Data)
-            : VertexBuffer(Size, static_cast<const void *>(Data)) {}
 
     void VertexBuffer::SetLayout(const std::initializer_list<VertexAttribute> &Attributes) {
         Check(m_layout == nullptr);

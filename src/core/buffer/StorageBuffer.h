@@ -19,6 +19,10 @@ namespace HWPT {
             return m_storageBuffer;
         }
 
+        [[nodiscard]] auto GetHandle() const -> const VkBuffer& {
+            return m_storageBuffer;
+        }
+
     private:
         VkBuffer m_storageBuffer = VK_NULL_HANDLE;
         VkDeviceMemory m_storageBufferMemory = VK_NULL_HANDLE;

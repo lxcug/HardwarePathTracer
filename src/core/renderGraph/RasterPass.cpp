@@ -9,11 +9,11 @@
 
 
 namespace HWPT {
-
     RasterPass::RasterPass(std::string PassName, PassFlag Flag, const std::string &VertexSPVPath,
                            const char *VertexEntry, const std::string &FragSPVPath,
-                           const char *FragEntry, PrimitiveType InPrimitiveType)
-            : RenderPassBase(std::move(PassName), Flag), m_primitiveType(InPrimitiveType) {
+                           const char *FragEntry, bool IsBasePass, PrimitiveType InPrimitiveType)
+            : RenderPassBase(std::move(PassName), Flag), m_primitiveType(InPrimitiveType),
+              m_isBasePass(IsBasePass) {
         m_shaders.VertexShader = new ShaderBase(ShaderType::Vertex, VertexSPVPath, VertexEntry);
         m_shaders.FragmentShader = new ShaderBase(ShaderType::Fragment, FragSPVPath, FragEntry);
     }
@@ -46,10 +46,10 @@ namespace HWPT {
         CreateRenderPipeline();
     }
 
-    void RasterPass::BindRenderPass(VkCommandBuffer CommandBuffer) const {
+    void RasterPass::BindRenderPass(VkCommandBuffer CommandBuffer) {
         m_parameters->OnRenderPassBegin();
-        vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout
-                , 0, 1, &m_parameters->GetDescriptorSets(), 0, nullptr);
+        vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipelineLayout, 0,
+                                1, &m_parameters->GetDescriptorSets(), 0, nullptr);
         vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
     }
 
@@ -65,7 +65,11 @@ namespace HWPT {
         MSAAColorAttachment.format = GetVKFormat(TextureFormat::RGBA);
         MSAAColorAttachment.samples = GetVKSampleCount(
                 VulkanBackendApp::GetApplication()->GetMSAASampleCount());
-        MSAAColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        if (m_isBasePass) {
+            MSAAColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        } else {
+            MSAAColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        }
         MSAAColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         MSAAColorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         MSAAColorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -76,7 +80,11 @@ namespace HWPT {
         DepthAttachment.format = GetVKFormat(TextureFormat::Depth32);
         DepthAttachment.samples = GetVKSampleCount(
                 VulkanBackendApp::GetApplication()->GetMSAASampleCount());
-        DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        if (m_isBasePass) {
+            DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        } else {
+            DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        }
         DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         DepthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         DepthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -86,7 +94,7 @@ namespace HWPT {
         VkAttachmentDescription ResolvedColorAttachment{};
         ResolvedColorAttachment.format = GetVKFormat(TextureFormat::RGBA);
         ResolvedColorAttachment.samples = GetVKSampleCount(1u);
-        ResolvedColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        ResolvedColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;  // Don't Care Load Op Cause MSAAColor will Resolve into ColorAttachment
         ResolvedColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         ResolvedColorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         ResolvedColorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -272,5 +280,64 @@ namespace HWPT {
 
         VK_CHECK(vkCreateGraphicsPipelines(GetVKDevice(), VK_NULL_HANDLE, 1, &PipelineInfo,
                                            nullptr, &m_pipeline));
+    }
+
+    void RasterPass::Execute(const VertexBuffer &InVertexBuffer) {
+        InVertexBuffer.Bind(m_commandBuffer);
+        vkCmdDraw(m_commandBuffer, InVertexBuffer.GetVertexCount(), 1, 0, 0);
+    }
+
+    void RasterPass::Execute(const StorageBuffer &InStorageBuffer, uint VertexCount) {
+        BeginRenderPass(m_commandBuffer);
+        VkDeviceSize Offset = 0;
+        vkCmdBindVertexBuffers(m_commandBuffer, 0, 1, &InStorageBuffer.GetHandle(), &Offset);
+        vkCmdDraw(m_commandBuffer, VertexCount, 1, 0, 0);
+        EndRenderPass(m_commandBuffer);
+    }
+
+    void RasterPass::Execute(const VertexBuffer &InVertexBuffer, const IndexBuffer &InIndexBuffer) {
+        BeginRenderPass(m_commandBuffer);
+        InVertexBuffer.Bind(m_commandBuffer);
+        InIndexBuffer.Bind(m_commandBuffer);
+        vkCmdDrawIndexed(m_commandBuffer, InIndexBuffer.GetIndexCount(), 1, 0, 0, 0);
+        EndRenderPass(m_commandBuffer);
+    }
+
+    void RasterPass::Execute(const Model &InModel) {
+        BeginRenderPass(m_commandBuffer);
+        InModel.DrawIndexed(m_commandBuffer);
+        EndRenderPass(m_commandBuffer);
+    }
+
+    void RasterPass::BeginRenderPass(VkCommandBuffer CommandBuffer) {
+        auto SwapChain = VulkanBackendApp::GetApplication()->GetSwapChain();
+        VkRenderPassBeginInfo RasterPassInfo{};
+        RasterPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        RasterPassInfo.renderPass = m_renderPass;
+        RasterPassInfo.framebuffer = VulkanBackendApp::GetApplication()->GetCurrentFrameBuffer()->GetHandle();
+        RasterPassInfo.renderArea.offset = {0, 0};
+        RasterPassInfo.renderArea.extent = SwapChain->GetExtent();
+        std::array<VkClearValue, 2> ClearValues{};
+        ClearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+        ClearValues[1].depthStencil = {1.0f, 0};
+        RasterPassInfo.clearValueCount = ClearValues.size();
+        RasterPassInfo.pClearValues = ClearValues.data();
+        vkCmdBeginRenderPass(CommandBuffer, &RasterPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+        VkViewport Viewport{};
+        Viewport.x = 0.f;
+        Viewport.y = 0.f;
+        Viewport.width = static_cast<float>(SwapChain->GetExtent().width);
+        Viewport.height = static_cast<float>(SwapChain->GetExtent().height);
+        Viewport.minDepth = 0.f;
+        Viewport.maxDepth = 1.f;
+        vkCmdSetViewportWithCount(CommandBuffer, 1, &Viewport);
+        VkRect2D Scissor{};
+        Scissor.offset = {0, 0};
+        Scissor.extent = SwapChain->GetExtent();
+        vkCmdSetScissorWithCount(CommandBuffer, 1, &Scissor);
+    }
+
+    void RasterPass::EndRenderPass(VkCommandBuffer CommandBuffer) {
+        vkCmdEndRenderPass(CommandBuffer);
     }
 }  // namespace HWPT

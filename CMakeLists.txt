@@ -57,6 +57,10 @@ add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/renderGraph/ComputePass.h
         src/core/renderGraph/ShaderParameters.cpp
         src/core/renderGraph/ShaderParameters.h
+        src/core/buffer/FrameBuffer.cpp
+        src/core/buffer/FrameBuffer.h
+        src/core/SwapChain.cpp
+        src/core/SwapChain.h
 )
 
 include_directories(

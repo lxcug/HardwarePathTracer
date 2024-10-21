@@ -21,6 +21,10 @@ namespace HWPT {
             return m_uniformBuffer;
         }
 
+        auto GetHandle() const -> const VkBuffer& {
+            return m_uniformBuffer;
+        }
+
     private:
         VkBuffer m_uniformBuffer = VK_NULL_HANDLE;
         VkDeviceMemory m_uniformBufferMemory = VK_NULL_HANDLE;

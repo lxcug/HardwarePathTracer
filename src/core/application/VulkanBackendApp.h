@@ -25,43 +25,18 @@
 #include "core/Model.h"
 #include "core/renderGraph/RasterPass.h"
 #include "core/renderGraph/ComputePass.h"
+#include "core/buffer/FrameBuffer.h"
+#include "core/SwapChain.h"
+#include "core/renderGraph/RenderGraph.h"
 
 
 namespace HWPT {
     const int MAX_FRAMES_IN_FLIGHT = 2;
 
-    struct QueueFamilyIndices {
-        std::optional<uint> GraphicsFamily;
-        std::optional<uint> ComputeFamily;
-        std::optional<uint> PresentFamily;
-
-        [[nodiscard]] auto IsComplete() const -> bool {
-            return GraphicsFamily.has_value() && ComputeFamily.has_value() && PresentFamily.has_value();
-        }
-    };
-
-    struct SwapChainSupportDetails {
-        VkSurfaceCapabilitiesKHR Capabilities;
-        std::vector<VkSurfaceFormatKHR> Formats;
-        std::vector<VkPresentModeKHR> PresentModes;
-    };
-
     struct Queue {
         VkQueue GraphicsQueue = VK_NULL_HANDLE;
         VkQueue ComputeQueue = VK_NULL_HANDLE;
         VkQueue PresentQueue = VK_NULL_HANDLE;
-    };
-
-    struct SwapChain {
-        VkSwapchainKHR SwapChainHandle = VK_NULL_HANDLE;
-        VkExtent2D Extent;
-        VkFormat Format;
-        std::vector<VkImage> SwapChainImages;
-        std::vector<VkImageView> SwapChainImageViews;
-
-        void CreateImageViews(VkDevice Device);
-
-        void GetImages(VkDevice Device);
     };
 
     struct CommandPool {
@@ -70,13 +45,21 @@ namespace HWPT {
     };
 
     struct MSAABuffer {
-        Texture2D* MSAAColorBuffer = nullptr;
-        Texture2D* MSAADepthBuffer = nullptr;
+        Texture2D *MSAAColorBuffer = nullptr;
+        Texture2D *MSAADepthBuffer = nullptr;
 
         ~MSAABuffer() {
             delete MSAAColorBuffer;
             delete MSAADepthBuffer;
         }
+    };
+
+    struct MVPData {
+        glm::mat4 ModelTrans;
+        glm::mat4 ViewTrans;
+        glm::mat4 ProjTrans;
+        glm::vec3 DebugColor;
+        float DeltaTime;
     };
 
     class VulkanBackendApp : public ApplicationBase {
@@ -105,11 +88,15 @@ namespace HWPT {
             return m_physicalDevice;
         }
 
-        static auto GetApplication() -> VulkanBackendApp* {
+        static auto GetApplication() -> VulkanBackendApp * {
             return s_application;
         }
 
-        auto GetSwapChain() -> SwapChain {
+        auto GetSwapChain() -> SwapChain * {
+            return m_swapChain;
+        }
+
+        [[nodiscard]] auto GetSwapChain() const -> const SwapChain * {
             return m_swapChain;
         }
 
@@ -117,12 +104,20 @@ namespace HWPT {
             return m_msaaSamples;
         }
 
-        auto GetGlobalSampler() -> Sampler* {
+        auto GetGlobalSampler() -> Sampler * {
             return m_sampler;
         }
 
-        auto GetGlobalDescriptorPool() -> VkDescriptorPool& {
+        auto GetGlobalDescriptorPool() -> VkDescriptorPool & {
             return m_descriptorPool;
+        }
+
+        auto GetGlobalQueue() -> Queue& {
+            return m_queue;
+        }
+
+        auto GetCurrentFrameBuffer() -> FrameBuffer* {
+            return m_basePassFrameBuffers[m_currentFrame];
         }
 
     private:
@@ -139,11 +134,13 @@ namespace HWPT {
         void Present();
 
         // FrameBuffer Resize Callback
-        static void FrameBufferResizeCallback(GLFWwindow* Window, int Width, int Height);
+        static void FrameBufferResizeCallback(GLFWwindow *Window, int Width, int Height);
 
         void RecreateSwapChain();
 
         void CreateMSAABuffers();
+
+        void UpdateViewUniformBuffer();
 
     private:
         void InitImGui();
@@ -160,25 +157,19 @@ namespace HWPT {
         // VulkanContext Init
         void CreateVkInstance();
 
-        static auto GetRequiredExtensions() -> std::vector<const char*>;
+        static auto GetRequiredExtensions() -> std::vector<const char *>;
 
         void CreateSurface();
 
         void SelectPhysicalDevice();
 
-        auto FindQueueFamilies(VkPhysicalDevice PhysicalDevice) -> QueueFamilyIndices;
-
         static auto IsDeviceExtensionSupport(VkPhysicalDevice PhysicalDevice) -> bool;
-
-        auto QuerySwapChainSupport(VkPhysicalDevice PhysicalDevice) -> SwapChainSupportDetails;
 
         auto IsSuitableDevice(VkPhysicalDevice PhysicalDevice) -> bool;
 
         void CreateLogicalDevice();
 
         void CreateSwapChain();
-
-        void CleanUpSwapChain();
 
         void CreateFrameBuffers();
 
@@ -190,11 +181,11 @@ namespace HWPT {
 
         void CreateSyncObjects();
 
-        void RecordCommandBuffer(VkCommandBuffer CommandBuffer, uint ImageIndex);
-
         void CreateUniformBuffers();
 
         void CreateModelAndSampler();
+
+        void CreateParticleStorageBuffers();
 
         void OnWindowResize();
 
@@ -203,11 +194,9 @@ namespace HWPT {
         void CreateComputePass();
 
     protected:
-        VkDevice m_device = VK_NULL_HANDLE;
-
         std::string m_windowTitle = "VulkanBackend Application";
         uint m_windowWidth = 1600, m_windowHeight = 900;
-        GLFWwindow* m_window = nullptr;
+        GLFWwindow *m_window = nullptr;
         bool m_frameBufferResized = false;
         bool m_contextInited = false;
 
@@ -231,34 +220,35 @@ namespace HWPT {
                 VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME
         };
 
+        VkDevice m_device = VK_NULL_HANDLE;
         VkInstance m_instance = VK_NULL_HANDLE;
         VkSurfaceKHR m_surface = VK_NULL_HANDLE;
         VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
+
+        SwapChain *m_swapChain = nullptr;
+        uint m_msaaSamples = 8;
+        MSAABuffer *m_msaaBuffers = nullptr;
+        std::vector<FrameBuffer *> m_basePassFrameBuffers;
+
         Queue m_queue;
-        SwapChain m_swapChain;
-        std::vector<VkFramebuffer> m_swapChainFrameBuffers;
-//        SwapChain m_viewportSwapChain;  // TODO
-//        std::vector<VkFramebuffer> m_viewportFrameBuffer;
         CommandPool m_commandPool;
         std::vector<VkCommandBuffer> m_graphicsCommandBuffers;
         std::vector<VkCommandBuffer> m_computeCommandBuffers;
 
-        VkPipeline m_particleGraphicsPipeline = VK_NULL_HANDLE;
-        // Compute Pipeline
-        VkDescriptorSetLayout m_computeDescriptorSetLayout = VK_NULL_HANDLE;
-        VkPipelineLayout m_computePipelineLayout = VK_NULL_HANDLE;
-        VkPipeline m_computePipeline = VK_NULL_HANDLE;
-
         VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
-        std::vector<VkDescriptorSet> m_computeDescriptorSets;
+
+        ImGuiInfrastructure *m_imguiInfrastructure = nullptr;
+
+//        SwapChain m_viewportSwapChain;  // TODO
+//        std::vector<VkFramebuffer> m_viewportFrameBuffer;
 
         uint m_currentFrame = 0;
         uint m_imageIndex = 0;
 
-        inline static VulkanBackendApp* s_application = nullptr;
+        inline static VulkanBackendApp *s_application = nullptr;
 
-        std::vector<UniformBuffer*> m_MVPUniformBuffers;
-        Sampler* m_sampler = nullptr;
+        std::vector<UniformBuffer *> m_MVPUniformBuffers;
+        Sampler *m_sampler = nullptr;
 
         std::vector<VkSemaphore> m_imageAvailableSemaphores;
         std::vector<VkSemaphore> m_renderFinishedSemaphores;
@@ -266,24 +256,20 @@ namespace HWPT {
         std::vector<VkFence> m_computeInFlightFences;
         std::vector<VkSemaphore> m_computeFinishedSemaphores;
 
-        ImGuiInfrastructure* m_imguiInfrastructure = nullptr;
-
         glm::vec2 m_viewportSize = glm::vec2(0.f, 0.f);
 
-        Model* m_vikingRoom = nullptr;
-        uint m_msaaSamples = 8;
-
-        MSAABuffer* m_msaaBuffers = nullptr;
+        Model *m_vikingRoom = nullptr;
 
         // For GPU Particles
         inline static uint s_particleCount = 81920;
-        std::vector<StorageBuffer*> m_particleStorageBuffers;
-        void CreateParticleStorageBuffers();
+        std::vector<StorageBuffer *> m_particleStorageBuffers;
         std::shared_ptr<VertexBufferLayout> m_particleVertexBufferLayout;
 
-        RasterPass* m_rasterPass = nullptr;
-        RasterPass* m_particlePass = nullptr;
-        ComputePass* m_updateParticlePass = nullptr;
+        RasterPass *m_rasterPass = nullptr;
+        RasterPass *m_particlePass = nullptr;
+        ComputePass *m_updateParticlePass = nullptr;
+
+        RenderGraph* m_renderGraph = nullptr;
     };
 }  // namespace HWPT
 

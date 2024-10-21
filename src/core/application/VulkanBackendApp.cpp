@@ -92,19 +92,17 @@ namespace HWPT {
     void VulkanBackendApp::InitVulkan() {
         InitVulkanInfrastructure();
 
-        CreateSwapChain();
-
         CreateUniformBuffers();
         CreateModelAndSampler();
         CreateParticleStorageBuffers();
 
         CreateRasterPass();
+        CreateFrameBuffers();
         CreateComputePass();
 
-        CreateMSAABuffers();
-        CreateFrameBuffers();
-
         CreateSyncObjects();
+
+        m_renderGraph = new RenderGraph();
     }
 
     void VulkanBackendApp::InitVulkanInfrastructure() {
@@ -115,6 +113,8 @@ namespace HWPT {
         CreateCommandPool();
         CreateCommandBuffers();
         CreateDescriptorPool();
+        CreateSwapChain();
+        CreateMSAABuffers();
     }
 
     void VulkanBackendApp::FrameBufferResizeCallback(GLFWwindow *Window, int Width, int Height) {
@@ -124,6 +124,7 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CleanUp() {
+        delete m_renderGraph;
         delete m_rasterPass;
         delete m_particlePass;
         delete m_updateParticlePass;
@@ -132,12 +133,13 @@ namespace HWPT {
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             delete m_MVPUniformBuffers[i];
             delete m_particleStorageBuffers[i];
+            delete m_basePassFrameBuffers[i];
         }
         delete m_sampler;
 
         CleanUpImGui();
+        delete m_swapChain;
 
-        CleanUpSwapChain();
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             vkDestroySemaphore(m_device, m_imageAvailableSemaphores[i], nullptr);
             vkDestroySemaphore(m_device, m_renderFinishedSemaphores[i], nullptr);
@@ -146,10 +148,6 @@ namespace HWPT {
             vkDestroySemaphore(m_device, m_computeFinishedSemaphores[i], nullptr);
         }
         vkDestroyDescriptorPool(m_device, m_descriptorPool, nullptr);
-        vkDestroyPipeline(m_device, m_particleGraphicsPipeline, nullptr);
-        vkDestroyDescriptorSetLayout(m_device, m_computeDescriptorSetLayout, nullptr);
-        vkDestroyPipelineLayout(m_device, m_computePipelineLayout, nullptr);
-        vkDestroyPipeline(m_device, m_computePipeline, nullptr);
         vkDestroyCommandPool(m_device, m_commandPool.GraphicsPool, nullptr);
         vkDestroyCommandPool(m_device, m_commandPool.ComputePool, nullptr);
         vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
@@ -161,45 +159,11 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::DrawFrame() {
-        vkWaitForFences(m_device, 1, &m_computeInFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
-        vkResetFences(m_device, 1, &m_computeInFlightFences[m_currentFrame]);
-
-        auto ComputeCommandBuffer = m_computeCommandBuffers[m_currentFrame];
-        vkResetCommandBuffer(ComputeCommandBuffer, 0);
-
-        VkCommandBufferBeginInfo ComputeBeginInfo{};
-        ComputeBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        VK_CHECK(vkBeginCommandBuffer(ComputeCommandBuffer, &ComputeBeginInfo));
-
-        uint LastFrameIndex = m_currentFrame == 0 ? MAX_FRAMES_IN_FLIGHT - 1 : m_currentFrame - 1;
-        m_updateParticlePass->GetShaderParameters()->SetParameter("ViewUniformBuffer", m_MVPUniformBuffers[0]);
-        m_updateParticlePass->GetShaderParameters()->SetParameter("ParticlesIn", m_particleStorageBuffers[LastFrameIndex]);
-        m_updateParticlePass->GetShaderParameters()->SetParameter("ParticlesOut", m_particleStorageBuffers[m_currentFrame]);
-        m_updateParticlePass->BindRenderPass(ComputeCommandBuffer);
-        m_updateParticlePass->Execute(ComputeCommandBuffer, (s_particleCount + 255) / 256, 1, 1);
-
-        VK_CHECK(vkEndCommandBuffer(ComputeCommandBuffer));
-
-        VkSubmitInfo ComputeSubmitInfo{};
-        ComputeSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        ComputeSubmitInfo.waitSemaphoreCount = 0;
-        ComputeSubmitInfo.commandBufferCount = 1;
-        ComputeSubmitInfo.pCommandBuffers = &ComputeCommandBuffer;
-        ComputeSubmitInfo.signalSemaphoreCount = 1;
-        ComputeSubmitInfo.pSignalSemaphores = &m_computeFinishedSemaphores[m_currentFrame];
-        VK_CHECK(vkQueueSubmit(m_queue.ComputeQueue, 1, &ComputeSubmitInfo,
-                               m_computeInFlightFences[m_currentFrame]));
-
         vkWaitForFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame], VK_TRUE,
                         UINT64_MAX);
         vkResetFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame]);
 
-        if (m_frameBufferResized) {
-            OnWindowResize();
-            m_frameBufferResized = false;
-        }
-
-        VkResult Result = vkAcquireNextImageKHR(m_device, m_swapChain.SwapChainHandle, UINT64_MAX,
+        VkResult Result = vkAcquireNextImageKHR(m_device, m_swapChain->GetHandle(), UINT64_MAX,
                                                 m_imageAvailableSemaphores[m_currentFrame],
                                                 VK_NULL_HANDLE, &m_imageIndex);
         if (Result == VK_ERROR_OUT_OF_DATE_KHR || Result == VK_SUBOPTIMAL_KHR) {
@@ -207,31 +171,67 @@ namespace HWPT {
         } else if (Result != VK_SUCCESS) {
             throw std::runtime_error("Failed to acquire swap chain images");
         }
+        if (m_frameBufferResized) {
+            OnWindowResize();
+            m_frameBufferResized = false;
+        }
 
-        auto GraphicsCommandBuffer = m_graphicsCommandBuffers[m_currentFrame];
-        vkResetCommandBuffer(GraphicsCommandBuffer, 0);
+        UpdateViewUniformBuffer();
 
-        RecordCommandBuffer(GraphicsCommandBuffer, m_imageIndex);
+        m_renderGraph->OnNewFrame();
+        m_renderGraph->SetImageAvailableSemaphore(m_imageAvailableSemaphores[m_currentFrame]);
+        m_renderGraph->SetRenderFinishFence(m_graphicsInFlightFences[m_currentFrame]);
+        m_renderGraph->SetRenderFinishSemaphore(m_renderFinishedSemaphores[m_currentFrame]);
 
-        VkSubmitInfo GraphicsSubmitInfo{};
-        GraphicsSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        std::array<VkSemaphore, 2> GraphicsWaitSemaphores = {
-                m_computeFinishedSemaphores[m_currentFrame],
-                m_imageAvailableSemaphores[m_currentFrame]
-        };
-        GraphicsSubmitInfo.waitSemaphoreCount = GraphicsWaitSemaphores.size();
-        GraphicsSubmitInfo.pWaitSemaphores = GraphicsWaitSemaphores.data();
-        std::array<VkPipelineStageFlags, 2> WaitStages = {
-                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
-        };
-        GraphicsSubmitInfo.pWaitDstStageMask = WaitStages.data();
-        GraphicsSubmitInfo.commandBufferCount = 1;
-        GraphicsSubmitInfo.pCommandBuffers = &GraphicsCommandBuffer;
-        GraphicsSubmitInfo.signalSemaphoreCount = 1;
-        GraphicsSubmitInfo.pSignalSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
-        VK_CHECK(vkQueueSubmit(m_queue.GraphicsQueue, 1, &GraphicsSubmitInfo,
-                               m_graphicsInFlightFences[m_currentFrame]));
+        // Update Particle
+        uint LastFrameIndex =
+                m_currentFrame == 0 ? MAX_FRAMES_IN_FLIGHT - 1 : m_currentFrame - 1;
+        m_updateParticlePass->GetShaderParameters()->SetParameter("ViewUniformBuffer",
+                                                                  m_MVPUniformBuffers[0]);
+        m_updateParticlePass->GetShaderParameters()->SetParameter("ParticlesIn",
+                                                                  m_particleStorageBuffers[LastFrameIndex]);
+        m_updateParticlePass->GetShaderParameters()->SetParameter("ParticlesOut",
+                                                                  m_particleStorageBuffers[m_currentFrame]);
+        m_updateParticlePass->SetCurrentCommandBuffer(m_computeCommandBuffers[m_currentFrame]);
+        m_renderGraph->AddPass(
+                "UpdateParticlePass",
+                m_updateParticlePass,
+                [this]() {
+                    m_updateParticlePass->BindRenderPass(m_computeCommandBuffers[m_currentFrame]);
+                    m_updateParticlePass->Execute((s_particleCount + 255) / 256, 1, 1);
+                }
+        );
+
+        // Draw Mesh
+        m_rasterPass->GetShaderParameters()->SetParameter<UniformBuffer *>("ViewUniformBuffer",
+                                                                           m_MVPUniformBuffers[0]);
+        m_rasterPass->GetShaderParameters()->SetParameter<Texture2D *>("Texture",
+                                                                       m_vikingRoom->GetTexture());
+        m_rasterPass->SetCurrentCommandBuffer(m_graphicsCommandBuffers[m_currentFrame]);
+        m_renderGraph->AddPass(
+                "MeshRasterPass",
+                m_rasterPass,
+                [this]() {
+                    m_rasterPass->BindRenderPass(m_graphicsCommandBuffers[m_currentFrame]);
+                    m_rasterPass->Execute(*m_vikingRoom);
+                }
+        );
+
+        // Draw Particle
+        m_particlePass->GetShaderParameters()->SetParameter<UniformBuffer *>("ViewUniformBuffer",
+                                                                             m_MVPUniformBuffers[0]);
+        m_particlePass->SetCurrentCommandBuffer(m_graphicsCommandBuffers[m_currentFrame]);
+        m_renderGraph->AddPass(
+                "RasterParticlePass",
+                m_particlePass,
+                [this]() {
+                    m_particlePass->BindRenderPass(m_graphicsCommandBuffers[m_currentFrame]);
+                    m_particlePass->Execute(*m_particleStorageBuffers[m_currentFrame],
+                                            s_particleCount);
+                }
+        );
+
+        m_renderGraph->Execute();
     }
 
     void VulkanBackendApp::CreateVkInstance() {
@@ -300,40 +300,6 @@ namespace HWPT {
         std::cout.flush();
     }
 
-    auto
-    VulkanBackendApp::FindQueueFamilies(VkPhysicalDevice PhysicalDevice) -> QueueFamilyIndices {
-        QueueFamilyIndices Indices;
-
-        uint QueueFamilyCount = 0;
-        vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount, nullptr);
-        std::vector<VkQueueFamilyProperties> QueueFamilies(QueueFamilyCount);
-        vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount,
-                                                 QueueFamilies.data());
-
-        int Index = 0;
-        for (const auto &QueueFamily: QueueFamilies) {
-            if (QueueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-                Indices.GraphicsFamily = Index;
-            }
-            // TODO: Use Dedicated Compute Queue, !(QueueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
-            if (QueueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) {
-                Indices.ComputeFamily = Index;
-            }
-
-            VkBool32 PresentSupport = false;
-            vkGetPhysicalDeviceSurfaceSupportKHR(PhysicalDevice, Index, m_surface, &PresentSupport);
-            if (PresentSupport) {
-                Indices.PresentFamily = Index;
-            }
-            if (Indices.IsComplete()) {
-                break;
-            }
-            ++Index;
-        }
-
-        return Indices;
-    }
-
     auto VulkanBackendApp::IsDeviceExtensionSupport(VkPhysicalDevice PhysicalDevice) -> bool {
         uint ExtensionCount = 0;
         vkEnumerateDeviceExtensionProperties(PhysicalDevice, nullptr, &ExtensionCount, nullptr);
@@ -350,39 +316,10 @@ namespace HWPT {
         return RequiredExtensionsCopy.empty();
     }
 
-    auto
-    VulkanBackendApp::QuerySwapChainSupport(
-            VkPhysicalDevice PhysicalDevice) -> SwapChainSupportDetails {
-        SwapChainSupportDetails Details;
-
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(PhysicalDevice, m_surface, &Details.Capabilities);
-
-        uint FormatCount = 0;
-        vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, m_surface, &FormatCount, nullptr);
-        if (FormatCount > 0) {
-            Details.Formats.resize(FormatCount);
-            vkGetPhysicalDeviceSurfaceFormatsKHR(PhysicalDevice, m_surface,
-                                                 &FormatCount, Details.Formats.data());
-        }
-
-        uint PresentModeCount = 0;
-        vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, m_surface, &PresentModeCount,
-                                                  nullptr);
-
-        if (PresentModeCount > 0) {
-            Details.PresentModes.resize(PresentModeCount);
-            vkGetPhysicalDeviceSurfacePresentModesKHR(PhysicalDevice, m_surface,
-                                                      &PresentModeCount,
-                                                      Details.PresentModes.data());
-        }
-
-        return Details;
-    }
-
     auto VulkanBackendApp::IsSuitableDevice(VkPhysicalDevice PhysicalDevice) -> bool {
-        QueueFamilyIndices Indices = FindQueueFamilies(PhysicalDevice);
+        QueueFamilyIndices Indices = SwapChain::FindQueueFamilies(PhysicalDevice, m_surface);
         bool IsExtensionSupport = IsDeviceExtensionSupport(PhysicalDevice);
-        auto SwapChainSupport = QuerySwapChainSupport(PhysicalDevice);
+        auto SwapChainSupport = SwapChain::QuerySwapChainSupport(PhysicalDevice, m_surface);
         bool IsSwapChainSupport =
                 !SwapChainSupport.Formats.empty() && !SwapChainSupport.PresentModes.empty();
 
@@ -390,7 +327,7 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateLogicalDevice() {
-        QueueFamilyIndices Indices = FindQueueFamilies(m_physicalDevice);
+        QueueFamilyIndices Indices = SwapChain::FindQueueFamilies(m_physicalDevice, m_surface);
 
         std::unordered_set<uint> UniqueQueueFamilies = {
                 Indices.GraphicsFamily.value(),
@@ -439,119 +376,28 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateSwapChain() {
-        SwapChainSupportDetails SwapChainSupport = QuerySwapChainSupport(m_physicalDevice);
-
-        VkSurfaceFormatKHR SurfaceFormat;
-        for (auto Format: SwapChainSupport.Formats) {
-            if (Format.format == VK_FORMAT_R8G8B8A8_SRGB &&
-                Format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-                SurfaceFormat = Format;
-                break;
-            }
-        }
-        VkPresentModeKHR PresentMode;
-        for (auto PreMode: SwapChainSupport.PresentModes) {
-            if (PreMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-                PresentMode = PreMode;
-                break;
-            }
-        }
-        VkExtent2D Extent;
-        if (SwapChainSupport.Capabilities.currentExtent.width != UINT_MAX) {
-            Extent = SwapChainSupport.Capabilities.currentExtent;
-        } else {
-            int Width, Height;
-            glfwGetFramebufferSize(m_window, &Width, &Height);
-            Extent = {static_cast<uint>(Width), static_cast<uint>(Height)};
-            VkExtent2D &MinExtent = SwapChainSupport.Capabilities.minImageExtent;
-            VkExtent2D &MaxExtent = SwapChainSupport.Capabilities.maxImageExtent;
-            Extent.width = std::clamp(Extent.width, MinExtent.width, MaxExtent.width);
-            Extent.height = std::clamp(Extent.height, MinExtent.height, MaxExtent.height);
-        }
-
-        uint ImageCount = std::clamp(SwapChainSupport.Capabilities.minImageCount,
-                                     SwapChainSupport.Capabilities.minImageCount,
-                                     SwapChainSupport.Capabilities.maxImageCount);
-        Check(MAX_FRAMES_IN_FLIGHT >= ImageCount);
-
-        VkSwapchainCreateInfoKHR CreateInfo{};
-        CreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-        CreateInfo.surface = m_surface;
-        CreateInfo.minImageCount = ImageCount;
-        CreateInfo.imageFormat = SurfaceFormat.format;
-        CreateInfo.imageColorSpace = SurfaceFormat.colorSpace;
-        CreateInfo.presentMode = PresentMode;
-        CreateInfo.imageExtent = Extent;
-        CreateInfo.imageArrayLayers = 1;
-        CreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-
-        QueueFamilyIndices Indices = FindQueueFamilies(m_physicalDevice);
-        std::unordered_set<uint> QueueFamilySet = {
-                Indices.GraphicsFamily.value(),
-                Indices.ComputeFamily.value(),
-                Indices.PresentFamily.value()
-        };
-        if (QueueFamilySet.size() == 1) {
-            CreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        } else {
-            CreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-            CreateInfo.queueFamilyIndexCount = QueueFamilySet.size();
-            std::vector<uint> QueueIndices(QueueFamilySet.size());
-            for (auto Index: QueueFamilySet) {
-                QueueIndices.push_back(Index);
-            }
-            CreateInfo.pQueueFamilyIndices = QueueIndices.data();
-        }
-
-        CreateInfo.preTransform = SwapChainSupport.Capabilities.currentTransform;
-        CreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-        CreateInfo.clipped = VK_TRUE;
-        CreateInfo.oldSwapchain = VK_NULL_HANDLE;
-
-        VK_CHECK(
-                vkCreateSwapchainKHR(m_device, &CreateInfo, nullptr, &m_swapChain.SwapChainHandle));
-        m_swapChain.Extent = Extent;
-        m_swapChain.Format = SurfaceFormat.format;
-        m_swapChain.GetImages(m_device);
-        m_swapChain.CreateImageViews(m_device);
-    }
-
-    void VulkanBackendApp::CleanUpSwapChain() {
-        for (auto &FrameBuffer: m_swapChainFrameBuffers) {
-            vkDestroyFramebuffer(m_device, FrameBuffer, nullptr);
-        }
-        for (auto &ImageView: m_swapChain.SwapChainImageViews) {
-            vkDestroyImageView(m_device, ImageView, nullptr);
-        }
-        vkDestroySwapchainKHR(m_device, m_swapChain.SwapChainHandle, nullptr);
+        m_swapChain = new SwapChain(m_surface, MAX_FRAMES_IN_FLIGHT);
     }
 
     void VulkanBackendApp::CreateFrameBuffers() {
-        m_swapChainFrameBuffers.resize(m_swapChain.SwapChainImages.size());
+        m_basePassFrameBuffers.resize(m_swapChain->GetConcurrentFrames());
 
-        for (size_t Index = 0; Index < m_swapChainFrameBuffers.size(); Index++) {
-            std::array<VkImageView, 3> Attachments = {
+        for (size_t Index = 0; Index < m_basePassFrameBuffers.size(); Index++) {
+            std::initializer_list<VkImageView> Attachments = {
                     m_msaaBuffers->MSAAColorBuffer->CreateSRV(),
                     m_msaaBuffers->MSAADepthBuffer->CreateSRV(),
-                    m_swapChain.SwapChainImageViews[Index]
+                    m_swapChain->GetSwapChainImageViews()[Index]
             };
 
-            VkFramebufferCreateInfo CreateInfo{};
-            CreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-            CreateInfo.renderPass = m_rasterPass->GetRenderPass();
-            CreateInfo.width = m_swapChain.Extent.width;
-            CreateInfo.height = m_swapChain.Extent.height;
-            CreateInfo.layers = 1;
-            CreateInfo.attachmentCount = Attachments.size();
-            CreateInfo.pAttachments = Attachments.data();
-
-            VK_CHECK(vkCreateFramebuffer(m_device, &CreateInfo, nullptr,
-                                         &m_swapChainFrameBuffers[Index]));
+            m_basePassFrameBuffers[Index] = new FrameBuffer(m_swapChain->GetExtent().width,
+                                                            m_swapChain->GetExtent().height,
+                                                            Attachments,
+                                                            m_rasterPass);
         }
     }
 
     void VulkanBackendApp::CreateCommandPool() {
-        QueueFamilyIndices Indices = FindQueueFamilies(m_physicalDevice);
+        QueueFamilyIndices Indices = SwapChain::FindQueueFamilies(m_physicalDevice, m_surface);
 
         VkCommandPoolCreateInfo GraphicsPoolCreateInfo{};
         GraphicsPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -612,24 +458,16 @@ namespace HWPT {
     void VulkanBackendApp::EndIntermediateCommand(VkCommandBuffer CommandBuffer) {
         vkEndCommandBuffer(CommandBuffer);
 
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &CommandBuffer;
+        VkSubmitInfo SubmitInfo{};
+        SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        SubmitInfo.commandBufferCount = 1;
+        SubmitInfo.pCommandBuffers = &CommandBuffer;
 
-        vkQueueSubmit(m_queue.GraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+        vkQueueSubmit(m_queue.GraphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
         vkQueueWaitIdle(m_queue.GraphicsQueue);
 
         vkFreeCommandBuffers(m_device, m_commandPool.GraphicsPool, 1, &CommandBuffer);
     }
-
-    struct MVPData {
-        glm::mat4 ModelTrans;
-        glm::mat4 ViewTrans;
-        glm::mat4 ProjTrans;
-        glm::vec3 DebugColor;
-        float DeltaTime;
-    };
 
     void VulkanBackendApp::CreateUniformBuffers() {
         MVPData MVP{};
@@ -700,77 +538,6 @@ namespace HWPT {
         }
     }
 
-    void VulkanBackendApp::RecordCommandBuffer(VkCommandBuffer CommandBuffer, uint ImageIndex) {
-        VkCommandBufferBeginInfo BeginInfo{};
-        BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-        VK_CHECK(vkBeginCommandBuffer(CommandBuffer, &BeginInfo));
-
-        VkRenderPassBeginInfo MeshRasterPassInfo{};
-        MeshRasterPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        MeshRasterPassInfo.renderPass = m_rasterPass->GetRenderPass();
-        MeshRasterPassInfo.framebuffer = m_swapChainFrameBuffers[ImageIndex];
-        MeshRasterPassInfo.renderArea.offset = {0, 0};
-        MeshRasterPassInfo.renderArea.extent = m_swapChain.Extent;
-        std::array<VkClearValue, 2> ClearValues{};
-        ClearValues[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
-        ClearValues[1].depthStencil = {1.0f, 0};
-        MeshRasterPassInfo.clearValueCount = ClearValues.size();
-        MeshRasterPassInfo.pClearValues = ClearValues.data();
-
-        vkCmdBeginRenderPass(CommandBuffer, &MeshRasterPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-        MVPData MVP{};
-        MVP.ModelTrans = glm::identity<glm::mat4>();
-        glm::vec3 CameraPos = glm::vec3(0.f, 0.f, 2.f);
-        MVP.ViewTrans = glm::lookAt(CameraPos, CameraPos + glm::vec3(0.f, 0.f, -1.f),
-                                    glm::vec3(0.f, 1.f, 0.f)) * mat4_cast(glm::quat(glm::vec3(
-                glm::radians(0.f),
-                glm::radians(0.f),
-                glm::radians(0.f)
-        )));
-        MVP.ProjTrans = glm::perspective(glm::radians(60.f),
-                                         static_cast<float>(m_windowWidth) /
-                                         static_cast<float>(m_windowHeight),
-                                         1e-3f, 1000.f);
-        MVP.DebugColor = glm::vec3(.5f, .9f, .6f);
-        MVP.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
-        m_MVPUniformBuffers[ImageIndex]->Update(&MVP);
-
-        VkViewport Viewport{};
-        Viewport.x = 0.f;
-        Viewport.y = 0.f;
-        Viewport.width = static_cast<float>(m_swapChain.Extent.width);
-        Viewport.height = static_cast<float>(m_swapChain.Extent.height);
-        Viewport.minDepth = 0.f;
-        Viewport.maxDepth = 1.f;
-        vkCmdSetViewportWithCount(CommandBuffer, 1, &Viewport);
-        VkRect2D Scissor{};
-        Scissor.offset = {0, 0};
-        Scissor.extent = m_swapChain.Extent;
-        vkCmdSetScissorWithCount(CommandBuffer, 1, &Scissor);
-
-
-        m_rasterPass->GetShaderParameters()->SetParameter<UniformBuffer *>("ViewUniformBuffer",
-                                                                m_MVPUniformBuffers[0]);
-        m_rasterPass->GetShaderParameters()->SetParameter<Texture2D *>("Texture", m_vikingRoom->GetTexture());
-        m_rasterPass->BindRenderPass(CommandBuffer);
-        m_vikingRoom->DrawIndexed(CommandBuffer);
-
-        VkDeviceSize Offsets = 0;
-        vkCmdBindVertexBuffers(CommandBuffer, 0, 1,
-                               &(m_particleStorageBuffers[m_currentFrame]->GetHandle()), &Offsets);
-
-        m_particlePass->GetShaderParameters()->SetParameter<UniformBuffer *>("ViewUniformBuffer",
-                                                                             m_MVPUniformBuffers[0]);
-        m_particlePass->BindRenderPass(CommandBuffer);
-        vkCmdDraw(CommandBuffer, s_particleCount, 1, 0, 0);
-
-        vkCmdEndRenderPass(CommandBuffer);
-
-        VK_CHECK(vkEndCommandBuffer(CommandBuffer));
-    }
-
     void VulkanBackendApp::RecreateSwapChain() {
         glfwGetFramebufferSize(m_window, reinterpret_cast<int *>(&m_windowWidth),
                                reinterpret_cast<int *>(&m_windowHeight));
@@ -781,11 +548,17 @@ namespace HWPT {
         }
         vkDeviceWaitIdle(m_device);
 
-        CleanUpSwapChain();
-        CreateSwapChain();
+        m_swapChain->OnResize(m_windowWidth, m_windowHeight);
         delete m_msaaBuffers;
         CreateMSAABuffers();
-        CreateFrameBuffers();
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            std::initializer_list<VkImageView> Attachments = {
+                    m_msaaBuffers->MSAAColorBuffer->CreateSRV(),
+                    m_msaaBuffers->MSAADepthBuffer->CreateSRV(),
+                    m_swapChain->GetSwapChainImageViews()[i]
+            };
+            m_basePassFrameBuffers[i]->OnResize(m_windowWidth, m_windowHeight, Attachments);
+        }
     }
 
     void VulkanBackendApp::CreateModelAndSampler() {
@@ -812,7 +585,8 @@ namespace HWPT {
         InitInfo.Instance = m_instance;
         InitInfo.PhysicalDevice = m_physicalDevice;
         InitInfo.Device = m_device;
-        InitInfo.QueueFamily = FindQueueFamilies(m_physicalDevice).GraphicsFamily.value();
+        InitInfo.QueueFamily = SwapChain::FindQueueFamilies(m_physicalDevice,
+                                                            m_surface).GraphicsFamily.value();
         InitInfo.Queue = m_queue.GraphicsQueue;
         InitInfo.DescriptorPool = m_imguiInfrastructure->m_descriptorPool;
         InitInfo.RenderPass = m_imguiInfrastructure->m_renderPass;
@@ -844,7 +618,7 @@ namespace HWPT {
         RenderPassInfo.renderPass = m_imguiInfrastructure->m_renderPass;
         RenderPassInfo.framebuffer = m_imguiInfrastructure->m_frameBuffers[m_imageIndex];
         RenderPassInfo.renderArea.offset = {0, 0};
-        RenderPassInfo.renderArea.extent = m_swapChain.Extent;
+        RenderPassInfo.renderArea.extent = m_swapChain->GetExtent();
         VkClearValue ClearValue = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
         RenderPassInfo.clearValueCount = 1;
         RenderPassInfo.pClearValues = &ClearValue;
@@ -875,7 +649,7 @@ namespace HWPT {
         PresentInfo.waitSemaphoreCount = 1;
         PresentInfo.pWaitSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
         PresentInfo.swapchainCount = 1;
-        PresentInfo.pSwapchains = &m_swapChain.SwapChainHandle;
+        PresentInfo.pSwapchains = &m_swapChain->GetHandle();
         PresentInfo.pImageIndices = &m_imageIndex;
 
         VkResult Result = vkQueuePresentKHR(m_queue.PresentQueue, &PresentInfo);
@@ -947,13 +721,13 @@ namespace HWPT {
     void VulkanBackendApp::CreateMSAABuffers() {
         m_msaaBuffers = new MSAABuffer();
 
-        m_msaaBuffers->MSAAColorBuffer = new Texture2D(m_swapChain.Extent.width,
-                                                       m_swapChain.Extent.height,
+        m_msaaBuffers->MSAAColorBuffer = new Texture2D(m_swapChain->GetExtent().width,
+                                                       m_swapChain->GetExtent().height,
                                                        TextureFormat::RGBA,
                                                        TextureUsage::ColorAttachmentMSAA,
                                                        GetVKSampleCount(m_msaaSamples));
-        m_msaaBuffers->MSAADepthBuffer = new Texture2D(m_swapChain.Extent.width,
-                                                       m_swapChain.Extent.height,
+        m_msaaBuffers->MSAADepthBuffer = new Texture2D(m_swapChain->GetExtent().width,
+                                                       m_swapChain->GetExtent().height,
                                                        TextureFormat::Depth32,
                                                        TextureUsage::DepthStencilAttachmentMSAA,
                                                        GetVKSampleCount(m_msaaSamples));
@@ -993,28 +767,31 @@ namespace HWPT {
     void VulkanBackendApp::CreateRasterPass() {
         m_rasterPass = new RasterPass("MeshRaster", PassFlag::Raster,
                                       "../../shader/HLSL/Vert.spv", "VSMain",
-                                      "../../shader/HLSL/Frag.spv", "PSMain");
+                                      "../../shader/HLSL/Frag.spv", "PSMain",
+                                      true, PrimitiveType::Triangle);
         auto *MeshRasterPassParameters = new ShaderParameters(m_rasterPass);
         MeshRasterPassParameters->AddParameters({
-            {"ViewUniformBuffer", ShaderParameterType::UniformBuffer},
-            {"Texture", ShaderParameterType::Texture2D}
-        });
+                                                        {"ViewUniformBuffer", ShaderParameterType::UniformBuffer},
+                                                        {"Texture",           ShaderParameterType::Texture2D}
+                                                });
         m_rasterPass->SetShaderParameters(MeshRasterPassParameters);
         m_rasterPass->OnRenderPassSetupFinish();
 
         m_particlePass = new RasterPass("ParticleRaster", PassFlag::Raster,
                                         "../../shader/HLSL/ParticleVert.spv", "VSMain",
                                         "../../shader/HLSL/ParticleFrag.spv", "PSMain",
+                                        false,
                                         PrimitiveType::Point);
         auto *ParticleRasterPassParameters = new ShaderParameters(m_particlePass);
         ParticleRasterPassParameters->AddParameters({
-            {"ViewUniformBuffer", ShaderParameterType::UniformBuffer},
-            });
+                                                            {"ViewUniformBuffer",
+                                                             ShaderParameterType::UniformBuffer},
+                                                    });
         m_particlePass->SetVertexBufferLayout({
-            {VertexAttributeDataType::Float3, "Pos"},
-            {VertexAttributeDataType::Float3, "PlaceHolder"},
-            {VertexAttributeDataType::Float3, "Color"}
-        });
+                                                      {VertexAttributeDataType::Float3, "Pos"},
+                                                      {VertexAttributeDataType::Float3, "PlaceHolder"},
+                                                      {VertexAttributeDataType::Float3, "Color"}
+                                              });
         m_particlePass->SetShaderParameters(ParticleRasterPassParameters);
         m_particlePass->OnRenderPassSetupFinish();
     }
@@ -1034,31 +811,22 @@ namespace HWPT {
         m_updateParticlePass->OnRenderPassSetupFinish();
     }
 
-    void SwapChain::GetImages(VkDevice Device) {
-        uint ImageCount = 0;
-        vkGetSwapchainImagesKHR(Device, SwapChainHandle, &ImageCount, nullptr);
-        SwapChainImages.resize(ImageCount);
-        vkGetSwapchainImagesKHR(Device, SwapChainHandle, &ImageCount, SwapChainImages.data());
-    }
-
-    void SwapChain::CreateImageViews(VkDevice Device) {
-        SwapChainImageViews.resize(SwapChainImages.size());
-        for (size_t Index = 0; Index < SwapChainImageViews.size(); Index++) {
-            VkImageViewCreateInfo ViewCreateInfo{};
-            ViewCreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-            ViewCreateInfo.image = SwapChainImages[Index];
-            ViewCreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-            ViewCreateInfo.format = Format;
-            ViewCreateInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-            ViewCreateInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-            ViewCreateInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-            ViewCreateInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-            ViewCreateInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            ViewCreateInfo.subresourceRange.levelCount = 1;
-            ViewCreateInfo.subresourceRange.baseArrayLayer = 0;
-            ViewCreateInfo.subresourceRange.layerCount = 1;
-            VK_CHECK(vkCreateImageView(Device, &ViewCreateInfo, nullptr,
-                                       &SwapChainImageViews[Index]));
-        }
+    void VulkanBackendApp::UpdateViewUniformBuffer() {
+        MVPData MVP{};
+        MVP.ModelTrans = glm::identity<glm::mat4>();
+        glm::vec3 CameraPos = glm::vec3(0.f, 0.f, 2.f);
+        MVP.ViewTrans = glm::lookAt(CameraPos, CameraPos + glm::vec3(0.f, 0.f, -1.f),
+                                    glm::vec3(0.f, 1.f, 0.f)) * mat4_cast(glm::quat(glm::vec3(
+                glm::radians(0.f),
+                glm::radians(0.f),
+                glm::radians(0.f)
+        )));
+        MVP.ProjTrans = glm::perspective(glm::radians(60.f),
+                                         static_cast<float>(m_windowWidth) /
+                                         static_cast<float>(m_windowHeight),
+                                         1e-3f, 1000.f);
+        MVP.DebugColor = glm::vec3(.5f, .9f, .6f);
+        MVP.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
+        m_MVPUniformBuffers[m_imageIndex]->Update(&MVP);
     }
 }  // namespace HWPT

@@ -22,7 +22,7 @@ namespace HWPT {
 
         void LoadModel(const std::filesystem::path& ModelPath);
 
-        void Bind(VkCommandBuffer CommandBuffer);
+        void Bind(VkCommandBuffer CommandBuffer) const;
 
         auto GetTexture() -> Texture2D* {
             return m_texture;
@@ -36,11 +36,19 @@ namespace HWPT {
             return m_vertexBuffer;
         }
 
+        [[nodiscard]] auto GetVertexBuffer() const -> const VertexBuffer* {
+            return m_vertexBuffer;
+        }
+
         auto GetVertexBufferLayout() -> VertexBufferLayout* {
             return m_vertexBuffer->GetLayout();
         }
 
-        void DrawIndexed(VkCommandBuffer CommandBuffer);
+        [[nodiscard]] auto GetVertexBufferLayout() const -> const VertexBufferLayout* {
+            return m_vertexBuffer->GetLayout();
+        }
+
+        void DrawIndexed(VkCommandBuffer CommandBuffer) const;
 
     private:
         Texture2D* m_texture = nullptr;

@@ -71,12 +71,12 @@ namespace HWPT {
         delete m_texture;
     }
 
-    void Model::Bind(VkCommandBuffer CommandBuffer) {
+    void Model::Bind(VkCommandBuffer CommandBuffer) const {
         m_vertexBuffer->Bind(CommandBuffer);
         m_indexBuffer->Bind(CommandBuffer);
     }
 
-    void Model::DrawIndexed(VkCommandBuffer CommandBuffer) {
+    void Model::DrawIndexed(VkCommandBuffer CommandBuffer) const {
         this->Bind(CommandBuffer);
         vkCmdDrawIndexed(CommandBuffer, GetIndexCount(), 1, 0, 0, 0);
     }

@@ -5,6 +5,7 @@
 #include "ComputePass.h"
 #include "core/renderGraph/ShaderParameters.h"
 #include <utility>
+#include "core/application/VulkanBackendApp.h"
 
 
 namespace HWPT {
@@ -26,7 +27,7 @@ namespace HWPT {
         CreateRenderPipeline();
     }
 
-    void ComputePass::BindRenderPass(VkCommandBuffer CommandBuffer) const {
+    void ComputePass::BindRenderPass(VkCommandBuffer CommandBuffer) {
         m_parameters->OnRenderPassBegin();
         vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout, 0,
                                 1, &m_parameters->GetDescriptorSets(), 0, nullptr);
@@ -50,8 +51,7 @@ namespace HWPT {
     }
 
     void
-    ComputePass::Execute(VkCommandBuffer CommandBuffer, uint NumThreadGroupX, uint NumThreadGroupY,
-                         uint NumThreadGroupZ) {
-        vkCmdDispatch(CommandBuffer, NumThreadGroupX, NumThreadGroupY, NumThreadGroupZ);
+    ComputePass::Execute(uint NumThreadGroupX, uint NumThreadGroupY, uint NumThreadGroupZ) {
+        vkCmdDispatch(m_commandBuffer, NumThreadGroupX, NumThreadGroupY, NumThreadGroupZ);
     }
 }  // namespace HWPT

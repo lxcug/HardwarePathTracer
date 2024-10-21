@@ -26,13 +26,11 @@ namespace HWPT {
 
         // CreateRenderPass
         VkAttachmentDescription ColorAttachment{};
-        ColorAttachment.format = VulkanBackendApp::GetApplication()->GetSwapChain().Format;
+        ColorAttachment.format = VulkanBackendApp::GetApplication()->GetSwapChain()->GetFormat();
         ColorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-        ColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+        ColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;  // Don't Care Load Op Cause MSAAColor will Resolve into ColorAttachment
         ColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        ColorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        ColorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-        ColorAttachment.initialLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        ColorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         ColorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
         VkAttachmentReference ColorAttachmentRef{};
@@ -64,18 +62,18 @@ namespace HWPT {
         VK_CHECK(vkCreateRenderPass(GetVKDevice(), &CreateInfo, nullptr, &m_renderPass));
 
         // CreateFrameBuffers
-        SwapChain _SwapChain = VulkanBackendApp::GetApplication()->GetSwapChain();
+        SwapChain* _SwapChain = VulkanBackendApp::GetApplication()->GetSwapChain();
         for (size_t Index = 0; Index < m_frameBuffers.size(); Index++) {
 
             std::array<VkImageView, 1> Attachments = {
-                    _SwapChain.SwapChainImageViews[Index]
+                    _SwapChain->GetSwapChainImageViews()[Index]
             };
 
             VkFramebufferCreateInfo FrameBufferCreateInfo{};
             FrameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
             FrameBufferCreateInfo.renderPass = m_renderPass;
-            FrameBufferCreateInfo.width = _SwapChain.Extent.width;
-            FrameBufferCreateInfo.height = _SwapChain.Extent.height;
+            FrameBufferCreateInfo.width = _SwapChain->GetExtent().width;
+            FrameBufferCreateInfo.height = _SwapChain->GetExtent().height;
             FrameBufferCreateInfo.layers = 1;
             FrameBufferCreateInfo.attachmentCount = Attachments.size();
             FrameBufferCreateInfo.pAttachments = Attachments.data();
@@ -94,19 +92,19 @@ namespace HWPT {
     }
 
     void ImGuiInfrastructure::RecreateFrameBuffer() {
-        SwapChain _SwapChain = VulkanBackendApp::GetApplication()->GetSwapChain();
+        SwapChain* SwapChain = VulkanBackendApp::GetApplication()->GetSwapChain();
         for (size_t Index = 0; Index < m_frameBuffers.size(); Index++) {
             vkDestroyFramebuffer(GetVKDevice(), m_frameBuffers[Index], nullptr);
 
             std::array<VkImageView, 1> Attachments = {
-                    _SwapChain.SwapChainImageViews[Index]
+                    SwapChain->GetSwapChainImageViews()[Index]
             };
 
             VkFramebufferCreateInfo FrameBufferCreateInfo{};
             FrameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
             FrameBufferCreateInfo.renderPass = m_renderPass;
-            FrameBufferCreateInfo.width = _SwapChain.Extent.width;
-            FrameBufferCreateInfo.height = _SwapChain.Extent.height;
+            FrameBufferCreateInfo.width = SwapChain->GetExtent().width;
+            FrameBufferCreateInfo.height = SwapChain->GetExtent().height;
             FrameBufferCreateInfo.layers = 1;
             FrameBufferCreateInfo.attachmentCount = Attachments.size();
             FrameBufferCreateInfo.pAttachments = Attachments.data();

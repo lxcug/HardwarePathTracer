@@ -52,16 +52,25 @@ namespace HWPT {
 
         ~VertexBuffer();
 
-        void Bind(VkCommandBuffer CommandBuffer);
+        void Bind(VkCommandBuffer CommandBuffer) const;
 
         auto GetHandle() -> VkBuffer & {
             return m_vertexBuffer;
+        }
+
+        [[nodiscard]] auto GetHandle() const -> const VkBuffer & {
+            return m_vertexBuffer;
+        }
+
+        [[nodiscard]] auto GetVertexCount() const -> uint {
+            return m_vertexCount;
         }
 
     private:
         VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
         VertexBufferLayout *m_layout = nullptr;
+        uint m_vertexCount = 0;
     };
 }  // namespace HWPT
 

@@ -109,7 +109,7 @@ namespace HWPT {
         RenderPassBase* m_renderPass = nullptr;
         VkDescriptorSetLayout m_descriptorSetLayout = VK_NULL_HANDLE;
         bool m_parameterSetFinish = false;
-        VkDescriptorSet m_descriptorSet;
+        VkDescriptorSet m_descriptorSet = VK_NULL_HANDLE;
         bool m_descriptorSetsAllocated = false;
     };
 }  // namespace HWPT

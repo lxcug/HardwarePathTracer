@@ -103,6 +103,9 @@ namespace HWPT {
             m_descriptorSetsAllocated = true;
         }
 
+        // NOTE: Avoid Stack Memory Reuse
+        std::vector<VkDescriptorBufferInfo*> BufferInfosToDelete;
+        std::vector<VkDescriptorImageInfo*> ImageInfosToDelete;
         std::vector<VkWriteDescriptorSet> DescriptorWrites;
         uint BindingIndex = 0;
         for (auto &It: m_parameterMetaData) {
@@ -111,81 +114,71 @@ namespace HWPT {
             switch (MetaData.ParameterType) {
                 case ShaderParameterType::UniformBuffer: {
                     Check(MetaData.Parameter != nullptr);
-                    VkDescriptorBufferInfo BufferInfo{};
-                    BufferInfo.buffer = static_cast<UniformBuffer *>(MetaData.Parameter)->GetHandle();
-                    BufferInfo.offset = 0;
-                    BufferInfo.range = VK_WHOLE_SIZE;
+                    auto* BufferInfo = new VkDescriptorBufferInfo{};
+                    BufferInfo->buffer = static_cast<UniformBuffer *>(MetaData.Parameter)->GetHandle();
+                    BufferInfo->offset = 0;
+                    BufferInfo->range = VK_WHOLE_SIZE;
                     MetaData.ParameterDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                     MetaData.ParameterDescriptorSet.dstSet = m_descriptorSet;
                     MetaData.ParameterDescriptorSet.dstBinding = BindingIndex++;
                     MetaData.ParameterDescriptorSet.dstArrayElement = 0;
                     MetaData.ParameterDescriptorSet.descriptorCount = 1;
                     MetaData.ParameterDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-                    MetaData.ParameterDescriptorSet.pBufferInfo = &BufferInfo;
+                    MetaData.ParameterDescriptorSet.pBufferInfo = BufferInfo;
+                    BufferInfosToDelete.push_back(BufferInfo);
                     DescriptorWrites.push_back(MetaData.ParameterDescriptorSet);
                     break;
                 }
                 case ShaderParameterType::Texture2D: {
                     Check(MetaData.Parameter != nullptr);
-                    VkDescriptorImageInfo ImageInfo{};
-                    ImageInfo.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
-                    ImageInfo.imageView = static_cast<Texture2D *>(MetaData.Parameter)->CreateSRV();
-                    ImageInfo.sampler = VulkanBackendApp::GetApplication()->GetGlobalSampler()->GetHandle();  // TODO
+                    auto* ImageInfo = new VkDescriptorImageInfo{};
+                    ImageInfo->imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+                    ImageInfo->imageView = static_cast<Texture2D *>(MetaData.Parameter)->CreateSRV();
+                    ImageInfo->sampler = VulkanBackendApp::GetApplication()->GetGlobalSampler()->GetHandle();  // TODO
                     MetaData.ParameterDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                     MetaData.ParameterDescriptorSet.dstSet = m_descriptorSet;
                     MetaData.ParameterDescriptorSet.dstBinding = BindingIndex++;
                     MetaData.ParameterDescriptorSet.dstArrayElement = 0;
                     MetaData.ParameterDescriptorSet.descriptorCount = 1;
                     MetaData.ParameterDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                    MetaData.ParameterDescriptorSet.pImageInfo = &ImageInfo;
+                    MetaData.ParameterDescriptorSet.pImageInfo = ImageInfo;
+                    ImageInfosToDelete.push_back(ImageInfo);
                     DescriptorWrites.push_back(MetaData.ParameterDescriptorSet);
                     break;
                 }
                 case ShaderParameterType::RWTexture2D: {
                     Check(MetaData.Parameter != nullptr);
-                    VkDescriptorImageInfo ImageInfo{};
-                    ImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-                    ImageInfo.imageView = static_cast<Texture2D *>(MetaData.Parameter)->CreateSRV();
-                    ImageInfo.sampler = VulkanBackendApp::GetApplication()->GetGlobalSampler()->GetHandle();  // TODO
+                    auto* ImageInfo = new VkDescriptorImageInfo{};
+                    ImageInfo->imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+                    ImageInfo->imageView = static_cast<Texture2D *>(MetaData.Parameter)->CreateSRV();
+                    ImageInfo->sampler = VulkanBackendApp::GetApplication()->GetGlobalSampler()->GetHandle();  // TODO
                     MetaData.ParameterDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                     MetaData.ParameterDescriptorSet.dstSet = m_descriptorSet;
                     MetaData.ParameterDescriptorSet.dstBinding = BindingIndex++;
                     MetaData.ParameterDescriptorSet.dstArrayElement = 0;
                     MetaData.ParameterDescriptorSet.descriptorCount = 1;
                     MetaData.ParameterDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                    MetaData.ParameterDescriptorSet.pImageInfo = &ImageInfo;
+                    MetaData.ParameterDescriptorSet.pImageInfo = ImageInfo;
+                    ImageInfosToDelete.push_back(ImageInfo);
                     DescriptorWrites.push_back(MetaData.ParameterDescriptorSet);
                     break;
                 }
-                case ShaderParameterType::StorageBuffer: {  // TODO: Why Fallthrough fails
-                    Check(MetaData.Parameter != nullptr);
-                    VkDescriptorBufferInfo BufferInfo{};
-                    BufferInfo.buffer = static_cast<StorageBuffer *>(MetaData.Parameter)->GetHandle();
-                    BufferInfo.offset = 0;
-                    BufferInfo.range = VK_WHOLE_SIZE;
-                    MetaData.ParameterDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                    MetaData.ParameterDescriptorSet.dstSet = m_descriptorSet;
-                    MetaData.ParameterDescriptorSet.dstBinding = BindingIndex++;
-                    MetaData.ParameterDescriptorSet.dstArrayElement = 0;
-                    MetaData.ParameterDescriptorSet.descriptorCount = 1;
-                    MetaData.ParameterDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                    MetaData.ParameterDescriptorSet.pBufferInfo = &BufferInfo;
-                    DescriptorWrites.push_back(MetaData.ParameterDescriptorSet);
-                    break;
-                }
+                case ShaderParameterType::StorageBuffer:
+                    [[fallthrough]];
                 case ShaderParameterType::RWStorageBuffer : {
                     Check(MetaData.Parameter != nullptr);
-                    VkDescriptorBufferInfo BufferInfo{};
-                    BufferInfo.buffer = static_cast<StorageBuffer *>(MetaData.Parameter)->GetHandle();
-                    BufferInfo.offset = 0;
-                    BufferInfo.range = VK_WHOLE_SIZE;
+                    auto* BufferInfo = new VkDescriptorBufferInfo{};
+                    BufferInfo->buffer = static_cast<StorageBuffer *>(MetaData.Parameter)->GetHandle();
+                    BufferInfo->offset = 0;
+                    BufferInfo->range = VK_WHOLE_SIZE;
                     MetaData.ParameterDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                     MetaData.ParameterDescriptorSet.dstSet = m_descriptorSet;
                     MetaData.ParameterDescriptorSet.dstBinding = BindingIndex++;
                     MetaData.ParameterDescriptorSet.dstArrayElement = 0;
                     MetaData.ParameterDescriptorSet.descriptorCount = 1;
                     MetaData.ParameterDescriptorSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-                    MetaData.ParameterDescriptorSet.pBufferInfo = &BufferInfo;
+                    MetaData.ParameterDescriptorSet.pBufferInfo = BufferInfo;
+                    BufferInfosToDelete.push_back(BufferInfo);
                     DescriptorWrites.push_back(MetaData.ParameterDescriptorSet);
                     break;
                 }
@@ -196,6 +189,12 @@ namespace HWPT {
         if (!DescriptorWrites.empty()) {
             vkUpdateDescriptorSets(GetVKDevice(), DescriptorWrites.size(), DescriptorWrites.data(),
                                    0, nullptr);
+        }
+        for (auto& ImageInfo : ImageInfosToDelete) {
+            delete ImageInfo;
+        }
+        for (auto& BufferInfo : BufferInfosToDelete) {
+            delete BufferInfo;
         }
     }
 
