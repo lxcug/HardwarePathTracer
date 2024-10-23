@@ -28,6 +28,7 @@
 #include "core/buffer/FrameBuffer.h"
 #include "core/SwapChain.h"
 #include "core/renderGraph/RenderGraph.h"
+#include "core/Scene.h"
 
 
 namespace HWPT {
@@ -179,8 +180,6 @@ namespace HWPT {
 
         void CreateDescriptorPool();
 
-        void CreateSyncObjects();
-
         void CreateUniformBuffers();
 
         void CreateModelAndSampler();
@@ -250,26 +249,15 @@ namespace HWPT {
         std::vector<UniformBuffer *> m_MVPUniformBuffers;
         Sampler *m_sampler = nullptr;
 
-        std::vector<VkSemaphore> m_imageAvailableSemaphores;
-        std::vector<VkSemaphore> m_renderFinishedSemaphores;
-        std::vector<VkFence> m_graphicsInFlightFences;
-        std::vector<VkFence> m_computeInFlightFences;
-        std::vector<VkSemaphore> m_computeFinishedSemaphores;
-
         glm::vec2 m_viewportSize = glm::vec2(0.f, 0.f);
-
-        Model *m_vikingRoom = nullptr;
 
         // For GPU Particles
         inline static uint s_particleCount = 81920;
         std::vector<StorageBuffer *> m_particleStorageBuffers;
         std::shared_ptr<VertexBufferLayout> m_particleVertexBufferLayout;
 
-        RasterPass *m_rasterPass = nullptr;
-        RasterPass *m_particlePass = nullptr;
-        ComputePass *m_updateParticlePass = nullptr;
-
         RenderGraph* m_renderGraph = nullptr;
+        Scene* m_scene = nullptr;
     };
 }  // namespace HWPT
 

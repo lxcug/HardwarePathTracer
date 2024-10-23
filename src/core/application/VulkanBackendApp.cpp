@@ -99,10 +99,6 @@ namespace HWPT {
         CreateRasterPass();
         CreateFrameBuffers();
         CreateComputePass();
-
-        CreateSyncObjects();
-
-        m_renderGraph = new RenderGraph();
     }
 
     void VulkanBackendApp::InitVulkanInfrastructure() {
@@ -115,6 +111,8 @@ namespace HWPT {
         CreateDescriptorPool();
         CreateSwapChain();
         CreateMSAABuffers();
+        m_renderGraph = new RenderGraph();
+        m_scene = new Scene();
     }
 
     void VulkanBackendApp::FrameBufferResizeCallback(GLFWwindow *Window, int Width, int Height) {
@@ -124,29 +122,20 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CleanUp() {
+        delete m_scene;
         delete m_renderGraph;
-        delete m_rasterPass;
-        delete m_particlePass;
-        delete m_updateParticlePass;
         delete m_msaaBuffers;
-        delete m_vikingRoom;
+
+        delete m_sampler;
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             delete m_MVPUniformBuffers[i];
             delete m_particleStorageBuffers[i];
             delete m_basePassFrameBuffers[i];
         }
-        delete m_sampler;
 
         CleanUpImGui();
         delete m_swapChain;
 
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroySemaphore(m_device, m_imageAvailableSemaphores[i], nullptr);
-            vkDestroySemaphore(m_device, m_renderFinishedSemaphores[i], nullptr);
-            vkDestroyFence(m_device, m_graphicsInFlightFences[i], nullptr);
-            vkDestroyFence(m_device, m_computeInFlightFences[i], nullptr);
-            vkDestroySemaphore(m_device, m_computeFinishedSemaphores[i], nullptr);
-        }
         vkDestroyDescriptorPool(m_device, m_descriptorPool, nullptr);
         vkDestroyCommandPool(m_device, m_commandPool.GraphicsPool, nullptr);
         vkDestroyCommandPool(m_device, m_commandPool.ComputePool, nullptr);
@@ -159,12 +148,9 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::DrawFrame() {
-        vkWaitForFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame], VK_TRUE,
-                        UINT64_MAX);
-        vkResetFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame]);
-
         VkResult Result = vkAcquireNextImageKHR(m_device, m_swapChain->GetHandle(), UINT64_MAX,
-                                                m_imageAvailableSemaphores[m_currentFrame],
+                                                m_renderGraph->GetImageAvailableSemaphore(
+                                                        m_currentFrame),
                                                 VK_NULL_HANDLE, &m_imageIndex);
         if (Result == VK_ERROR_OUT_OF_DATE_KHR || Result == VK_SUBOPTIMAL_KHR) {
             OnWindowResize();
@@ -177,57 +163,62 @@ namespace HWPT {
         }
 
         UpdateViewUniformBuffer();
-
-        m_renderGraph->OnNewFrame();
-        m_renderGraph->SetImageAvailableSemaphore(m_imageAvailableSemaphores[m_currentFrame]);
-        m_renderGraph->SetRenderFinishFence(m_graphicsInFlightFences[m_currentFrame]);
-        m_renderGraph->SetRenderFinishSemaphore(m_renderFinishedSemaphores[m_currentFrame]);
+        m_renderGraph->OnNewFrame(m_currentFrame);
 
         // Update Particle
         uint LastFrameIndex =
                 m_currentFrame == 0 ? MAX_FRAMES_IN_FLIGHT - 1 : m_currentFrame - 1;
-        m_updateParticlePass->GetShaderParameters()->SetParameter("ViewUniformBuffer",
-                                                                  m_MVPUniformBuffers[0]);
-        m_updateParticlePass->GetShaderParameters()->SetParameter("ParticlesIn",
-                                                                  m_particleStorageBuffers[LastFrameIndex]);
-        m_updateParticlePass->GetShaderParameters()->SetParameter("ParticlesOut",
-                                                                  m_particleStorageBuffers[m_currentFrame]);
-        m_updateParticlePass->SetCurrentCommandBuffer(m_computeCommandBuffers[m_currentFrame]);
+        auto UpdateParticlePass = m_renderGraph->GetPassByName<ComputePass>("UpdateParticlePass");
+        auto UpdateParticlePassParameters = m_renderGraph->GetShaderParameterByName(
+                "UpdateParticlePass");
+        UpdateParticlePassParameters->SetParameter("ViewUniformBuffer", m_MVPUniformBuffers[0]);
+        UpdateParticlePassParameters->SetParameter("ParticlesIn",
+                                                   m_particleStorageBuffers[LastFrameIndex]);
+        UpdateParticlePassParameters->SetParameter("ParticlesOut",
+                                                   m_particleStorageBuffers[m_currentFrame]);
+        UpdateParticlePass->SetCurrentCommandBuffer(m_computeCommandBuffers[m_currentFrame]);
         m_renderGraph->AddPass(
                 "UpdateParticlePass",
-                m_updateParticlePass,
-                [this]() {
-                    m_updateParticlePass->BindRenderPass(m_computeCommandBuffers[m_currentFrame]);
-                    m_updateParticlePass->Execute((s_particleCount + 255) / 256, 1, 1);
+                UpdateParticlePass,
+                [this, UpdateParticlePass]() {
+                    UpdateParticlePass->BindRenderPass(m_computeCommandBuffers[m_currentFrame]);
+                    UpdateParticlePass->Execute((s_particleCount + 255) / 256, 1, 1);
                 }
         );
 
         // Draw Mesh
-        m_rasterPass->GetShaderParameters()->SetParameter<UniformBuffer *>("ViewUniformBuffer",
-                                                                           m_MVPUniformBuffers[0]);
-        m_rasterPass->GetShaderParameters()->SetParameter<Texture2D *>("Texture",
-                                                                       m_vikingRoom->GetTexture());
-        m_rasterPass->SetCurrentCommandBuffer(m_graphicsCommandBuffers[m_currentFrame]);
+        auto MeshRasterPass = m_renderGraph->GetPassByName<RasterPass>("MeshRaster");
+        auto MeshRasterPassParameters = m_renderGraph->GetShaderParameterByName("MeshRaster");
+
+        MeshRasterPassParameters->SetParameter<UniformBuffer *>("ViewUniformBuffer",
+                                                                m_MVPUniformBuffers[0]);
+        MeshRasterPass->SetCurrentCommandBuffer(m_graphicsCommandBuffers[m_currentFrame]);
         m_renderGraph->AddPass(
                 "MeshRasterPass",
-                m_rasterPass,
-                [this]() {
-                    m_rasterPass->BindRenderPass(m_graphicsCommandBuffers[m_currentFrame]);
-                    m_rasterPass->Execute(*m_vikingRoom);
+                MeshRasterPass,
+                [this, MeshRasterPass]() {
+                    for (auto It = m_scene->Begin(); It != m_scene->End(); It++) {
+                        (*It)->Bind(MeshRasterPass->GetShaderParameters());
+                        MeshRasterPass->BindRenderPass(m_graphicsCommandBuffers[m_currentFrame]);
+                        MeshRasterPass->Execute(**It);
+                    }
                 }
         );
 
         // Draw Particle
-        m_particlePass->GetShaderParameters()->SetParameter<UniformBuffer *>("ViewUniformBuffer",
-                                                                             m_MVPUniformBuffers[0]);
-        m_particlePass->SetCurrentCommandBuffer(m_graphicsCommandBuffers[m_currentFrame]);
+        auto ParticleRasterPass = m_renderGraph->GetPassByName<RasterPass>("ParticleRaster");
+        auto ParticleRasterPassParameters = m_renderGraph->GetShaderParameterByName(
+                "ParticleRaster");
+        ParticleRasterPassParameters->SetParameter<UniformBuffer *>("ViewUniformBuffer",
+                                                                    m_MVPUniformBuffers[0]);
+        ParticleRasterPass->SetCurrentCommandBuffer(m_graphicsCommandBuffers[m_currentFrame]);
         m_renderGraph->AddPass(
-                "RasterParticlePass",
-                m_particlePass,
-                [this]() {
-                    m_particlePass->BindRenderPass(m_graphicsCommandBuffers[m_currentFrame]);
-                    m_particlePass->Execute(*m_particleStorageBuffers[m_currentFrame],
-                                            s_particleCount);
+                "ParticleRasterPass",
+                ParticleRasterPass,
+                [this, ParticleRasterPass]() {
+                    ParticleRasterPass->BindRenderPass(m_graphicsCommandBuffers[m_currentFrame]);
+                    ParticleRasterPass->Execute(*m_particleStorageBuffers[m_currentFrame],
+                                                s_particleCount);
                 }
         );
 
@@ -389,10 +380,11 @@ namespace HWPT {
                     m_swapChain->GetSwapChainImageViews()[Index]
             };
 
+            auto BasePass = m_renderGraph->GetPassByName<RasterPass>("MeshRaster");
             m_basePassFrameBuffers[Index] = new FrameBuffer(m_swapChain->GetExtent().width,
                                                             m_swapChain->GetExtent().height,
                                                             Attachments,
-                                                            m_rasterPass);
+                                                            BasePass);
         }
     }
 
@@ -512,32 +504,6 @@ namespace HWPT {
         VK_CHECK(vkCreateDescriptorPool(m_device, &PoolInfo, nullptr, &m_descriptorPool));
     }
 
-    void VulkanBackendApp::CreateSyncObjects() {
-        m_imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-        m_renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-        m_graphicsInFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
-        m_computeInFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
-        m_computeFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            VkSemaphoreCreateInfo SemaphoreInfo{};
-            SemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-
-            VkFenceCreateInfo FenceInfo{};
-            FenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-            FenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-
-            VK_CHECK(vkCreateSemaphore(m_device, &SemaphoreInfo, nullptr,
-                                       &m_imageAvailableSemaphores[i]));
-            VK_CHECK(vkCreateSemaphore(m_device, &SemaphoreInfo, nullptr,
-                                       &m_renderFinishedSemaphores[i]));
-            VK_CHECK(vkCreateFence(m_device, &FenceInfo, nullptr, &m_graphicsInFlightFences[i]));
-            VK_CHECK(vkCreateFence(m_device, &FenceInfo, nullptr, &m_computeInFlightFences[i]));
-            VK_CHECK(vkCreateSemaphore(m_device, &SemaphoreInfo, nullptr,
-                                       &m_computeFinishedSemaphores[i]));
-        }
-    }
-
     void VulkanBackendApp::RecreateSwapChain() {
         glfwGetFramebufferSize(m_window, reinterpret_cast<int *>(&m_windowWidth),
                                reinterpret_cast<int *>(&m_windowHeight));
@@ -562,9 +528,8 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateModelAndSampler() {
-        m_vikingRoom = new Model("../../asset/viking_room/viking_room.obj",
-                                 "../../asset/viking_room/viking_room.png", true);
-
+        m_scene->AddPrimitive("../../asset/viking_room/viking_room.obj",
+                              "../../asset/viking_room/viking_room.png", true);
         m_sampler = new Sampler();
     }
 
@@ -647,7 +612,7 @@ namespace HWPT {
         VkPresentInfoKHR PresentInfo{};
         PresentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         PresentInfo.waitSemaphoreCount = 1;
-        PresentInfo.pWaitSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
+        PresentInfo.pWaitSemaphores = &m_renderGraph->GetImageRenderFinishSemaphore(m_currentFrame);
         PresentInfo.swapchainCount = 1;
         PresentInfo.pSwapchains = &m_swapChain->GetHandle();
         PresentInfo.pImageIndices = &m_imageIndex;
@@ -765,50 +730,46 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateRasterPass() {
-        m_rasterPass = new RasterPass("MeshRaster", PassFlag::Raster,
-                                      "../../shader/HLSL/Vert.spv", "VSMain",
-                                      "../../shader/HLSL/Frag.spv", "PSMain",
-                                      true, PrimitiveType::Triangle);
-        auto *MeshRasterPassParameters = new ShaderParameters(m_rasterPass);
-        MeshRasterPassParameters->AddParameters({
-                                                        {"ViewUniformBuffer", ShaderParameterType::UniformBuffer},
-                                                        {"Texture",           ShaderParameterType::Texture2D}
-                                                });
-        m_rasterPass->SetShaderParameters(MeshRasterPassParameters);
-        m_rasterPass->OnRenderPassSetupFinish();
+        auto MeshPass = m_renderGraph->AllocateRasterPass("MeshRaster",
+                                                          "../../shader/HLSL/Vert.spv", "VSMain",
+                                                          "../../shader/HLSL/Frag.spv", "PSMain",
+                                                          true, PrimitiveType::Triangle);
+        m_renderGraph->AllocateParameters(MeshPass,
+                                          {
+                                                  {"ViewUniformBuffer", ShaderParameterType::UniformBuffer},
+                                                  {"Texture",           ShaderParameterType::Texture2D}
+                                          });
 
-        m_particlePass = new RasterPass("ParticleRaster", PassFlag::Raster,
-                                        "../../shader/HLSL/ParticleVert.spv", "VSMain",
-                                        "../../shader/HLSL/ParticleFrag.spv", "PSMain",
-                                        false,
-                                        PrimitiveType::Point);
-        auto *ParticleRasterPassParameters = new ShaderParameters(m_particlePass);
-        ParticleRasterPassParameters->AddParameters({
-                                                            {"ViewUniformBuffer",
-                                                             ShaderParameterType::UniformBuffer},
-                                                    });
-        m_particlePass->SetVertexBufferLayout({
-                                                      {VertexAttributeDataType::Float3, "Pos"},
-                                                      {VertexAttributeDataType::Float3, "PlaceHolder"},
-                                                      {VertexAttributeDataType::Float3, "Color"}
-                                              });
-        m_particlePass->SetShaderParameters(ParticleRasterPassParameters);
-        m_particlePass->OnRenderPassSetupFinish();
+        auto ParticlePass = m_renderGraph->AllocateRasterPass("ParticleRaster",
+                                                              "../../shader/HLSL/ParticleVert.spv",
+                                                              "VSMain",
+                                                              "../../shader/HLSL/ParticleFrag.spv",
+                                                              "PSMain",
+                                                              false,
+                                                              PrimitiveType::Point);
+        ParticlePass->SetVertexBufferLayout({
+                                                    {VertexAttributeDataType::Float3, "Pos"},
+                                                    {VertexAttributeDataType::Float3, "PlaceHolder"},
+                                                    {VertexAttributeDataType::Float3, "Color"}
+                                            });
+        m_renderGraph->AllocateParameters(ParticlePass,
+                                          {
+                                                  {"ViewUniformBuffer",
+                                                   ShaderParameterType::UniformBuffer},
+                                          });
     }
 
 
     void VulkanBackendApp::CreateComputePass() {
-        m_updateParticlePass = new ComputePass("UpdateParticle", PassFlag::Compute,
-                                               "../../shader/HLSL/UpdateParticle.spv",
-                                               "UpdateParticles");
-        auto *PassParameters = new ShaderParameters(m_updateParticlePass);
-        PassParameters->AddParameters({
-                                              {"ViewUniformBuffer", ShaderParameterType::UniformBuffer},
-                                              {"ParticlesIn",       ShaderParameterType::StorageBuffer},
-                                              {"ParticlesOut",      ShaderParameterType::RWStorageBuffer}
-                                      });
-        m_updateParticlePass->SetShaderParameters(PassParameters);
-        m_updateParticlePass->OnRenderPassSetupFinish();
+        auto UpdateParticlePass = m_renderGraph->AllocateComputePass("UpdateParticlePass",
+                                                                     "../../shader/HLSL/UpdateParticle.spv",
+                                                                     "UpdateParticles");
+        m_renderGraph->AllocateParameters(UpdateParticlePass,
+                                          {
+                                                  {"ViewUniformBuffer", ShaderParameterType::UniformBuffer},
+                                                  {"ParticlesIn",       ShaderParameterType::StorageBuffer},
+                                                  {"ParticlesOut",      ShaderParameterType::RWStorageBuffer}
+                                          });
     }
 
     void VulkanBackendApp::UpdateViewUniformBuffer() {

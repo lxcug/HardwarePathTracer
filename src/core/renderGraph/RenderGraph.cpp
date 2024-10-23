@@ -7,20 +7,36 @@
 
 
 namespace HWPT {
-    RenderGraph::RenderGraph() {
+    RenderGraph::RenderGraph(uint NumConcurrentFrames) : m_concurrentFrames(NumConcurrentFrames) {
         Create();
+        m_frameImageAvailable.resize(m_concurrentFrames);
+        m_frameImageRenderFinish.resize(m_concurrentFrames);
+        VkSemaphoreCreateInfo SemaphoreInfo{};
+        SemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        VkFenceCreateInfo FenceInfo{};
+        FenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        for (int i = 0; i < m_concurrentFrames; i++) {
+            VK_CHECK(vkCreateSemaphore(GetVKDevice(), &SemaphoreInfo, nullptr,
+                                       &m_frameImageAvailable[i]));
+            VK_CHECK(vkCreateSemaphore(GetVKDevice(), &SemaphoreInfo, nullptr,
+                                       &m_frameImageRenderFinish[i]));
+        }
     }
 
     RenderGraph::~RenderGraph() {
+        for (auto &PassMetaData: m_passMetaData) {
+            delete PassMetaData.Pass;
+        }
         Destroy();
+        for (int i = 0; i < m_concurrentFrames; i++) {
+            vkDestroySemaphore(GetVKDevice(), m_frameImageAvailable[i], nullptr);
+            vkDestroySemaphore(GetVKDevice(), m_frameImageRenderFinish[i], nullptr);
+        }
     }
 
     void RenderGraph::Create() {}
 
     void RenderGraph::Destroy() {
-//        for (auto &PassMetaData: m_passMetaData) {
-//            delete PassMetaData.Pass;
-//        }
         m_passMetaData.clear();
         for (int i = 0; i < m_passSyncSemaphores.size(); i++) {
             vkDestroySemaphore(GetVKDevice(), m_passSyncSemaphores[i], nullptr);
@@ -34,11 +50,21 @@ namespace HWPT {
         m_passMetaData.push_back(PassMetaData);
     }
 
+    auto RenderGraph::AllocateParameters(RenderPassBase *Pass,
+                                         const std::initializer_list<std::pair<std::string, ShaderParameterType>> &InitList) -> ShaderParameters * {
+        auto *ShaderParameter = new ShaderParameters(Pass, InitList);
+        return ShaderParameter;
+    }
+
     auto RenderGraph::Validate() -> bool {
+        if (m_passMetaData.empty()) {
+            return false;
+        }
+
+        // Make sure BasePass is raster first(cause only base pass do attachments clear ops)
         for (auto &PassMetaData: m_passMetaData) {
             if (PassMetaData.Pass->GetPassFlag() == PassFlag::Raster) {
                 auto Raster = dynamic_cast<RasterPass *>(PassMetaData.Pass);
-                // Make sure BasePass is raster first(cause only base pass do attachments clear ops)
                 if (Raster->IsBasePass()) {
                     return true;
                 } else {
@@ -49,8 +75,9 @@ namespace HWPT {
         return true;
     }
 
-    void RenderGraph::OnNewFrame() {
+    void RenderGraph::OnNewFrame(uint FrameIndex) {
         Destroy();
+        m_frameIndex = FrameIndex;
     }
 
     void RenderGraph::Execute() {
@@ -58,7 +85,7 @@ namespace HWPT {
             throw std::runtime_error("RenderGraph Validate Fails");
         }
 
-        m_passSyncSemaphores.resize(m_passMetaData.size());
+        m_passSyncSemaphores.resize(m_passMetaData.size() - 1);
         VkSemaphoreCreateInfo SemaphoreInfo{};
         SemaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
         for (int i = 0; i < m_passSyncSemaphores.size(); i++) {
@@ -66,61 +93,75 @@ namespace HWPT {
         }
 
         VkCommandBuffer LastCommandBuffer = VK_NULL_HANDLE;
-        uint PassIndex = 0;
-        for (auto &PassMetaData: m_passMetaData) {
-            auto CurrentCommandBuffer = PassMetaData.Pass->GetCurrentCommandBuffer();
 
-            if (CurrentCommandBuffer == LastCommandBuffer) {
-                vkDeviceWaitIdle(GetVKDevice());
+        for (int i = 0; i < m_passMetaData.size(); i++) {
+            auto &PassMetaData = m_passMetaData[i];
+            auto &Pass = PassMetaData.Pass;
+
+            bool IsFirstPass = i == 0;
+            bool IsLastPass = i == m_passMetaData.size() - 1;
+            bool IsRasterPass = Pass->GetPassFlag() == PassFlag::Raster;
+            bool IsComputePass = Pass->GetPassFlag() == PassFlag::Compute ||
+                                 Pass->GetPassFlag() == PassFlag::AsyncCompute;
+            // Wait CommandBuffer Free TODO: Merge 2 Pass into SameCommandBuffer(Queue or CommandBuffer)
+            auto CurrentCommandBuffer = Pass->GetCurrentCommandBuffer();
+            bool UseSameCommandBufferWithNextPass = false;
+            if (!IsLastPass &&
+                CurrentCommandBuffer == m_passMetaData[i + 1].Pass->GetCurrentCommandBuffer()) {
+                UseSameCommandBufferWithNextPass = true;
             }
+
+            bool UseSameCommandBufferWithLastPass = CurrentCommandBuffer == LastCommandBuffer;
             LastCommandBuffer = CurrentCommandBuffer;
 
-            vkResetCommandBuffer(CurrentCommandBuffer, 0);
-            VkCommandBufferBeginInfo BeginInfo{};
-            BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-            VK_CHECK(vkBeginCommandBuffer(CurrentCommandBuffer, &BeginInfo));
+            // TODO: Make sure no dependency when merge commands
+            // Begin CommandBuffer(don't begin when use the same command buffer with last pass for command merge)
+            if (!UseSameCommandBufferWithLastPass) {
+                vkResetCommandBuffer(CurrentCommandBuffer, 0);
+                VkCommandBufferBeginInfo BeginInfo{};
+                BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+                VK_CHECK(vkBeginCommandBuffer(CurrentCommandBuffer, &BeginInfo));
+            }
+
+//            Pass->BindRenderPass(CurrentCommandBuffer);
             PassMetaData.ExecLambda();
-            VK_CHECK(vkEndCommandBuffer(CurrentCommandBuffer));
 
-            VkSubmitInfo PassSubmitInfo{};
-            PassSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            // End CommandBuffer(don't end command buffer and submit commands when use the same command buffer with next pass for command merge)
+            if (!UseSameCommandBufferWithNextPass) {
+                VK_CHECK(vkEndCommandBuffer(CurrentCommandBuffer));
 
-            if (PassIndex == 0) {  // Wait for swapchain image available
-                PassSubmitInfo.waitSemaphoreCount = 1;
-                PassSubmitInfo.pWaitSemaphores = &m_imageAvailable;
-                VkPipelineStageFlags WaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-                PassSubmitInfo.pWaitDstStageMask = &WaitStage;
-            } else {  // wait for last pass finish
-                PassSubmitInfo.waitSemaphoreCount = 1;
-                PassSubmitInfo.pWaitSemaphores = &m_passSyncSemaphores[PassIndex - 1];
-                VkPipelineStageFlags WaitStage =
-                        PassMetaData.Pass->GetPassFlag() == PassFlag::Raster ?
-                        VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
-                                                                             : VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-                PassSubmitInfo.pWaitDstStageMask = &WaitStage;
-            }
+                // Submit Commands
+                VkSubmitInfo PassSubmitInfo{};
+                PassSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+                if (IsFirstPass) {  // Wait for swapchain image available
+                    PassSubmitInfo.waitSemaphoreCount = 1;
+                    PassSubmitInfo.pWaitSemaphores = &m_frameImageAvailable[m_frameIndex];
+                    VkPipelineStageFlags WaitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                    PassSubmitInfo.pWaitDstStageMask = &WaitStage;
+                } else {  // wait for last pass finish
+                    PassSubmitInfo.waitSemaphoreCount = 1;
+                    PassSubmitInfo.pWaitSemaphores = &m_passSyncSemaphores[i - 1];
+                    VkPipelineStageFlags WaitStage =
+                            Pass->GetPassFlag() == PassFlag::Raster
+                            ? VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+                            : VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+                    PassSubmitInfo.pWaitDstStageMask = &WaitStage;
+                }
+                if (UseSameCommandBufferWithLastPass) {
+                    PassSubmitInfo.waitSemaphoreCount = 0;
+                }
 
-            if (PassIndex == m_passMetaData.size() - 1) {
-                PassSubmitInfo.signalSemaphoreCount = 2;
-                std::array<VkSemaphore, 2> SignalSemaphores = {
-                        m_passSyncSemaphores[PassIndex],
-                        m_renderFinishSemaphore
-                };
-                PassSubmitInfo.pSignalSemaphores = SignalSemaphores.data();
-            } else {
                 PassSubmitInfo.signalSemaphoreCount = 1;
-                PassSubmitInfo.pSignalSemaphores = &m_passSyncSemaphores[PassIndex];
-            }
-            PassSubmitInfo.commandBufferCount = 1;
-            PassSubmitInfo.pCommandBuffers = &CurrentCommandBuffer;
+                PassSubmitInfo.pSignalSemaphores = IsLastPass ? &m_frameImageRenderFinish[m_frameIndex]
+                                                              : &m_passSyncSemaphores[i];
+                PassSubmitInfo.commandBufferCount = 1;
+                PassSubmitInfo.pCommandBuffers = &CurrentCommandBuffer;
 
-            auto Queue = PassMetaData.Pass->GetPassFlag() == PassFlag::Raster ?
-                         VulkanBackendApp::GetApplication()->GetGlobalQueue().GraphicsQueue :
-                         VulkanBackendApp::GetApplication()->GetGlobalQueue().ComputeQueue;
-            VK_CHECK(vkQueueSubmit(Queue, 1, &PassSubmitInfo,
-                                   PassIndex == m_passMetaData.size() - 1 ? m_renderFinish
-                                                                          : nullptr));
-            PassIndex++;
+                auto Queue = Pass->GetPassFlag() == PassFlag::Raster ?
+                             VulkanBackendApp::GetApplication()->GetGlobalQueue().GraphicsQueue :
+                             VulkanBackendApp::GetApplication()->GetGlobalQueue().ComputeQueue;
+                VK_CHECK(vkQueueSubmit(Queue, 1, &PassSubmitInfo, nullptr));
+            }
         }
     }
 }  // namespace HWPT

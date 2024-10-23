@@ -7,6 +7,9 @@
 
 #include "RenderPassCommon.h"
 #include <functional>
+#include "core/renderGraph/ShaderParameters.h"
+#include "core/renderGraph/RasterPass.h"
+#include "core/renderGraph/ComputePass.h"
 
 
 namespace HWPT {
@@ -18,7 +21,7 @@ namespace HWPT {
 
     class RenderGraph {
     public:
-        RenderGraph();
+        explicit RenderGraph(uint NumConcurrentFrames = 2);
 
         ~RenderGraph();
 
@@ -29,39 +32,65 @@ namespace HWPT {
         void AddPass(const std::string &PassName, RenderPassBase *Pass,
                      const std::function<void()> &ExecLambda);
 
+        template<typename ...Args>
+        auto AllocateRasterPass(const std::string &PassName, Args &&... args) {
+            auto Pass = new RasterPass(PassName, PassFlag::Raster, std::forward<Args>(args)...);
+            m_passNameMap[PassName] = Pass;
+            return Pass;
+        }
+
+        template<typename ...Args>
+        auto AllocateComputePass(const std::string &PassName, Args &&... args) {
+            auto Pass = new ComputePass(PassName, PassFlag::Compute, std::forward<Args>(args)...);
+            m_passNameMap[PassName] = Pass;
+            return Pass;
+        }
+
+        auto AllocateParameters(RenderPassBase *Pass,
+                                const std::initializer_list<std::pair<std::string, ShaderParameterType>> &InitList) -> ShaderParameters *;
+
         auto Validate() -> bool;
+
+        void OnNewFrame(uint FrameIndex);
 
         void Execute();
 
-        void OnNewFrame();
-
-        void SetFrameIndex(uint FrameIndex) {
-            m_frameIndex = FrameIndex;
+        template<class PassType>
+        auto GetPassByName(const std::string &PassName) -> PassType * {
+            if (m_passNameMap.find(PassName) == m_passNameMap.end()) {
+                throw std::runtime_error("Nonexistent Pass");
+            }
+            auto Pass = dynamic_cast<PassType *>(m_passNameMap[PassName]);
+            if (!Pass) {
+                throw std::runtime_error(
+                        "The Pass that is retrieving is not equal to template type");
+            }
+            return Pass;
         }
 
-        void SetImageAvailableSemaphore(VkSemaphore ImageAvailable) {
-            m_imageAvailable = ImageAvailable;
+        auto GetShaderParameterByName(const std::string &PassName) -> ShaderParameters * {
+            if (m_passNameMap.find(PassName) == m_passNameMap.end()) {
+                throw std::runtime_error("Nonexistent Pass");
+            }
+            return m_passNameMap[PassName]->GetShaderParameters();
         }
 
-        void SetRenderFinishFence(VkFence RenderFinish) {
-            m_renderFinish = RenderFinish;
+        auto GetImageAvailableSemaphore(uint FrameIndex) -> VkSemaphore & {
+            return m_frameImageAvailable[FrameIndex];
         }
 
-        auto GetRenderFinishSemaphore() -> VkSemaphore& {
-            return m_passSyncSemaphores[m_passMetaData.size() - 1];
-        }
-
-        auto SetRenderFinishSemaphore(VkSemaphore Semaphore) {
-            m_renderFinishSemaphore = Semaphore;
+        auto GetImageRenderFinishSemaphore(uint FrameIndex) -> VkSemaphore & {
+            return m_frameImageRenderFinish[FrameIndex];
         }
 
     private:
+        uint m_concurrentFrames;
         std::vector<RenderPassMetaData> m_passMetaData;
         std::vector<VkSemaphore> m_passSyncSemaphores;
+        std::vector<VkSemaphore> m_frameImageAvailable;
+        std::vector<VkSemaphore> m_frameImageRenderFinish;
         uint m_frameIndex = 0;
-        VkSemaphore m_imageAvailable = VK_NULL_HANDLE;
-        VkFence m_renderFinish = VK_NULL_HANDLE;
-        VkSemaphore m_renderFinishSemaphore = VK_NULL_HANDLE;
+        std::unordered_map<std::string, RenderPassBase *> m_passNameMap;
     };
 }  // namespace HWPT
 

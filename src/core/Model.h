@@ -14,6 +14,8 @@
 
 
 namespace HWPT {
+    class ShaderParameters;
+
     class Model {
     public:
         Model(const std::filesystem::path& ModelPath, const std::filesystem::path& TexturePath, bool GenerateMips = false);
@@ -50,11 +52,17 @@ namespace HWPT {
 
         void DrawIndexed(VkCommandBuffer CommandBuffer) const;
 
+        void Bind(ShaderParameters* Parameters);
+
     private:
         Texture2D* m_texture = nullptr;
         IndexBuffer* m_indexBuffer = nullptr;
         VertexBuffer* m_vertexBuffer = nullptr;
         bool m_generateMips = false;
+        glm::mat4 ModelTrans = glm::identity<glm::mat4>();
+
+        inline static std::string TextureName = "Texture";
+        inline static std::string ModelTransName = "ModelTrans";
     };
 
 }  // namespace HWPT

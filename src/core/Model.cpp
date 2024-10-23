@@ -7,6 +7,7 @@
 #include <tiny_obj_loader.h>
 #include "Model.h"
 #include <unordered_map>
+#include "core/renderGraph/ShaderParameters.h"
 
 
 namespace HWPT {
@@ -27,8 +28,15 @@ namespace HWPT {
                                             ModelPath.string().c_str());
         Check(LoadSuccess);
 
+        uint NumIndices = 0;
+        for (const auto& Shape : Shapes) {
+            NumIndices += Shape.mesh.indices.size();
+        }
+
         std::vector<Vertex> Vertices;
+        Vertices.reserve(NumIndices / 3);
         std::vector<uint> Indices;
+        Indices.reserve(NumIndices);
         std::unordered_map<Vertex, uint> UniqueVertices;
 
         Check(!Shapes.empty());
@@ -79,5 +87,9 @@ namespace HWPT {
     void Model::DrawIndexed(VkCommandBuffer CommandBuffer) const {
         this->Bind(CommandBuffer);
         vkCmdDrawIndexed(CommandBuffer, GetIndexCount(), 1, 0, 0, 0);
+    }
+
+    void Model::Bind(ShaderParameters *Parameters) {
+        Parameters->SetParameter(TextureName, m_texture);
     }
 }  // namespace HWPT

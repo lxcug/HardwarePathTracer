@@ -61,6 +61,8 @@ add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/buffer/FrameBuffer.h
         src/core/SwapChain.cpp
         src/core/SwapChain.h
+        src/core/Scene.cpp
+        src/core/Scene.h
 )
 
 include_directories(
@@ -84,6 +86,8 @@ target_link_libraries(
 
 add_executable(
         CompileHLSL src/core/shaderCompiler/CompilerHLSL.cpp
+        src/core/camera/Camera.cpp
+        src/core/camera/Camera.h
 )
 
 target_link_libraries(

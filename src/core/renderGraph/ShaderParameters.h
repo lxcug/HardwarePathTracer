@@ -53,6 +53,8 @@ namespace HWPT {
 
         explicit ShaderParameters(RenderPassBase* RenderPass);
 
+        ShaderParameters(RenderPassBase* RenderPass, const std::initializer_list<std::pair<std::string, ShaderParameterType>>& InitList);
+
         virtual ~ShaderParameters();
 
         void AddParameters(const std::initializer_list<std::pair<std::string, ShaderParameterType>>& InitList);

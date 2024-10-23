@@ -14,6 +14,14 @@ namespace HWPT {
     ShaderParameters::ShaderParameters(RenderPassBase *RenderPass)
             : m_renderPass(RenderPass) {}
 
+    ShaderParameters::ShaderParameters(RenderPassBase *RenderPass,
+                                       const std::initializer_list<std::pair<std::string, ShaderParameterType>> &InitList)
+            : m_renderPass(RenderPass) {
+        AddParameters(InitList);
+        m_renderPass->SetShaderParameters(this);
+        m_renderPass->OnRenderPassSetupFinish();
+    }
+
     ShaderParameters::~ShaderParameters() {
         vkDestroyDescriptorSetLayout(GetVKDevice(), m_descriptorSetLayout, nullptr);
     }
@@ -104,8 +112,8 @@ namespace HWPT {
         }
 
         // NOTE: Avoid Stack Memory Reuse
-        std::vector<VkDescriptorBufferInfo*> BufferInfosToDelete;
-        std::vector<VkDescriptorImageInfo*> ImageInfosToDelete;
+        std::vector<VkDescriptorBufferInfo *> BufferInfosToDelete;
+        std::vector<VkDescriptorImageInfo *> ImageInfosToDelete;
         std::vector<VkWriteDescriptorSet> DescriptorWrites;
         uint BindingIndex = 0;
         for (auto &It: m_parameterMetaData) {
@@ -114,7 +122,7 @@ namespace HWPT {
             switch (MetaData.ParameterType) {
                 case ShaderParameterType::UniformBuffer: {
                     Check(MetaData.Parameter != nullptr);
-                    auto* BufferInfo = new VkDescriptorBufferInfo{};
+                    auto *BufferInfo = new VkDescriptorBufferInfo{};
                     BufferInfo->buffer = static_cast<UniformBuffer *>(MetaData.Parameter)->GetHandle();
                     BufferInfo->offset = 0;
                     BufferInfo->range = VK_WHOLE_SIZE;
@@ -131,7 +139,7 @@ namespace HWPT {
                 }
                 case ShaderParameterType::Texture2D: {
                     Check(MetaData.Parameter != nullptr);
-                    auto* ImageInfo = new VkDescriptorImageInfo{};
+                    auto *ImageInfo = new VkDescriptorImageInfo{};
                     ImageInfo->imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
                     ImageInfo->imageView = static_cast<Texture2D *>(MetaData.Parameter)->CreateSRV();
                     ImageInfo->sampler = VulkanBackendApp::GetApplication()->GetGlobalSampler()->GetHandle();  // TODO
@@ -148,7 +156,7 @@ namespace HWPT {
                 }
                 case ShaderParameterType::RWTexture2D: {
                     Check(MetaData.Parameter != nullptr);
-                    auto* ImageInfo = new VkDescriptorImageInfo{};
+                    auto *ImageInfo = new VkDescriptorImageInfo{};
                     ImageInfo->imageLayout = VK_IMAGE_LAYOUT_GENERAL;
                     ImageInfo->imageView = static_cast<Texture2D *>(MetaData.Parameter)->CreateSRV();
                     ImageInfo->sampler = VulkanBackendApp::GetApplication()->GetGlobalSampler()->GetHandle();  // TODO
@@ -167,7 +175,7 @@ namespace HWPT {
                     [[fallthrough]];
                 case ShaderParameterType::RWStorageBuffer : {
                     Check(MetaData.Parameter != nullptr);
-                    auto* BufferInfo = new VkDescriptorBufferInfo{};
+                    auto *BufferInfo = new VkDescriptorBufferInfo{};
                     BufferInfo->buffer = static_cast<StorageBuffer *>(MetaData.Parameter)->GetHandle();
                     BufferInfo->offset = 0;
                     BufferInfo->range = VK_WHOLE_SIZE;
@@ -190,10 +198,10 @@ namespace HWPT {
             vkUpdateDescriptorSets(GetVKDevice(), DescriptorWrites.size(), DescriptorWrites.data(),
                                    0, nullptr);
         }
-        for (auto& ImageInfo : ImageInfosToDelete) {
+        for (auto &ImageInfo: ImageInfosToDelete) {
             delete ImageInfo;
         }
-        for (auto& BufferInfo : BufferInfosToDelete) {
+        for (auto &BufferInfo: BufferInfosToDelete) {
             delete BufferInfo;
         }
     }
