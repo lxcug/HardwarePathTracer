@@ -135,7 +135,7 @@ experience.
 - `-P` flag will now behave as it does with cl using the file specified by `-Fi` or a default
 - Unbound multidimensional resource arrays are allowed
 - Diagnostic improvements
-- Reflection support on non-Windows platforms; minor updates adding RequiredFeatureFlags to library function reflection and thread group size for AS and MS.
+- Reflection support on non-Windows platforms; minor updates adding RequiredFeatureFlags to library function reflection and thread group size for AccelHandle and MS.
 
 The package includes dxc.exe, dxcompiler.dll, corresponding lib and headers, and dxil.dll for x64 and arm64 platforms on Windows.
 For the first time the package also includes Linux version of the compiler with corresponding executable, libdxcompiler.so, corresponding headers, and libdxil.so for x64 platforms.

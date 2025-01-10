@@ -23,6 +23,15 @@ namespace HWPT::RHI {
         return 0u;
     }
 
+    auto BeginIntermediateCommandBuffer(QueueType QueueType_) -> VkCommandBuffer {
+        return VulkanBackendApp::GetApplication()->GetCommandPool()->BeginCommandBuffer(QueueType_);
+    }
+
+    void SubmitIntermediateCommandBuffer(VkCommandBuffer CommandBuffer, QueueType QueueType_) {
+        VulkanBackendApp::GetApplication()->GetCommandPool()->SubmitCommandBuffer(CommandBuffer,
+                                                                                  QueueType_);
+    }
+
     void CreateBuffer(VkDeviceSize Size, VkBufferUsageFlags Usage, VkMemoryPropertyFlags Properties,
                       VkBuffer &Buffer, VkDeviceMemory &BufferMemory) {
         VkBufferCreateInfo BufferInfo{};
@@ -34,23 +43,28 @@ namespace HWPT::RHI {
         VkDevice GlobalDevice = GetVKDevice();
         VK_CHECK(vkCreateBuffer(GlobalDevice, &BufferInfo, nullptr, &Buffer));
 
-        VkMemoryRequirements memoryRequirements;
-        vkGetBufferMemoryRequirements(GlobalDevice, Buffer, &memoryRequirements);
+        VkMemoryRequirements MemoryRequirements;
+        vkGetBufferMemoryRequirements(GlobalDevice, Buffer, &MemoryRequirements);
 
-        VkMemoryAllocateInfo allocateInfo{};
-        allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-        allocateInfo.allocationSize = memoryRequirements.size;
-        allocateInfo.memoryTypeIndex = FindMemoryType(memoryRequirements.memoryTypeBits,
+        VkMemoryAllocateInfo AllocateInfo{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+        AllocateInfo.allocationSize = MemoryRequirements.size;
+        AllocateInfo.memoryTypeIndex = FindMemoryType(MemoryRequirements.memoryTypeBits,
                                                       Properties);
 
-        VK_CHECK(vkAllocateMemory(GlobalDevice, &allocateInfo, nullptr, &BufferMemory));
+        // Additional Allocate Flags for VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
+        VkMemoryAllocateFlagsInfo AllocFlagsInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO};
+        AllocFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+        if (Usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) {
+            AllocateInfo.pNext = &AllocFlagsInfo;
+        }
+
+        VK_CHECK(vkAllocateMemory(GlobalDevice, &AllocateInfo, nullptr, &BufferMemory));
 
         vkBindBufferMemory(GlobalDevice, Buffer, BufferMemory, 0);
     }
 
     void CopyBuffer(VkBuffer Src, VkBuffer Dst, VkDeviceSize Size) {
-        auto App = VulkanBackendApp::GetApplication();
-        auto CommandBuffer = App->BeginIntermediateCommand();
+        auto CommandBuffer = RHI::BeginIntermediateCommandBuffer();
 
         VkBufferCopy copyRegion{};
         copyRegion.srcOffset = 0;
@@ -58,7 +72,7 @@ namespace HWPT::RHI {
         copyRegion.size = Size;
         vkCmdCopyBuffer(CommandBuffer, Src, Dst, 1, &copyRegion);
 
-        App->EndIntermediateCommand(CommandBuffer);
+        RHI::SubmitIntermediateCommandBuffer(CommandBuffer);
     }
 
     auto CreateStagingBuffer(VkDeviceSize Size) -> std::tuple<VkBuffer, VkDeviceMemory> {
@@ -108,7 +122,7 @@ namespace HWPT::RHI {
 
     void TransitionTextureLayout(VkImage Image, uint NumMips, VkImageLayout OldLayout,
                                  VkImageLayout NewLayout) {
-        VkCommandBuffer CommandBuffer = VulkanBackendApp::GetApplication()->BeginIntermediateCommand();
+        auto CommandBuffer = RHI::BeginIntermediateCommandBuffer();
 
         VkImageMemoryBarrier Barrier{};
         Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -152,6 +166,27 @@ namespace HWPT::RHI {
 
             SourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
             DestinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        } else if (OldLayout == VK_IMAGE_LAYOUT_UNDEFINED &&
+                   NewLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
+            Barrier.srcAccessMask = VK_ACCESS_NONE;
+            Barrier.dstAccessMask = VK_ACCESS_NONE;
+
+            SourceStage = VK_PIPELINE_STAGE_NONE;
+            DestinationStage = VK_PIPELINE_STAGE_NONE;
+        } else if (OldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR &&
+                   NewLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+            Barrier.srcAccessMask = VK_ACCESS_NONE;
+            Barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+            SourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            DestinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        } else if (OldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+                   NewLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR) {
+            Barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            Barrier.dstAccessMask = VK_ACCESS_NONE;
+
+            SourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            DestinationStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
         } else {
             throw std::runtime_error("Unsupported layout transition!");
         }
@@ -159,7 +194,75 @@ namespace HWPT::RHI {
         vkCmdPipelineBarrier(CommandBuffer, SourceStage, DestinationStage,
                              0, 0, nullptr, 0, nullptr, 1, &Barrier);
 
-        VulkanBackendApp::GetApplication()->EndIntermediateCommand(CommandBuffer);
+        RHI::SubmitIntermediateCommandBuffer(CommandBuffer);
+    }
+
+    void TransitionTextureLayout(VkImage Image, uint NumMips, VkImageLayout OldLayout,
+                                 VkImageLayout NewLayout, VkAccessFlags SrcAccessFlag,
+                                 VkAccessFlags DstAccessFlag, VkPipelineStageFlags SrcStage,
+                                 VkPipelineStageFlags DstStage) {
+        auto CommandBuffer = RHI::BeginIntermediateCommandBuffer();
+
+        TransitionTextureLayout(CommandBuffer, Image, NumMips, OldLayout, NewLayout, SrcAccessFlag,
+                                DstAccessFlag, SrcStage, DstStage);
+
+        RHI::SubmitIntermediateCommandBuffer(CommandBuffer);
+    }
+
+    void TransitionTextureLayout(VkCommandBuffer CommandBuffer, VkImage Image, uint NumMips,
+                                 VkImageLayout OldLayout,
+                                 VkImageLayout NewLayout, VkAccessFlags SrcAccessFlag,
+                                 VkAccessFlags DstAccessFlag, VkPipelineStageFlags SrcStage,
+                                 VkPipelineStageFlags DstStage) {
+        VkImageMemoryBarrier Barrier{};
+        Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        Barrier.oldLayout = OldLayout;
+        Barrier.newLayout = NewLayout;
+        Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        Barrier.image = Image;
+        Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        Barrier.subresourceRange.baseMipLevel = 0;
+        Barrier.subresourceRange.levelCount = NumMips;
+        Barrier.subresourceRange.baseArrayLayer = 0;
+        Barrier.subresourceRange.layerCount = 1;
+        Barrier.srcAccessMask = SrcAccessFlag;
+        Barrier.dstAccessMask = DstAccessFlag;
+
+        vkCmdPipelineBarrier(CommandBuffer, SrcStage, DstStage,
+                             0, 0, nullptr, 0, nullptr, 1, &Barrier);
+    }
+
+    void TransitionTextureLayout(VkImage Image, uint NumMips,
+                                 const TextureTransitionInput &SrcInput,
+                                 const TextureTransitionInput &DstInput) {
+        auto CommandBuffer = RHI::BeginIntermediateCommandBuffer();
+
+        TransitionTextureLayout(CommandBuffer, Image, NumMips, SrcInput, DstInput);
+
+        RHI::SubmitIntermediateCommandBuffer(CommandBuffer);
+    }
+
+    void TransitionTextureLayout(VkCommandBuffer CommandBuffer, VkImage Image, uint NumMips,
+                                 const TextureTransitionInput &SrcInput,
+                                 const TextureTransitionInput &DstInput) {
+        VkImageMemoryBarrier Barrier{};
+        Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+        Barrier.oldLayout = SrcInput.Layout;
+        Barrier.newLayout = DstInput.Layout;
+        Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        Barrier.image = Image;
+        Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        Barrier.subresourceRange.baseMipLevel = 0;
+        Barrier.subresourceRange.levelCount = NumMips;
+        Barrier.subresourceRange.baseArrayLayer = 0;
+        Barrier.subresourceRange.layerCount = 1;
+        Barrier.srcAccessMask = SrcInput.AccessMask;
+        Barrier.dstAccessMask = DstInput.AccessMask;
+
+        vkCmdPipelineBarrier(CommandBuffer, SrcInput.PipelineStage, DstInput.PipelineStage,
+                             0, 0, nullptr, 0, nullptr, 1, &Barrier);
     }
 
     void CreateImageView(VkImage Image, VkFormat Format, VkImageView &ImageView) {
@@ -180,7 +283,7 @@ namespace HWPT::RHI {
     }
 
     void CopyBufferToTexture(VkImage Image, VkBuffer Buffer, uint Width, uint Height) {
-        VkCommandBuffer CommandBuffer = VulkanBackendApp::GetApplication()->BeginIntermediateCommand();
+        auto CommandBuffer = RHI::BeginIntermediateCommandBuffer();
 
         VkBufferImageCopy Region{};
         Region.bufferOffset = 0;
@@ -202,11 +305,11 @@ namespace HWPT::RHI {
         vkCmdCopyBufferToImage(CommandBuffer, Buffer, Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                1, &Region);
 
-        VulkanBackendApp::GetApplication()->EndIntermediateCommand(CommandBuffer);
+        RHI::SubmitIntermediateCommandBuffer(CommandBuffer);
     }
 
     void GenerateMips(VkImage Image, uint Width, uint Height, uint NumMips) {
-        auto CommandBuffer = VulkanBackendApp::GetApplication()->BeginIntermediateCommand();
+        auto CommandBuffer = RHI::BeginIntermediateCommandBuffer();
 
         VkImageMemoryBarrier Barrier{};
         Barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -276,18 +379,25 @@ namespace HWPT::RHI {
                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
                              1, &Barrier);
 
-        VulkanBackendApp::GetApplication()->EndIntermediateCommand(CommandBuffer);
+        RHI::SubmitIntermediateCommandBuffer(CommandBuffer);
     }
 
     void GenerateMips(VkImage Image, uint Width, uint Height, uint NumMips, VkFormat Format) {
         VkFormatProperties FormatProperties;
         vkGetPhysicalDeviceFormatProperties(GetVKPhysicalDevice(), Format, &FormatProperties);
 
-        if (!(FormatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)) {
+        if (!(FormatProperties.optimalTilingFeatures &
+              VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)) {
             throw std::runtime_error("Texture image format does not support linear blitting!");
         }
 
         // TODO
+    }
+
+    auto GetBufferDeviceAddress(VkBuffer Buffer) -> VkDeviceAddress {
+        VkBufferDeviceAddressInfo DeviceAddressInfo{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
+        DeviceAddressInfo.buffer = Buffer;
+        return vkGetBufferDeviceAddress(GetVKDevice(), &DeviceAddressInfo);
     }
 
 }  // namespace HWPT::RHI

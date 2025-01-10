@@ -23,20 +23,11 @@
 #include "core/texture/Sampler.h"
 #include "ImGuiIntegration.h"
 #include "core/Model.h"
+#include "core/Commands/CommandPool.h"
 
 
 namespace HWPT {
     const int MAX_FRAMES_IN_FLIGHT = 2;
-
-    struct QueueFamilyIndices {
-        std::optional<uint> GraphicsFamily;
-        std::optional<uint> ComputeFamily;
-        std::optional<uint> PresentFamily;
-
-        [[nodiscard]] auto IsComplete() const -> bool {
-            return GraphicsFamily.has_value() && ComputeFamily.has_value() && PresentFamily.has_value();
-        }
-    };
 
     struct SwapChainSupportDetails {
         VkSurfaceCapabilitiesKHR Capabilities;
@@ -62,11 +53,6 @@ namespace HWPT {
         void GetImages(VkDevice Device);
     };
 
-    struct CommandPool {
-        VkCommandPool GraphicsPool = VK_NULL_HANDLE;
-        VkCommandPool ComputePool = VK_NULL_HANDLE;
-    };
-
     struct MSAABuffer {
         Texture2D* MSAAColorBuffer = nullptr;
         Texture2D* MSAADepthBuffer = nullptr;
@@ -85,11 +71,7 @@ namespace HWPT {
 
         void DrawFrame() override;
 
-        void DrawImGuiFrame();
-
-        auto BeginIntermediateCommand() -> VkCommandBuffer;
-
-        void EndIntermediateCommand(VkCommandBuffer commandBuffer);
+        virtual void DrawImGuiFrame();
 
         auto GetVkInstance() -> VkInstance {
             return m_instance;
@@ -111,14 +93,38 @@ namespace HWPT {
             return m_swapChain;
         }
 
-    private:
+        auto GetQueue() -> Queue {
+            return m_queue;
+        }
+
+        auto GetFrameBuffers(uint Index) -> VkFramebuffer {
+            return m_swapChainFrameBuffers[Index];
+        }
+
+        auto GetWindow() -> GLFWwindow* {
+            return m_window;
+        }
+
+        [[nodiscard]] auto GetImageIndex() const -> uint {
+            return m_imageIndex;
+        }
+
+        auto GetCommandPool() -> CommandPool* {
+            return m_commandPool;
+        }
+
+        auto GetSurface() -> VkSurfaceKHR {
+            return m_surface;
+        }
+
+    protected:
         // Init GLFW Windows
         void InitWindow();
 
         // Init Vulkan Backend
-        void InitVulkan();
+        virtual void InitVulkan();
 
-        void CleanUp();
+        virtual void CleanUp();
 
         void Present();
 
@@ -129,18 +135,12 @@ namespace HWPT {
 
         void CreateMSAABuffers();
 
-    private:
+    protected:
         void InitImGui();
-
-        void BeginImGui();
-
-        void EndImGui();
 
         void CleanUpImGui();
 
-        void EnableWholeScreenDocking();
-
-    private:
+    protected:
         // VulkanContext Init
         void CreateVkInstance();
 
@@ -149,8 +149,6 @@ namespace HWPT {
         void CreateSurface();
 
         void SelectPhysicalDevice();
-
-        auto FindQueueFamilies(VkPhysicalDevice PhysicalDevice) -> QueueFamilyIndices;
 
         static auto IsDeviceExtensionSupport(VkPhysicalDevice PhysicalDevice) -> bool;
 
@@ -188,7 +186,7 @@ namespace HWPT {
 
         void CreateComputeDescriptorSets();
 
-        void CreateSyncObjects();
+        virtual void CreateSyncObjects();
 
         void RecordCommandBuffer(VkCommandBuffer CommandBuffer, uint ImageIndex);
 
@@ -196,7 +194,7 @@ namespace HWPT {
 
         void CreateModelAndSampler();
 
-        void OnWindowResize();
+        virtual void OnWindowResize();
 
     protected:
         VkDevice m_device = VK_NULL_HANDLE;
@@ -220,11 +218,7 @@ namespace HWPT {
 #endif
         inline static std::vector<const char *> DeviceExtensions = {
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-                VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
-                VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
-                VK_KHR_RAY_QUERY_EXTENSION_NAME,
-                VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
-                VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME
+                VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME
         };
 
         VkInstance m_instance = VK_NULL_HANDLE;
@@ -233,10 +227,8 @@ namespace HWPT {
         Queue m_queue;
         SwapChain m_swapChain;
         std::vector<VkFramebuffer> m_swapChainFrameBuffers;
-//        SwapChain m_viewportSwapChain;  // TODO
-//        std::vector<VkFramebuffer> m_viewportFrameBuffer;
         VkRenderPass m_renderPass = VK_NULL_HANDLE;
-        CommandPool m_commandPool;
+        CommandPool* m_commandPool = nullptr;
         std::vector<VkCommandBuffer> m_graphicsCommandBuffers;
         std::vector<VkCommandBuffer> m_computeCommandBuffers;
         // Graphics Pipeline
@@ -255,6 +247,7 @@ namespace HWPT {
 
         uint m_currentFrame = 0;
         uint m_imageIndex = 0;
+        uint m_frameNum = 0;
 
         inline static VulkanBackendApp* s_application = nullptr;
 
@@ -268,7 +261,6 @@ namespace HWPT {
         std::vector<VkSemaphore> m_computeFinishedSemaphores;
 
         ImGuiInfrastructure* m_imguiInfrastructure = nullptr;
-
         glm::vec2 m_viewportSize = glm::vec2(0.f, 0.f);
 
         Model* m_vikingRoom = nullptr;

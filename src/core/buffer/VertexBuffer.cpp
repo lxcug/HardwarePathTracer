@@ -17,7 +17,10 @@ namespace HWPT {
         vkUnmapMemory(GetVKDevice(), StagingBufferMemory);
 
         RHI::CreateBuffer(Size,
-                          VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                          VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                          VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+                          VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                           m_vertexBuffer, m_vertexBufferMemory);
 
@@ -39,7 +42,9 @@ namespace HWPT {
     }
 
     VertexBuffer::VertexBuffer(VkDeviceSize Size, const Vertex *Data)
-            : VertexBuffer(Size, static_cast<const void *>(Data)) {}
+            : VertexBuffer(Size, static_cast<const void *>(Data)) {
+        m_vertexCount = Size / sizeof(Vertex);
+    }
 
     void VertexBuffer::SetLayout(const std::initializer_list<VertexAttribute> &Attributes) {
         Check(m_layout == nullptr);

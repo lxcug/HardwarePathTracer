@@ -23,14 +23,26 @@ namespace HWPT {
             case ShaderType::Compute:
                 ShaderStageString = "cs_6_0";
                 break;
+            case ShaderType::RayGen:
+                [[fallthrough]];
+            case ShaderType::Miss:
+                [[fallthrough]];
+            case ShaderType::ClosestHit:
+                ShaderStageString = "lib_6_3";
+                break;
         }
+
         std::string CompileCommand =
                 absolute(s_dxcPath).string() + "/bin/x64/dxc.exe" +
                 " -E " + Entry +
                 " -T " + ShaderStageString +
                 " -spirv" +
                 " -Fo " + absolute(s_hlslDirectory).string() + "/" + OutFile + ".spv " +
+                " -fspv-extension=SPV_KHR_ray_tracing" +
+                " -fspv-target-env=vulkan1.2 " +
                 absolute(s_hlslDirectory).string() + "/" + ShaderFile;
+
+//        std::cout << CompileCommand << '\n';
 
         auto RetString = HLSLCompiler::ExecCmd(CompileCommand);
 
@@ -101,15 +113,3 @@ namespace HWPT {
         return output;
     }
 }  // namespace HWPT
-
-
-auto main() -> int {
-    HWPT::HLSLCompiler::CompileShader("Mesh.hlsl", "VSMain", HWPT::ShaderType::Vertex, "Vert");
-    HWPT::HLSLCompiler::CompileShader("Mesh.hlsl", "PSMain", HWPT::ShaderType::Fragment, "Frag");
-    HWPT::HLSLCompiler::CompileShader("Particle.hlsl", "VSMain", HWPT::ShaderType::Vertex, "ParticleVert");
-//    HWPT::HLSLCompiler::CompileShader("Particle.hlsl", "GSMain", HWPT::ShaderType::Geometry, "ParticleGeometry");
-    HWPT::HLSLCompiler::CompileShader("Particle.hlsl", "PSMain", HWPT::ShaderType::Fragment, "ParticleFrag");
-    HWPT::HLSLCompiler::CompileShader("UpdateParticle.hlsl", "UpdateParticles", HWPT::ShaderType::Compute, "UpdateParticle");
-
-    return 0;
-}

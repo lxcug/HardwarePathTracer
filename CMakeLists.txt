@@ -13,6 +13,21 @@ find_package(tinyobjloader CONFIG REQUIRED)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/vendor)
 
+add_executable(
+        CompileHLSL
+        src/core/shaderCompiler/CompileScript.cpp
+        src/core/shaderCompiler/CompilerHLSL.cpp
+)
+
+target_link_libraries(
+        CompileHLSL
+        PRIVATE Vulkan::Vulkan
+        PRIVATE glfw
+        PRIVATE glm::glm
+        PRIVATE imgui
+        PRIVATE tinyobjloader::tinyobjloader
+)
+
 add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/application/Application.cpp
         src/core/application/Application.h
@@ -47,6 +62,20 @@ add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/Model.h
         src/core/buffer/VertexBufferLayout.cpp
         src/core/buffer/VertexBufferLayout.h
+        src/core/application/VulkanRayTracingApp.cpp
+        src/core/application/VulkanRayTracingApp.h
+        src/core/acceleration_structure/AccelerationStructure.cpp
+        src/core/acceleration_structure/AccelerationStructure.h
+        src/core/shaderCompiler/CompilerHLSL.cpp
+        src/core/shaderCompiler/CompilerHLSL.h
+        src/core/buffer/ArbitraryBuffer.cpp
+        src/core/buffer/ArbitraryBuffer.h
+        src/core/Commands/CommandPool.cpp
+        src/core/Commands/CommandPool.h
+        src/core/Utils.h
+        src/core/Utils.cpp
+        src/core/scene/Scene.cpp
+        src/core/scene/Scene.h
 )
 
 include_directories(
@@ -66,17 +95,5 @@ target_link_libraries(
         PRIVATE glm::glm
         PRIVATE imgui
         PRIVATE tinyobjloader::tinyobjloader
-)
-
-add_executable(
-        CompileHLSL src/core/shaderCompiler/CompilerHLSL.cpp
-)
-
-target_link_libraries(
-        CompileHLSL
-        PRIVATE Vulkan::Vulkan
-        PRIVATE glfw
-        PRIVATE glm::glm
-        PRIVATE imgui
-        PRIVATE tinyobjloader::tinyobjloader
+#        PRIVATE glog
 )

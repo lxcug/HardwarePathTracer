@@ -46,7 +46,7 @@ namespace HWPT {
 
         void SetLayout(const std::initializer_list<VertexAttribute> &Attributes);
 
-        auto GetLayout() -> VertexBufferLayout* {
+        auto GetLayout() -> VertexBufferLayout * {
             return m_layout;
         }
 
@@ -58,10 +58,17 @@ namespace HWPT {
             return m_vertexBuffer;
         }
 
+        [[nodiscard]] auto GetVertexCount() const -> uint {
+            // If vertex type is not 'Vertex', we don't cal the vertex count explicitly in vertex buffer
+            Check(m_vertexCount != 0);
+            return m_vertexCount;
+        }
+
     private:
         VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
         VertexBufferLayout *m_layout = nullptr;
+        uint m_vertexCount = 0;
     };
 }  // namespace HWPT
 

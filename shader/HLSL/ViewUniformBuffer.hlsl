@@ -4,4 +4,6 @@ cbuffer ViewUniformBuffer : register(b0) {
     float4x4 ProjTrans;
     float3 DebugColor;
     float DeltaTime;
+    float3 CameraPos;
+    uint FrameNum;
 };

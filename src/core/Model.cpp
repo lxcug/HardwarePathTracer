@@ -7,6 +7,9 @@
 #include <tiny_obj_loader.h>
 #include "Model.h"
 #include <unordered_map>
+#include "core/application/VulkanBackendApp.h"
+#include "core/RHI.h"
+#include "core/Utils.h"
 
 
 namespace HWPT {
@@ -79,5 +82,55 @@ namespace HWPT {
     void Model::DrawIndexed(VkCommandBuffer CommandBuffer) {
         this->Bind(CommandBuffer);
         vkCmdDrawIndexed(CommandBuffer, GetIndexCount(), 1, 0, 0, 0);
+    }
+
+    auto Model::GetBLASBuildInput() const -> BLASBuildInput {
+        // Get Vertex/Index Buffer Device Address
+        VkDeviceAddress VertexBufferAddress = RHI::GetBufferDeviceAddress(
+                m_vertexBuffer->GetHandle());
+        VkDeviceAddress IndexBufferAddress = RHI::GetBufferDeviceAddress(
+                m_indexBuffer->GetHandle());
+
+        VkAccelerationStructureGeometryTrianglesDataKHR Triangles{
+                VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR};
+        Triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+        Triangles.vertexData.deviceAddress = VertexBufferAddress;
+        Triangles.vertexStride = sizeof(Vertex);
+        Triangles.maxVertex = m_vertexBuffer->GetVertexCount() - 1;
+        Triangles.indexType = VK_INDEX_TYPE_UINT32;
+        Triangles.indexData.deviceAddress = IndexBufferAddress;
+        Triangles.transformData = {};  // Indicate Identity Transform
+
+        // Create AS Geometry
+        VkAccelerationStructureGeometryKHR ASGeometry{
+                VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
+        ASGeometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+        ASGeometry.geometry.triangles = Triangles;
+        ASGeometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+
+        // Create AS Build Range
+        VkAccelerationStructureBuildRangeInfoKHR BuildRange;
+        BuildRange.primitiveCount = m_indexBuffer->GetIndexCount() / 3;
+        BuildRange.primitiveOffset = 0;
+        BuildRange.firstVertex = 0;
+        BuildRange.transformOffset = 0;
+
+        BLASBuildInput Input;
+        Input.ASGeometries.emplace_back(ASGeometry);
+        Input.ASBuildRangeInfos.emplace_back(BuildRange);
+
+        return Input;
+    }
+
+    auto Model::GetTLASBuildInput() const -> VkAccelerationStructureInstanceKHR {
+        VkAccelerationStructureInstanceKHR Instance{};
+        Instance.transform = Utils::GLMToVulkanMatrix(m_transform);
+        Instance.instanceCustomIndex = 0;
+//        Instance.accelerationStructureReference
+        Instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+        Instance.mask = 0xff;  //  Only be hit if rayMask & instance.mask != 0
+        Instance.instanceShaderBindingTableRecordOffset = 0;
+
+        return Instance;
     }
 }  // namespace HWPT
