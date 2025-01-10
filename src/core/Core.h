@@ -12,8 +12,10 @@
 #include <vulkan/vulkan.h>
 // Math
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/type_ptr.hpp"
 
 #define BUILD_DEVELOP 1
 #define BUILD_SHIPPING 0
@@ -43,7 +45,7 @@ using uint = uint32_t;
 
 #if !BUILD_RELEASE && !BUILD_SHIPPING
 #define Assert(x) assert(x)
-#define Check(x) assert(x)
+#define Check(x) assert(x && __FILE__ && __LINE__)
 #else
 #define Assert(x)
 #define Check(x)
@@ -51,7 +53,10 @@ using uint = uint32_t;
 
 #if !BUILD_RELEASE && !BUILD_SHIPPING
 #define VK_CHECK(exp) do { VkResult _Result_ = exp; \
-Check(_Result_ == VK_SUCCESS); } while(false)
+if (_Result_ != VK_SUCCESS) {                        \
+    std::cerr << "VkResult: " << _Result_ << '\n';  \
+    Check(false);                                  \
+}} while (false)                                                   \
 
 #define VK_CHECK_WITH_MESSAGE(exp, message) do { VkResult _Result_ = exp; \
 if (_Result_ != VK_SUCCESS) \

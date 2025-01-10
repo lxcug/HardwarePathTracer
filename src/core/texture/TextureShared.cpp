@@ -23,7 +23,7 @@ namespace HWPT {
             case TextureFormat::RGB:
                 [[fallthrough]];
             case TextureFormat::RGBA:
-                return VK_FORMAT_R8G8B8A8_SRGB;
+                return VK_FORMAT_R8G8B8A8_UNORM;  // SRGB or UNORM
             case TextureFormat::Depth32:
                 return VK_FORMAT_D32_SFLOAT;
             case TextureFormat::Depth32Stencil8:

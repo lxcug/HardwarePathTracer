@@ -57,6 +57,12 @@ namespace HWPT {
                                      VK_IMAGE_USAGE_SAMPLED_BIT,
                                      VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
                 break;
+            case TextureUsage::UAV:
+                RHI::CreateTexture2D(Width, Height, m_numMips, VK_SAMPLE_COUNT_1_BIT,
+                                     VK_FORMAT_R8G8B8A8_UNORM,
+                                     VK_IMAGE_USAGE_STORAGE_BIT,
+                                     VK_IMAGE_TILING_LINEAR, m_texture, m_textureMemory);
+                break;
             default:
                 throw std::runtime_error("Unsupported TextureUsage");
         }
@@ -125,6 +131,9 @@ namespace HWPT {
         CreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         CreateInfo.image = m_texture;
         CreateInfo.format = GetVKFormat(m_format);
+        if (m_textureUsage == TextureUsage::UAV) {
+            CreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+        }
         CreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         VkImageAspectFlags AspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
         if (IsDepthStencilTexture(m_format)) {

@@ -9,6 +9,8 @@
 #include <core/buffer/VertexBuffer.h>
 #include "core/RHI.h"
 #include <random>
+#include "core/shaderCompiler/CompilerHLSL.h"
+#include "core/Utils.h"
 
 
 namespace HWPT {
@@ -30,11 +32,12 @@ namespace HWPT {
             glfwPollEvents();
             DrawFrame();
 
-            BeginImGui();
+            m_imguiInfrastructure->BeginImGui();
             DrawImGuiFrame();
-            EndImGui();
+            m_imguiInfrastructure->EndImGui();
 
             Present();
+            m_frameNum++;
         }
         vkDeviceWaitIdle(m_device);
 
@@ -55,14 +58,14 @@ namespace HWPT {
 //            ImGui::End();
 //        }
         {
-            ImGui::Begin("Settings");
+            ImGuiInfrastructure::Begin("Settings");
 
-            ImGui::End();
+            ImGuiInfrastructure::End();
         }
         {
-            ImGui::Begin("Statistics");
+            ImGuiInfrastructure::Begin("Statistics");
             ImGui::Text("FPS: %d", m_fpsCalculator->GetFPS());
-            ImGui::End();
+            ImGuiInfrastructure::End();
         }
     }
 
@@ -85,6 +88,14 @@ namespace HWPT {
         m_window = glfwCreateWindow(
                 static_cast<int>(m_windowWidth), static_cast<int>(m_windowHeight),
                 m_windowTitle.c_str(), nullptr, nullptr);
+
+        GLFWmonitor *PrimaryMonitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode *Mode = glfwGetVideoMode(PrimaryMonitor);
+        int PosX = static_cast<int>((Mode->width - m_windowWidth) / 2);
+        int PosY = static_cast<int>((Mode->height - m_windowHeight) / 2);
+
+        glfwSetWindowPos(m_window, PosX, PosY);
+
         glfwSetWindowUserPointer(m_window, this);
         glfwSetFramebufferSizeCallback(m_window, FrameBufferResizeCallback);
     }
@@ -94,14 +105,13 @@ namespace HWPT {
         CreateSurface();
         SelectPhysicalDevice();
         CreateLogicalDevice();
+        CreateCommandPool();
+        CreateCommandBuffers();
         CreateSwapChain();
 
         CreateRenderPass();
         CreateMSAABuffers();
         CreateFrameBuffers();
-
-        CreateCommandPool();
-        CreateCommandBuffers();
 
         CreateDescriptorPool();
 
@@ -137,8 +147,8 @@ namespace HWPT {
         delete m_sampler;
 
         CleanUpImGui();
-
         CleanUpSwapChain();
+
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             vkDestroySemaphore(m_device, m_imageAvailableSemaphores[i], nullptr);
             vkDestroySemaphore(m_device, m_renderFinishedSemaphores[i], nullptr);
@@ -155,8 +165,7 @@ namespace HWPT {
         vkDestroyDescriptorSetLayout(m_device, m_computeDescriptorSetLayout, nullptr);
         vkDestroyPipelineLayout(m_device, m_computePipelineLayout, nullptr);
         vkDestroyPipeline(m_device, m_computePipeline, nullptr);
-        vkDestroyCommandPool(m_device, m_commandPool.GraphicsPool, nullptr);
-        vkDestroyCommandPool(m_device, m_commandPool.ComputePool, nullptr);
+        delete m_commandPool;
         vkDestroyRenderPass(m_device, m_renderPass, nullptr);
         vkDestroySurfaceKHR(m_instance, m_surface, nullptr);
         vkDestroyDevice(m_device, nullptr);
@@ -245,7 +254,7 @@ namespace HWPT {
         AppInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
         AppInfo.pEngineName = "No Engine";
         AppInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-        AppInfo.apiVersion = VK_API_VERSION_1_0;
+        AppInfo.apiVersion = VK_API_VERSION_1_3;
 
         VkInstanceCreateInfo CreateInfo{};
         CreateInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -271,11 +280,11 @@ namespace HWPT {
         Extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #endif
 
-        std::cout << "Enabled Extensions:\n";
-        for (const auto &ExtensionName: Extensions) {
-            std::cout << "\t" << ExtensionName << std::endl;
-        }
-        std::cout.flush();
+//        std::cout << "Enabled Extensions:\n";
+//        for (const auto &ExtensionName: Extensions) {
+//            std::cout << "\t" << ExtensionName << std::endl;
+//        }
+//        std::cout.flush();
 
         return Extensions;
     }
@@ -302,40 +311,6 @@ namespace HWPT {
         vkGetPhysicalDeviceProperties(m_physicalDevice, &DeviceProperty);
         std::cout << "Device Name: " << DeviceProperty.deviceName << "\n";
         std::cout.flush();
-    }
-
-    auto
-    VulkanBackendApp::FindQueueFamilies(VkPhysicalDevice PhysicalDevice) -> QueueFamilyIndices {
-        QueueFamilyIndices Indices;
-
-        uint QueueFamilyCount = 0;
-        vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount, nullptr);
-        std::vector<VkQueueFamilyProperties> QueueFamilies(QueueFamilyCount);
-        vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &QueueFamilyCount,
-                                                 QueueFamilies.data());
-
-        int Index = 0;
-        for (const auto &QueueFamily: QueueFamilies) {
-            if (QueueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-                Indices.GraphicsFamily = Index;
-            }
-            // TODO: Use Dedicated Compute Queue, !(QueueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT)
-            if (QueueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) {
-                Indices.ComputeFamily = Index;
-            }
-
-            VkBool32 PresentSupport = false;
-            vkGetPhysicalDeviceSurfaceSupportKHR(PhysicalDevice, Index, m_surface, &PresentSupport);
-            if (PresentSupport) {
-                Indices.PresentFamily = Index;
-            }
-            if (Indices.IsComplete()) {
-                break;
-            }
-            ++Index;
-        }
-
-        return Indices;
     }
 
     auto VulkanBackendApp::IsDeviceExtensionSupport(VkPhysicalDevice PhysicalDevice) -> bool {
@@ -384,7 +359,7 @@ namespace HWPT {
     }
 
     auto VulkanBackendApp::IsSuitableDevice(VkPhysicalDevice PhysicalDevice) -> bool {
-        QueueFamilyIndices Indices = FindQueueFamilies(PhysicalDevice);
+        QueueFamilyIndices Indices = Utils::FindQueueFamilies(PhysicalDevice);
         bool IsExtensionSupport = IsDeviceExtensionSupport(PhysicalDevice);
         auto SwapChainSupport = QuerySwapChainSupport(PhysicalDevice);
         bool IsSwapChainSupport =
@@ -394,7 +369,7 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateLogicalDevice() {
-        QueueFamilyIndices Indices = FindQueueFamilies(m_physicalDevice);
+        QueueFamilyIndices Indices = Utils::FindQueueFamilies();
 
         std::unordered_set<uint> UniqueQueueFamilies = {
                 Indices.GraphicsFamily.value(),
@@ -431,15 +406,30 @@ namespace HWPT {
         }
 
         // Sync2
-        VkPhysicalDeviceSynchronization2FeaturesKHR Sync2Feature = {};
-        Sync2Feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR;
+        VkPhysicalDeviceSynchronization2FeaturesKHR Sync2Feature{
+                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR};
         Sync2Feature.synchronization2 = VK_TRUE;
         CreateInfo.pNext = &Sync2Feature;
+        // RayTracingPipeline
+        VkPhysicalDeviceRayTracingPipelineFeaturesKHR RayTracingPipelineFeatures{
+                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR};
+        RayTracingPipelineFeatures.rayTracingPipeline = VK_TRUE;
+        // AccelerationStructure
+        VkPhysicalDeviceAccelerationStructureFeaturesKHR ASFeature{
+                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR};
+        ASFeature.accelerationStructure = VK_TRUE;
+        // GetBufferDeviceAddress
+        VkPhysicalDeviceBufferDeviceAddressFeatures BufferDeviceAddressFeature{
+                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES};
+        BufferDeviceAddressFeature.bufferDeviceAddress = VK_TRUE;
+
+        // Link Features
+        ASFeature.pNext = &BufferDeviceAddressFeature;
+        Sync2Feature.pNext = &ASFeature;
+        RayTracingPipelineFeatures.pNext = &Sync2Feature;
+        CreateInfo.pNext = &RayTracingPipelineFeatures;
 
         VK_CHECK(vkCreateDevice(m_physicalDevice, &CreateInfo, nullptr, &m_device));
-        vkGetDeviceQueue(m_device, Indices.GraphicsFamily.value(), 0, &m_queue.GraphicsQueue);
-        vkGetDeviceQueue(m_device, Indices.ComputeFamily.value(), 0, &m_queue.ComputeQueue);
-        vkGetDeviceQueue(m_device, Indices.PresentFamily.value(), 0, &m_queue.PresentQueue);
     }
 
     void VulkanBackendApp::CreateSwapChain() {
@@ -447,8 +437,7 @@ namespace HWPT {
 
         VkSurfaceFormatKHR SurfaceFormat;
         for (auto Format: SwapChainSupport.Formats) {
-            if (Format.format == VK_FORMAT_R8G8B8A8_SRGB &&
-                Format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+            if (Format.format == VK_FORMAT_R8G8B8A8_UNORM) {
                 SurfaceFormat = Format;
                 break;
             }
@@ -487,9 +476,10 @@ namespace HWPT {
         CreateInfo.presentMode = PresentMode;
         CreateInfo.imageExtent = Extent;
         CreateInfo.imageArrayLayers = 1;
-        CreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        CreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
+                                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
 
-        QueueFamilyIndices Indices = FindQueueFamilies(m_physicalDevice);
+        QueueFamilyIndices Indices = m_commandPool->GetQueueFamilyIndices();
         std::unordered_set<uint> QueueFamilySet = {
                 Indices.GraphicsFamily.value(),
                 Indices.ComputeFamily.value(),
@@ -631,22 +621,10 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateCommandPool() {
-        QueueFamilyIndices Indices = FindQueueFamilies(m_physicalDevice);
-
-        VkCommandPoolCreateInfo GraphicsPoolCreateInfo{};
-        GraphicsPoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        GraphicsPoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        GraphicsPoolCreateInfo.queueFamilyIndex = Indices.GraphicsFamily.value();
-
-        VK_CHECK(vkCreateCommandPool(m_device, &GraphicsPoolCreateInfo,
-                                     nullptr, &m_commandPool.GraphicsPool));
-
-        VkCommandPoolCreateInfo ComputePoolCreateInfo{};
-        ComputePoolCreateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        ComputePoolCreateInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        ComputePoolCreateInfo.queueFamilyIndex = Indices.ComputeFamily.value();
-        VK_CHECK(vkCreateCommandPool(m_device, &ComputePoolCreateInfo,
-                                     nullptr, &m_commandPool.ComputePool));
+        m_commandPool = new CommandPool(PoolType::Graphics | PoolType::Compute);
+        m_queue.GraphicsQueue = m_commandPool->GetGraphicsQueue();
+        m_queue.ComputeQueue = m_commandPool->GetComputeQueue();
+        m_queue.PresentQueue = m_commandPool->GetPresentQueue();
     }
 
     void VulkanBackendApp::CreateCommandBuffers() {
@@ -655,7 +633,7 @@ namespace HWPT {
 
         VkCommandBufferAllocateInfo GraphicsAllocateInfo{};
         GraphicsAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        GraphicsAllocateInfo.commandPool = m_commandPool.GraphicsPool;
+        GraphicsAllocateInfo.commandPool = m_commandPool->GetGraphicsPool();
         GraphicsAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         GraphicsAllocateInfo.commandBufferCount = m_graphicsCommandBuffers.size();
         VK_CHECK(vkAllocateCommandBuffers(m_device, &GraphicsAllocateInfo,
@@ -663,44 +641,12 @@ namespace HWPT {
 
         VkCommandBufferAllocateInfo ComputeAllocateInfo{};
         ComputeAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        ComputeAllocateInfo.commandPool = m_commandPool.ComputePool;
+        ComputeAllocateInfo.commandPool = m_commandPool->GetComputePool();
         ComputeAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         ComputeAllocateInfo.commandBufferCount = m_computeCommandBuffers.size();
 
         VK_CHECK(vkAllocateCommandBuffers(m_device, &ComputeAllocateInfo,
                                           m_computeCommandBuffers.data()));
-    }
-
-    auto VulkanBackendApp::BeginIntermediateCommand() -> VkCommandBuffer {
-        VkCommandBufferAllocateInfo AllocateInfo{};
-        AllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        AllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        AllocateInfo.commandPool = m_commandPool.GraphicsPool;
-        AllocateInfo.commandBufferCount = 1;
-
-        VkCommandBuffer CommandBuffer;
-        VK_CHECK(vkAllocateCommandBuffers(m_device, &AllocateInfo, &CommandBuffer));
-
-        VkCommandBufferBeginInfo BeginInfo{};
-        BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        BeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        vkBeginCommandBuffer(CommandBuffer, &BeginInfo);
-
-        return CommandBuffer;
-    }
-
-    void VulkanBackendApp::EndIntermediateCommand(VkCommandBuffer CommandBuffer) {
-        vkEndCommandBuffer(CommandBuffer);
-
-        VkSubmitInfo submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &CommandBuffer;
-
-        vkQueueSubmit(m_queue.GraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
-        vkQueueWaitIdle(m_queue.GraphicsQueue);
-
-        vkFreeCommandBuffers(m_device, m_commandPool.GraphicsPool, 1, &CommandBuffer);
     }
 
     void VulkanBackendApp::CreateGraphicsDescriptorSetLayout() {
@@ -731,19 +677,28 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateGraphicsPipeline() {
-        ShaderBase VertexShader(ShaderType::Vertex, "../../shader/HLSL/Vert.spv");
-        ShaderBase FragmentShader(ShaderType::Fragment, "../../shader/HLSL/Frag.spv");
+        HLSLCompiler::CompileShader("Mesh.hlsl", "VSMain", HWPT::ShaderType::Vertex, "Vert");
+        HLSLCompiler::CompileShader("Mesh.hlsl", "PSMain", HWPT::ShaderType::Fragment, "Frag");
+        HLSLCompiler::CompileShader("Particle.hlsl", "VSMain", HWPT::ShaderType::Vertex,
+                                    "ParticleVert");
+        HLSLCompiler::CompileShader("Particle.hlsl", "PSMain", HWPT::ShaderType::Fragment,
+                                    "ParticleFrag");
+        HLSLCompiler::CompileShader("UpdateParticle.hlsl", "UpdateParticles",
+                                    HWPT::ShaderType::Compute, "UpdateParticle");
+
+        ShaderBase VertexShader(ShaderType::Vertex, "../../shader/HLSL/Vert.spv", "VSMain");
+        ShaderBase FragmentShader(ShaderType::Fragment, "../../shader/HLSL/Frag.spv", "PSMain");
 
         VkPipelineShaderStageCreateInfo VertShaderStageInfo{};
         VertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         VertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
         VertShaderStageInfo.module = VertexShader.GetHandle();
-        VertShaderStageInfo.pName = "VSMain";
+        VertShaderStageInfo.pName = VertexShader.GetEntryName();
         VkPipelineShaderStageCreateInfo FragShaderStageInfo{};
         FragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         FragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
         FragShaderStageInfo.module = FragmentShader.GetHandle();
-        FragShaderStageInfo.pName = "PSMain";
+        FragShaderStageInfo.pName = FragmentShader.GetEntryName();
 
         std::array<VkPipelineShaderStageCreateInfo, 2> ShaderStages = {
                 VertShaderStageInfo, FragShaderStageInfo
@@ -864,19 +819,20 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateParticleGraphicsPipeline() {
-        ShaderBase VertexShader(ShaderType::Vertex, "../../shader/HLSL/ParticleVert.spv");
-        ShaderBase FragmentShader(ShaderType::Fragment, "../../shader/HLSL/ParticleFrag.spv");
+        ShaderBase VertexShader(ShaderType::Vertex, "../../shader/HLSL/ParticleVert.spv", "VSMain");
+        ShaderBase FragmentShader(ShaderType::Fragment, "../../shader/HLSL/ParticleFrag.spv",
+                                  "PSMain");
 
         VkPipelineShaderStageCreateInfo VertShaderStageInfo{};
         VertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         VertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
         VertShaderStageInfo.module = VertexShader.GetHandle();
-        VertShaderStageInfo.pName = "VSMain";
+        VertShaderStageInfo.pName = VertexShader.GetEntryName();
         VkPipelineShaderStageCreateInfo FragShaderStageInfo{};
         FragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         FragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
         FragShaderStageInfo.module = FragmentShader.GetHandle();
-        FragShaderStageInfo.pName = "PSMain";
+        FragShaderStageInfo.pName = FragmentShader.GetEntryName();
 
         std::array<VkPipelineShaderStageCreateInfo, 2> ShaderStages = {
                 VertShaderStageInfo, FragShaderStageInfo
@@ -1028,13 +984,14 @@ namespace HWPT {
         VK_CHECK(vkCreatePipelineLayout(m_device, &PipelineLayoutInfo, nullptr,
                                         &m_computePipelineLayout));
 
-        ShaderBase ComputeShader(ShaderType::Compute, "../../shader/HLSL/UpdateParticle.spv");
+        ShaderBase ComputeShader(ShaderType::Compute, "../../shader/HLSL/UpdateParticle.spv",
+                                 "UpdateParticles");
 
         VkPipelineShaderStageCreateInfo ComputeShaderStageInfo{};
         ComputeShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         ComputeShaderStageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
         ComputeShaderStageInfo.module = ComputeShader.GetHandle();
-        ComputeShaderStageInfo.pName = "UpdateParticles";
+        ComputeShaderStageInfo.pName = ComputeShader.GetEntryName();
 
         VkComputePipelineCreateInfo PipelineInfo{};
         PipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
@@ -1045,34 +1002,38 @@ namespace HWPT {
                                           &m_computePipeline));
     }
 
-    struct MVPData {
+    struct ViewUniformBuffer {
         glm::mat4 ModelTrans;
         glm::mat4 ViewTrans;
         glm::mat4 ProjTrans;
         glm::vec3 DebugColor;
         float DeltaTime;
+        glm::vec3 CameraPos;
+        uint FrameNum;
     };
 
     void VulkanBackendApp::CreateUniformBuffers() {
-        MVPData MVP{};
-        MVP.ModelTrans = glm::identity<glm::mat4>();
-        glm::vec3 CameraPos = glm::vec3(0.f, 0.f, 2.f);
-        MVP.ViewTrans = glm::lookAt(CameraPos, CameraPos + glm::vec3(0.f, 0.f, -1.f),
-                                    glm::vec3(0.f, 1.f, 0.f)) * mat4_cast(glm::quat(glm::vec3(
+        ViewUniformBuffer ViewUniformBuffer_{};
+        ViewUniformBuffer_.ModelTrans = glm::identity<glm::mat4>();
+        glm::vec3 CameraPos = glm::vec3(0.f, 0.f, 3.f);
+        ViewUniformBuffer_.ViewTrans = glm::lookAt(CameraPos, CameraPos + glm::vec3(0.f, 0.f, -1.f),
+                                                   glm::vec3(0.f, 1.f, 0.f)) * mat4_cast(glm::quat(glm::vec3(
                 glm::radians(0.f),
                 glm::radians(0.f),
                 glm::radians(0.f)
         )));
-        MVP.ProjTrans = glm::perspective(glm::radians(60.f),
+        ViewUniformBuffer_.ProjTrans = glm::perspective(glm::radians(60.f),
                                          static_cast<float>(m_windowWidth) /
                                          static_cast<float>(m_windowHeight),
-                                         1e-3f, 1000.f);
-        MVP.DebugColor = glm::vec3(.5f, .9f, .6f);
-        MVP.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
+                                                        1e-3f, 1000.f);
+        ViewUniformBuffer_.DebugColor = glm::vec3(.5f, .9f, .6f);
+        ViewUniformBuffer_.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
+        ViewUniformBuffer_.FrameNum = m_frameNum;
+        ViewUniformBuffer_.CameraPos = CameraPos;
 
         m_MVPUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            m_MVPUniformBuffers[i] = new UniformBuffer(sizeof(MVPData), &MVP);
+            m_MVPUniformBuffers[i] = new UniformBuffer(sizeof(ViewUniformBuffer), &ViewUniformBuffer_);
         }
     }
 
@@ -1132,7 +1093,7 @@ namespace HWPT {
             DescriptorWrites[1].descriptorCount = 1;
             DescriptorWrites[1].pImageInfo = &ImageInfo;
 
-            vkUpdateDescriptorSets(m_device, 2, DescriptorWrites.data(), 0, nullptr);
+            vkUpdateDescriptorSets(m_device, DescriptorWrites.size(), DescriptorWrites.data(), 0, nullptr);
         }
     }
 
@@ -1183,22 +1144,24 @@ namespace HWPT {
         vkCmdBeginRenderPass(CommandBuffer, &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
 
-        MVPData MVP{};
-        MVP.ModelTrans = glm::identity<glm::mat4>();
-        glm::vec3 CameraPos = glm::vec3(0.f, 0.f, 2.f);
-        MVP.ViewTrans = glm::lookAt(CameraPos, CameraPos + glm::vec3(0.f, 0.f, -1.f),
-                                    glm::vec3(0.f, 1.f, 0.f)) * mat4_cast(glm::quat(glm::vec3(
+        ViewUniformBuffer ViewUniformBuffer_{};
+        ViewUniformBuffer_.ModelTrans = glm::identity<glm::mat4>();
+        glm::vec3 CameraPos = glm::vec3(0.f, 0.f, 3.f);
+        ViewUniformBuffer_.ViewTrans = glm::lookAt(CameraPos, CameraPos + glm::vec3(0.f, 0.f, -1.f),
+                                                   glm::vec3(0.f, 1.f, 0.f)) * mat4_cast(glm::quat(glm::vec3(
                 glm::radians(0.f),
                 glm::radians(0.f),
                 glm::radians(0.f)
         )));
-        MVP.ProjTrans = glm::perspective(glm::radians(60.f),
+        ViewUniformBuffer_.ProjTrans = glm::perspective(glm::radians(60.f),
                                          static_cast<float>(m_windowWidth) /
                                          static_cast<float>(m_windowHeight),
-                                         1e-3f, 1000.f);
-        MVP.DebugColor = glm::vec3(.5f, .9f, .6f);
-        MVP.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
-        m_MVPUniformBuffers[ImageIndex]->Update(&MVP);
+                                                        1e-3f, 1000.f);
+        ViewUniformBuffer_.DebugColor = glm::vec3(.5f, .9f, .6f);
+        ViewUniformBuffer_.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
+        ViewUniformBuffer_.CameraPos = CameraPos;
+        ViewUniformBuffer_.FrameNum = m_frameNum;
+        m_MVPUniformBuffers[ImageIndex]->Update(&ViewUniformBuffer_);
 
         vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                 m_graphicsPipelineLayout,
@@ -1264,7 +1227,7 @@ namespace HWPT {
         ImGui::StyleColorsDark();
         ImGuiIO &IO = ImGui::GetIO();
 
-        auto Consolas = IO.Fonts->AddFontFromFileTTF("../../asset/font/Consolas-Regular.ttf", 16.f);
+        auto Consolas = IO.Fonts->AddFontFromFileTTF("../../asset/font/Consolas-Regular.ttf", 22.f);
         IO.Fonts->Build();
         IO.FontDefault = Consolas;
 
@@ -1272,7 +1235,7 @@ namespace HWPT {
         InitInfo.Instance = m_instance;
         InitInfo.PhysicalDevice = m_physicalDevice;
         InitInfo.Device = m_device;
-        InitInfo.QueueFamily = FindQueueFamilies(m_physicalDevice).GraphicsFamily.value();
+        InitInfo.QueueFamily = Utils::FindQueueFamilies().GraphicsFamily.value();
         InitInfo.Queue = m_queue.GraphicsQueue;
         InitInfo.DescriptorPool = m_imguiInfrastructure->m_descriptorPool;
         InitInfo.RenderPass = m_imguiInfrastructure->m_renderPass;
@@ -1289,43 +1252,7 @@ namespace HWPT {
         IO.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;       // IF using Multi View
     }
 
-    void VulkanBackendApp::BeginImGui() {
-        ImGui_ImplGlfw_NewFrame();
-        ImGui_ImplVulkan_NewFrame();
-        ImGui::NewFrame();
-//        EnableWholeScreenDocking();
-    }
-
-    void VulkanBackendApp::EndImGui() {
-        auto CommandBuffer = BeginIntermediateCommand();
-
-        VkRenderPassBeginInfo RenderPassInfo{};
-        RenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-        RenderPassInfo.renderPass = m_imguiInfrastructure->m_renderPass;
-        RenderPassInfo.framebuffer = m_imguiInfrastructure->m_frameBuffers[m_imageIndex];
-        RenderPassInfo.renderArea.offset = {0, 0};
-        RenderPassInfo.renderArea.extent = m_swapChain.Extent;
-        VkClearValue ClearValue = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
-        RenderPassInfo.clearValueCount = 1;
-        RenderPassInfo.pClearValues = &ClearValue;
-        vkCmdBeginRenderPass(CommandBuffer, &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-        ImGui::Render();
-        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), CommandBuffer);
-
-        vkCmdEndRenderPass(CommandBuffer);
-        EndIntermediateCommand(CommandBuffer);
-
-        // For ImGui MultiView
-        ImGui::UpdatePlatformWindows();
-        ImGui::RenderPlatformWindowsDefault();
-        glfwMakeContextCurrent(m_window);
-    }
-
     void VulkanBackendApp::CleanUpImGui() {
-        ImGui_ImplVulkan_Shutdown();
-        ImGui_ImplGlfw_Shutdown();
-        ImGui::DestroyContext();
         delete m_imguiInfrastructure;
     }
 
@@ -1346,57 +1273,6 @@ namespace HWPT {
         }
 
         m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-    }
-
-    void VulkanBackendApp::EnableWholeScreenDocking() {
-        static bool dockspaceOpen = true;
-        static bool opt_fullscreen_persistant = true;
-        bool opt_fullscreen = opt_fullscreen_persistant;
-        static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
-
-        // We are using the ImGuiWindowFlags_NoDocking flag to make the parent window not dockable into,
-        // because it would be confusing to have two docking targets within each others.
-        ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
-        if (opt_fullscreen) {
-            ImGuiViewport *viewport = ImGui::GetMainViewport();
-            ImGui::SetNextWindowPos(viewport->Pos);
-            ImGui::SetNextWindowSize(viewport->Size);
-            ImGui::SetNextWindowViewport(viewport->ID);
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-            window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
-                            ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-            window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
-        }
-
-        // When using ImGuiDockNodeFlags_PassthruCentralNode, DockSpace() will render our background and handle the pass-thru hole, so we ask Begin() to not render a background.
-        if (dockspace_flags & ImGuiDockNodeFlags_PassthruCentralNode)
-            window_flags |= ImGuiWindowFlags_NoBackground;
-
-        // Important: note that we proceed even if Begin() returns false (aka window is collapsed).
-        // This is because we want to keep our DockSpace() active. If a DockSpace() is inactive,
-        // all active windows docked into it will lose their parent and become undocked.
-        // We cannot preserve the docking relationship between an active window and an inactive docking, otherwise
-        // any change of dockspace/settings would lead to windows being stuck in limbo and never being visible.
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-        ImGui::Begin("DockSpace Demo", &dockspaceOpen, window_flags);
-        ImGui::PopStyleVar();
-
-        if (opt_fullscreen)
-            ImGui::PopStyleVar(2);
-
-        // DockSpace
-        ImGuiIO &io = ImGui::GetIO();
-        ImGuiStyle &style = ImGui::GetStyle();
-        float minWinSizeX = style.WindowMinSize.x;
-        style.WindowMinSize.x = 370.0f;
-
-        if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable) {
-            ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
-            ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
-        }
-        style.WindowMinSize.x = minWinSizeX;
-        ImGui::End();
     }
 
     void VulkanBackendApp::OnWindowResize() {
@@ -1510,6 +1386,11 @@ namespace HWPT {
         vkGetSwapchainImagesKHR(Device, SwapChainHandle, &ImageCount, nullptr);
         SwapChainImages.resize(ImageCount);
         vkGetSwapchainImagesKHR(Device, SwapChainHandle, &ImageCount, SwapChainImages.data());
+
+        for (uint ImageIndex = 0; ImageIndex < SwapChainImages.size(); ImageIndex++) {
+            RHI::TransitionTextureLayout(SwapChainImages[ImageIndex], 1, VK_IMAGE_LAYOUT_UNDEFINED,
+                                         VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+        }
     }
 
     void SwapChain::CreateImageViews(VkDevice Device) {
