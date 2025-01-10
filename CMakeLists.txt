@@ -70,12 +70,18 @@ add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/shaderCompiler/CompilerHLSL.h
         src/core/buffer/ArbitraryBuffer.cpp
         src/core/buffer/ArbitraryBuffer.h
-        src/core/Commands/CommandPool.cpp
-        src/core/Commands/CommandPool.h
+        src/core/commands/CommandPool.cpp
+        src/core/commands/CommandPool.h
         src/core/Utils.h
         src/core/Utils.cpp
         src/core/scene/Scene.cpp
         src/core/scene/Scene.h
+        src/core/scene/Camera.cpp
+        src/core/scene/Camera.h
+        src/core/input/KeyCode.h
+        src/core/input/MouseCode.h
+        src/core/input/Input.cpp
+        src/core/input/Input.h
 )
 
 include_directories(
