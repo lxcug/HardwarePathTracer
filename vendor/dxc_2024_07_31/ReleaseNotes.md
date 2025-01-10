@@ -125,17 +125,17 @@ DX Compiler release for December 2022.
  This includes the compiler executable, the dynamic library, and the dxil signing library.
 - New flags for inspecting compile times:
   - `-ftime-report` flag prints a high level summary of compile time broken down by major phase or pass in the compiler. The DXC
-command line will print the output to stdout.
+  command line will print the output to stdout.
   - `-ftime-trace` flag prints a Chrome trace json file. The output can be routed to a specific file by providing a filename to
-the argument using the format `-ftime-trace=<filename>`. Chrome trace files can be opened in Chrome by loading the built-in tracing tool
-at chrome://tracing. The trace file captures hierarchial timing data with additional context enabling a much more in-depth profiling
-experience.
+  the argument using the format `-ftime-trace=<filename>`. Chrome trace files can be opened in Chrome by loading the built-in tracing tool
+  at chrome://tracing. The trace file captures hierarchial timing data with additional context enabling a much more in-depth profiling
+  experience.
   - Both new options are supported via the DXC API using the `DXC_OUT_TIME_REPORT` and `DXC_OUT_TIME_TRACE` output kinds respectively.
 - IDxcPdbUtils2 enables reading new PDB container part
 - `-P` flag will now behave as it does with cl using the file specified by `-Fi` or a default
 - Unbound multidimensional resource arrays are allowed
 - Diagnostic improvements
-- Reflection support on non-Windows platforms; minor updates adding RequiredFeatureFlags to library function reflection and thread group size for AccelHandle and MS.
+- Reflection support on non-Windows platforms; minor updates adding RequiredFeatureFlags to library function reflection and thread group size for AS and MS.
 
 The package includes dxc.exe, dxcompiler.dll, corresponding lib and headers, and dxil.dll for x64 and arm64 platforms on Windows.
 For the first time the package also includes Linux version of the compiler with corresponding executable, libdxcompiler.so, corresponding headers, and libdxil.so for x64 platforms.
