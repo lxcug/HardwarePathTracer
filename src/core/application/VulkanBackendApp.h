@@ -24,6 +24,7 @@
 #include "ImGuiIntegration.h"
 #include "core/Model.h"
 #include "core/Commands/CommandPool.h"
+#include "core/scene/Camera.h"
 
 
 namespace HWPT {
@@ -61,6 +62,21 @@ namespace HWPT {
             delete MSAAColorBuffer;
             delete MSAADepthBuffer;
         }
+    };
+
+    struct ViewUniformBuffer {
+        glm::mat4 ModelTrans;
+        glm::mat4 ViewTrans;
+        glm::mat4 ProjTrans;
+
+        glm::vec3 DebugColor;
+        float DeltaTime;
+
+        glm::vec3 CameraPos;
+        uint FrameNum;
+
+        glm::mat4 InvView;
+        glm::mat4 InvProj;
     };
 
     class VulkanBackendApp : public ApplicationBase {
@@ -273,6 +289,8 @@ namespace HWPT {
         std::vector<StorageBuffer*> m_particleStorageBuffers;
         void CreateParticleStorageBuffers();
         std::shared_ptr<VertexBufferLayout> m_particleVertexBufferLayout;
+
+        std::shared_ptr<CameraBase> m_camera;
     };
 }  // namespace HWPT
 

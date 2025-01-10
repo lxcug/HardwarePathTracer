@@ -129,15 +129,19 @@ namespace HWPT {
                              VK_IMAGE_LAYOUT_GENERAL, &ClearColor, 1,
                              &SubresourceRange);
 
-//        SrcInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-//        SrcInput.AccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-//        SrcInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-//        DstInput.Layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-//        DstInput.AccessMask = 0;
-//        DstInput.PipelineStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-//        RHI::TransitionTextureLayout(CommandBuffer,
-//                                     m_swapChain.SwapChainImages[m_imageIndex], 1,
-//                                     SrcInput, DstInput);
+        // Update ViewUniformBuffer
+        ViewUniformBuffer ViewUniformBuffer_{};
+        ViewUniformBuffer_.ModelTrans = glm::identity<glm::mat4>();
+        ViewUniformBuffer_.ModelTrans = glm::identity<glm::mat4>();
+        ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();
+        ViewUniformBuffer_.ProjTrans = m_camera->GetProjMatrix();
+        ViewUniformBuffer_.CameraPos = m_camera->GetCameraPos();
+        ViewUniformBuffer_.DebugColor = glm::vec3(.5f, .9f, .6f);
+        ViewUniformBuffer_.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
+        ViewUniformBuffer_.FrameNum = m_frameNum;
+        ViewUniformBuffer_.InvView = glm::transpose(m_camera->GetViewMatrix());
+        ViewUniformBuffer_.InvProj = glm::inverse(m_camera->GetProjMatrix());
+        m_MVPUniformBuffers[m_imageIndex]->Update(&ViewUniformBuffer_);
 
         // TODO: Add RayTracing Code Here
         vkCmdBindPipeline(CommandBuffer,

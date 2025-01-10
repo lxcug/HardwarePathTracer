@@ -28,6 +28,7 @@ namespace HWPT {
 
         while (!glfwWindowShouldClose(m_window)) {
             m_fpsCalculator->Tick();
+            m_camera->Tick(m_fpsCalculator->GetDeltaTime());
 
             glfwPollEvents();
             DrawFrame();
@@ -1002,34 +1003,22 @@ namespace HWPT {
                                           &m_computePipeline));
     }
 
-    struct ViewUniformBuffer {
-        glm::mat4 ModelTrans;
-        glm::mat4 ViewTrans;
-        glm::mat4 ProjTrans;
-        glm::vec3 DebugColor;
-        float DeltaTime;
-        glm::vec3 CameraPos;
-        uint FrameNum;
-    };
-
     void VulkanBackendApp::CreateUniformBuffers() {
+        glm::vec3 CameraPos = glm::vec3(0.f, 0.f, 3.f);
+        float AspectRatio = static_cast<float>(m_windowWidth) / static_cast<float>(m_windowHeight);
+        m_camera = std::make_shared<PerspectiveCamera>(CameraPos, AspectRatio, 1e-2f, 1e3f, 45);
+        m_camera->Init();
+
         ViewUniformBuffer ViewUniformBuffer_{};
         ViewUniformBuffer_.ModelTrans = glm::identity<glm::mat4>();
-        glm::vec3 CameraPos = glm::vec3(0.f, 0.f, 3.f);
-        ViewUniformBuffer_.ViewTrans = glm::lookAt(CameraPos, CameraPos + glm::vec3(0.f, 0.f, -1.f),
-                                                   glm::vec3(0.f, 1.f, 0.f)) * mat4_cast(glm::quat(glm::vec3(
-                glm::radians(0.f),
-                glm::radians(0.f),
-                glm::radians(0.f)
-        )));
-        ViewUniformBuffer_.ProjTrans = glm::perspective(glm::radians(60.f),
-                                         static_cast<float>(m_windowWidth) /
-                                         static_cast<float>(m_windowHeight),
-                                                        1e-3f, 1000.f);
+        ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();
+        ViewUniformBuffer_.ProjTrans = m_camera->GetProjMatrix();
+        ViewUniformBuffer_.CameraPos = m_camera->GetCameraPos();
         ViewUniformBuffer_.DebugColor = glm::vec3(.5f, .9f, .6f);
         ViewUniformBuffer_.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
         ViewUniformBuffer_.FrameNum = m_frameNum;
-        ViewUniformBuffer_.CameraPos = CameraPos;
+        ViewUniformBuffer_.InvView = glm::transpose(m_camera->GetViewMatrix());
+        ViewUniformBuffer_.InvProj = glm::inverse(m_camera->GetProjMatrix());
 
         m_MVPUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -1146,21 +1135,15 @@ namespace HWPT {
 
         ViewUniformBuffer ViewUniformBuffer_{};
         ViewUniformBuffer_.ModelTrans = glm::identity<glm::mat4>();
-        glm::vec3 CameraPos = glm::vec3(0.f, 0.f, 3.f);
-        ViewUniformBuffer_.ViewTrans = glm::lookAt(CameraPos, CameraPos + glm::vec3(0.f, 0.f, -1.f),
-                                                   glm::vec3(0.f, 1.f, 0.f)) * mat4_cast(glm::quat(glm::vec3(
-                glm::radians(0.f),
-                glm::radians(0.f),
-                glm::radians(0.f)
-        )));
-        ViewUniformBuffer_.ProjTrans = glm::perspective(glm::radians(60.f),
-                                         static_cast<float>(m_windowWidth) /
-                                         static_cast<float>(m_windowHeight),
-                                                        1e-3f, 1000.f);
+        ViewUniformBuffer_.ModelTrans = glm::identity<glm::mat4>();
+        ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();
+        ViewUniformBuffer_.ProjTrans = m_camera->GetProjMatrix();
+        ViewUniformBuffer_.CameraPos = m_camera->GetCameraPos();
         ViewUniformBuffer_.DebugColor = glm::vec3(.5f, .9f, .6f);
         ViewUniformBuffer_.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
-        ViewUniformBuffer_.CameraPos = CameraPos;
         ViewUniformBuffer_.FrameNum = m_frameNum;
+        ViewUniformBuffer_.InvView = glm::transpose(m_camera->GetViewMatrix());
+        ViewUniformBuffer_.InvProj = glm::inverse(m_camera->GetProjMatrix());
         m_MVPUniformBuffers[ImageIndex]->Update(&ViewUniformBuffer_);
 
         vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,

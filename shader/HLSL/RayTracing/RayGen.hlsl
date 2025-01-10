@@ -31,13 +31,17 @@ void main()
     float2 uv = (index + .5) / dim;
     // TODO: Bind View Uniform Buffer
     float3 origin = CameraPos;
-    float2 screen_coord = uv * 2.0f - 1.0f;
+    float2 screen_coord = uv * 2.f - 1.f;
 
-    float3 dir = normalize(float3(screen_coord.x * aspect_ratio, screen_coord.y, -2.f));
+    // z could be any value in [0, 1]
+    float4 target_view_space = mul(InvProj, float4(screen_coord, 0.f, 1.f));
+    target_view_space /= target_view_space.w;
+
+    float3 dir = mul(InvView, float4(normalize(target_view_space.xyz), 0.f)).xyz;
 
     RayDesc ray;
-    ray.Origin = origin;
-    ray.Direction = dir;
+    ray.Origin = origin.xyz;
+    ray.Direction = dir.xyz;
     ray.TMin = 1e-3f;
     ray.TMax = 1e10f;
 
