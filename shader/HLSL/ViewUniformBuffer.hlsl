@@ -11,4 +11,6 @@ cbuffer ViewUniformBuffer : register(b0) {
 
     float4x4 InvView;
     float4x4 InvProj;
+
+    bool ShouldReAccumulate;
 };

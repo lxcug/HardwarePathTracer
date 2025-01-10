@@ -77,6 +77,8 @@ namespace HWPT {
 
         glm::mat4 InvView;
         glm::mat4 InvProj;
+
+        bool ShouldReAccumulate;
     };
 
     class VulkanBackendApp : public ApplicationBase {

@@ -52,6 +52,14 @@ namespace HWPT {
 
         [[nodiscard]] auto GetTLASBuildInput() const -> VkAccelerationStructureInstanceKHR;
 
+        void SetModelTransform(const glm::mat4& ModelTransform) {
+            m_transform = ModelTransform;
+        }
+
+        auto GetModelTransform() -> glm::mat4 {
+            return m_transform;
+        }
+
     private:
         Texture2D *m_texture = nullptr;
         IndexBuffer *m_indexBuffer = nullptr;

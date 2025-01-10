@@ -103,6 +103,21 @@ namespace HWPT {
         VkCommandBufferBeginInfo BeginInfo{};
         BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
 
+        // Update ViewUniformBuffer
+        ViewUniformBuffer ViewUniformBuffer_{};
+        ViewUniformBuffer_.ModelTrans = m_vikingRoom->GetModelTransform();
+        ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();
+        ViewUniformBuffer_.ProjTrans = m_camera->GetProjMatrix();
+        ViewUniformBuffer_.CameraPos = m_camera->GetCameraPos();
+        ViewUniformBuffer_.DebugColor = glm::vec3(.5f, .9f, .6f);
+        ViewUniformBuffer_.DeltaTime = m_fpsCalculator
+                                       ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
+        ViewUniformBuffer_.FrameNum = m_frameNum;
+        ViewUniformBuffer_.InvView = glm::transpose(m_camera->GetViewMatrix());
+        ViewUniformBuffer_.InvProj = glm::inverse(m_camera->GetProjMatrix());
+        ViewUniformBuffer_.ShouldReAccumulate = m_camera->IsMoving();
+        m_MVPUniformBuffers[m_imageIndex]->Update(&ViewUniformBuffer_);
+
         VK_CHECK(vkBeginCommandBuffer(CommandBuffer, &BeginInfo));
 
         VkClearColorValue ClearColor = {{0.f, 0.f, 0.f, 1.0f}};
@@ -125,23 +140,15 @@ namespace HWPT {
                                      m_swapChain.SwapChainImages[m_imageIndex], 1,
                                      SrcInput, DstInput);
 
+        int LastFrameIndex = m_currentFrame == 0 ? MAX_FRAMES_IN_FLIGHT - 1 : m_currentFrame - 1;
+        RHI::TransitionTextureLayout(CommandBuffer,
+                                     m_swapChain.SwapChainImages[LastFrameIndex], 1,
+                                     SrcInput, DstInput);
+
+
         vkCmdClearColorImage(CommandBuffer, m_swapChain.SwapChainImages[m_imageIndex],
                              VK_IMAGE_LAYOUT_GENERAL, &ClearColor, 1,
                              &SubresourceRange);
-
-        // Update ViewUniformBuffer
-        ViewUniformBuffer ViewUniformBuffer_{};
-        ViewUniformBuffer_.ModelTrans = glm::identity<glm::mat4>();
-        ViewUniformBuffer_.ModelTrans = glm::identity<glm::mat4>();
-        ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();
-        ViewUniformBuffer_.ProjTrans = m_camera->GetProjMatrix();
-        ViewUniformBuffer_.CameraPos = m_camera->GetCameraPos();
-        ViewUniformBuffer_.DebugColor = glm::vec3(.5f, .9f, .6f);
-        ViewUniformBuffer_.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
-        ViewUniformBuffer_.FrameNum = m_frameNum;
-        ViewUniformBuffer_.InvView = glm::transpose(m_camera->GetViewMatrix());
-        ViewUniformBuffer_.InvProj = glm::inverse(m_camera->GetProjMatrix());
-        m_MVPUniformBuffers[m_imageIndex]->Update(&ViewUniformBuffer_);
 
         // TODO: Add RayTracing Code Here
         vkCmdBindPipeline(CommandBuffer,
@@ -168,6 +175,9 @@ namespace HWPT {
         DstInput.PipelineStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
         RHI::TransitionTextureLayout(CommandBuffer,
                                      m_swapChain.SwapChainImages[m_imageIndex], 1,
+                                     SrcInput, DstInput);
+        RHI::TransitionTextureLayout(CommandBuffer,
+                                     m_swapChain.SwapChainImages[LastFrameIndex], 1,
                                      SrcInput, DstInput);
 
         VK_CHECK(vkEndCommandBuffer(CommandBuffer));
@@ -261,7 +271,8 @@ namespace HWPT {
         ViewUniformBufferBinding.binding = 0;
         ViewUniformBufferBinding.descriptorCount = 1;
         ViewUniformBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        ViewUniformBufferBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+        ViewUniformBufferBinding.stageFlags =
+                VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
         VkDescriptorSetLayoutBinding TLASBinding{};
         TLASBinding.binding = 1;
@@ -276,8 +287,14 @@ namespace HWPT {
         OutImageBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         OutImageBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
-        std::array<VkDescriptorSetLayoutBinding, 3> Bindings = {
-                ViewUniformBufferBinding, TLASBinding, OutImageBinding
+        VkDescriptorSetLayoutBinding InImageBinding{};
+        InImageBinding.binding = 3;
+        InImageBinding.descriptorCount = 1;
+        InImageBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        InImageBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+
+        std::array<VkDescriptorSetLayoutBinding, 4> Bindings = {
+                ViewUniformBufferBinding, TLASBinding, OutImageBinding, InImageBinding
         };
 
         VkDescriptorSetLayoutCreateInfo CreateInfo{};
@@ -301,7 +318,7 @@ namespace HWPT {
     }
 
     void VulkanRayTracingApp::BindRTDescriptorSets() {
-        std::array<VkWriteDescriptorSet, 3> DescriptorWrites{};
+        std::array<VkWriteDescriptorSet, 4> DescriptorWrites{};
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkDescriptorBufferInfo BufferInfo{};
             BufferInfo.buffer = m_MVPUniformBuffers[i]->GetHandle();
@@ -328,18 +345,31 @@ namespace HWPT {
             DescriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
             DescriptorWrites[1].pNext = &ASInfo;
 
-            VkDescriptorImageInfo ImageInfo{};
-            ImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-            ImageInfo.imageView = m_swapChain.SwapChainImageViews[i];
+            VkDescriptorImageInfo OutImageInfo{};
+            OutImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            OutImageInfo.imageView = m_swapChain.SwapChainImageViews[i];
             DescriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             DescriptorWrites[2].dstSet = m_RTDescriptorSets[i];
             DescriptorWrites[2].dstBinding = 2;
             DescriptorWrites[2].dstArrayElement = 0;
             DescriptorWrites[2].descriptorCount = 1;
             DescriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            DescriptorWrites[2].pImageInfo = &ImageInfo;
+            DescriptorWrites[2].pImageInfo = &OutImageInfo;
 
-            vkUpdateDescriptorSets(m_device, DescriptorWrites.size(), DescriptorWrites.data(), 0, nullptr);
+            VkDescriptorImageInfo InImageInfo{};
+            InImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            int LastFrameIndex = i == 0 ? MAX_FRAMES_IN_FLIGHT - 1 : i - 1;
+            InImageInfo.imageView = m_swapChain.SwapChainImageViews[LastFrameIndex];
+            DescriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            DescriptorWrites[3].dstSet = m_RTDescriptorSets[i];
+            DescriptorWrites[3].dstBinding = 3;
+            DescriptorWrites[3].dstArrayElement = 0;
+            DescriptorWrites[3].descriptorCount = 1;
+            DescriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+            DescriptorWrites[3].pImageInfo = &InImageInfo;
+
+            vkUpdateDescriptorSets(m_device, DescriptorWrites.size(), DescriptorWrites.data(), 0,
+                                   nullptr);
         }
     }
 
@@ -471,12 +501,14 @@ namespace HWPT {
             pData += m_rayGenRegion.stride;
         }
         for (int i = 0; i < MissCount; i++) {
-            memcpy(reinterpret_cast<void *>(pData), Handles.data() + HandleIndex++ * m_RTProps.shaderGroupHandleSize,
+            memcpy(reinterpret_cast<void *>(pData),
+                   Handles.data() + HandleIndex++ * m_RTProps.shaderGroupHandleSize,
                    m_RTProps.shaderGroupHandleSize);
             pData += m_missRegion.stride;
         }
         for (int i = 0; i < HitCount; i++) {
-            memcpy(reinterpret_cast<void *>(pData), Handles.data() + HandleIndex++ * m_RTProps.shaderGroupHandleSize,
+            memcpy(reinterpret_cast<void *>(pData),
+                   Handles.data() + HandleIndex++ * m_RTProps.shaderGroupHandleSize,
                    m_RTProps.shaderGroupHandleSize);
             pData += m_hitRegion.stride;
         }

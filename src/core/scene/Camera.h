@@ -34,6 +34,7 @@ namespace HWPT {
             m_viewMat = glm::toMat4(glm::conjugate(GetOrientation())) * glm::translate(glm::mat4(1.f), -m_cameraPos);
         }
 
+        // Return if camera is moving
         virtual void Tick(float DeltaTime);
 
         [[nodiscard]] auto GetOrientation() const -> glm::quat {
@@ -72,6 +73,10 @@ namespace HWPT {
             m_rotateSpeedMultiplier = Value;
         }
 
+        [[nodiscard]] auto IsMoving() const -> bool {
+            return m_isMoving;
+        }
+
     protected:
         CameraType m_type = CameraType::CameraTypeMax;
         glm::vec3 m_cameraPos;
@@ -84,6 +89,7 @@ namespace HWPT {
         static inline float s_rotateSpeed = 1.f;
         glm::vec2 m_lastMousePos;
         bool m_isFirstTouch = true;
+        bool m_isMoving = false;
     };
 
 

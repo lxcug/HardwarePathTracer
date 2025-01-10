@@ -29,6 +29,9 @@ namespace HWPT {
         while (!glfwWindowShouldClose(m_window)) {
             m_fpsCalculator->Tick();
             m_camera->Tick(m_fpsCalculator->GetDeltaTime());
+            if (m_camera->IsMoving()) {
+                m_frameNum = 0;
+            }
 
             glfwPollEvents();
             DrawFrame();
@@ -1134,8 +1137,7 @@ namespace HWPT {
         vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
 
         ViewUniformBuffer ViewUniformBuffer_{};
-        ViewUniformBuffer_.ModelTrans = glm::identity<glm::mat4>();
-        ViewUniformBuffer_.ModelTrans = glm::identity<glm::mat4>();
+        ViewUniformBuffer_.ModelTrans = m_vikingRoom->GetModelTransform();
         ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();
         ViewUniformBuffer_.ProjTrans = m_camera->GetProjMatrix();
         ViewUniformBuffer_.CameraPos = m_camera->GetCameraPos();
@@ -1197,6 +1199,7 @@ namespace HWPT {
     void VulkanBackendApp::CreateModelAndSampler() {
         m_vikingRoom = new Model("../../asset/viking_room/viking_room.obj",
                                  "../../asset/viking_room/viking_room.png", true);
+        m_vikingRoom->SetModelTransform(glm::rotate(glm::identity<glm::mat4>(), glm::radians(90.f), glm::vec3(1.f, 0.f, 0.f)));
 
         m_sampler = new Sampler();
     }

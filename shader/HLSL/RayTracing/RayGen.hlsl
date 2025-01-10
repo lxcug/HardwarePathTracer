@@ -54,7 +54,7 @@ void main()
     if (payload.is_hit) {
         float rnds[AO_RAYS * 2];
         for (int i = 0; i < 10; i++) {
-            rnds[i] = Random(payload.pos + float3(i, 0.0, 0.0) + float3(DispatchRaysIndex().xy, 1));
+            rnds[i] = Random(payload.pos + float3(i, FrameNum, FrameNum) + float3(DispatchRaysIndex().xy, FrameNum));
         }
 
         uint hit_count = 0;
@@ -73,8 +73,15 @@ void main()
             }
         }
         ao = 1.f - hit_count / AO_RAYS;
+    } else {
+        ao = 0.f;
     }
 
-
-    OutImage[index] = float4(ao * payload.color, 1.0);
+    if (FrameNum == 0 || ShouldReAccumulate) {
+        OutImage[index] = float4(ao, ao, ao, 1.0);
+    } else {
+        float last_ao = InImage[index].r;
+        float new_ao = lerp(last_ao, ao, 1.f / FrameNum);
+        OutImage[index] = float4(new_ao, new_ao, new_ao, 1.0);
+    }
 }

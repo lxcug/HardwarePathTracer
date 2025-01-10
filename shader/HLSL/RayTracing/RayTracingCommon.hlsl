@@ -5,6 +5,7 @@
 
 RaytracingAccelerationStructure TLAS : register(t1);
 RWTexture2D<float4> OutImage : register(u2);
+Texture2D<float4> InImage : register(t3);
 
 struct RayPayload
 {
