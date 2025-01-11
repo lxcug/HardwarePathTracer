@@ -27,7 +27,7 @@ void main()
     uint2 index = DispatchRaysIndex().xy;
     uint2 dim = DispatchRaysDimensions().xy;
 
-    uint seed = tea(index.y * dim.x + index.y, FrameNum);
+    uint seed = FrameNum + index.x * dim.y + index.y * dim.x;
     float2 jitter = float2(rnd(seed), rnd(seed));
     float2 uv = (index + .5 + jitter * .5f) / dim;
     float3 origin = CameraPos;
