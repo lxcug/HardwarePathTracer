@@ -21,6 +21,8 @@ namespace HWPT {
 
     class Texture2D {
     public:
+        Texture2D();
+
         explicit Texture2D(const std::filesystem::path& TexturePath, uint MSAASamples = 1, bool GenerateMips = false);
 
         Texture2D(uint Width, uint Height, TextureFormat Format, TextureUsage Usage,

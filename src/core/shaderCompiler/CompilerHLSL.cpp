@@ -36,10 +36,12 @@ namespace HWPT {
                 absolute(s_dxcPath).string() + "/bin/x64/dxc.exe" +
                 " -E " + Entry +
                 " -T " + ShaderStageString +
-                " -spirv" +
                 " -Fo " + absolute(s_hlslDirectory).string() + "/" + OutFile + ".spv " +
                 " -fspv-extension=SPV_KHR_ray_tracing" +
                 " -fspv-target-env=vulkan1.2 " +
+                " -spirv " +
+                " -fspv-extension=SPV_KHR_physical_storage_buffer " +
+                " -fspv-extension=SPV_EXT_descriptor_indexing " +
                 absolute(s_hlslDirectory).string() + "/" + ShaderFile;
 
 //        std::cout << CompileCommand << '\n';

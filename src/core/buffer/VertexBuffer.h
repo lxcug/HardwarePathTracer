@@ -21,16 +21,13 @@
 namespace HWPT {
     struct Vertex {
         glm::vec3 Pos;
-        glm::vec3 Color;
+        glm::vec3 Normal;
         glm::vec2 TexCoord;
 
         Vertex() = default;
 
-        Vertex(const glm::vec3 &Pos, const glm::vec3 &Color, const glm::vec2 &TexCoord) :
-                Pos(Pos), Color(Color), TexCoord(TexCoord) {}
-
         auto operator==(const Vertex &Other) const -> bool {
-            return Pos == Other.Pos;
+            return Pos == Other.Pos && Normal == Other.Normal;
         }
 
         static auto GetBindingDescription() -> VkVertexInputBindingDescription;
@@ -77,7 +74,7 @@ namespace std {
     struct hash<HWPT::Vertex> {
         auto operator()(HWPT::Vertex const &_Vertex) const -> size_t {
             return ((hash<glm::vec3>()(_Vertex.Pos) ^
-                     (hash<glm::vec3>()(_Vertex.Color) << 1)) >> 1) ^
+                     (hash<glm::vec3>()(_Vertex.Normal) << 1)) >> 1) ^
                    (hash<glm::vec2>()(_Vertex.TexCoord) << 1);
         }
     };

@@ -82,6 +82,8 @@ add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/input/MouseCode.h
         src/core/input/Input.cpp
         src/core/input/Input.h
+        src/core/SwapChain.cpp
+        src/core/SwapChain.h
 )
 
 include_directories(

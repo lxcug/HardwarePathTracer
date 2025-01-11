@@ -12,6 +12,12 @@
 
 namespace HWPT {
 
+    struct ModelDesc {
+        VkDeviceAddress VertexBufferAddress;
+        VkDeviceAddress IndexBufferAddress;
+        // TODO: Material
+    };
+
     class VulkanRayTracingApp : public VulkanBackendApp {
     public:
         VulkanRayTracingApp();
@@ -65,6 +71,8 @@ namespace HWPT {
         VkPhysicalDeviceRayTracingPipelinePropertiesKHR m_RTProps{
                 VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
         ASBuilder *m_accelBuilder = nullptr;
+
+        Texture2D* m_lastFrameSceneColor = nullptr;
     };
 
 }  // namespace HWPT

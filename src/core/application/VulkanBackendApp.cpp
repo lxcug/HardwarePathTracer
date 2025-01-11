@@ -36,12 +36,9 @@ namespace HWPT {
             glfwPollEvents();
             DrawFrame();
 
-            m_imguiInfrastructure->BeginImGui();
-            DrawImGuiFrame();
-            m_imguiInfrastructure->EndImGui();
-
             Present();
             m_frameNum++;
+            m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
         }
         vkDeviceWaitIdle(m_device);
 
@@ -230,6 +227,11 @@ namespace HWPT {
 
         RecordCommandBuffer(GraphicsCommandBuffer, m_imageIndex);
 
+        // TODO: Use the same command buffer for better performance
+        m_imguiInfrastructure->BeginImGui();
+        DrawImGuiFrame();
+        m_imguiInfrastructure->EndImGui();
+
         VkSubmitInfo GraphicsSubmitInfo{};
         GraphicsSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
         std::array<VkSemaphore, 2> GraphicsWaitSemaphores = {
@@ -400,6 +402,7 @@ namespace HWPT {
         VkPhysicalDeviceFeatures DeviceFeatures{};
         DeviceFeatures.sampleRateShading = VK_TRUE;
         DeviceFeatures.geometryShader = VK_TRUE;
+        DeviceFeatures.shaderInt64 = VK_TRUE;
         CreateInfo.pEnabledFeatures = &DeviceFeatures;
         CreateInfo.enabledExtensionCount = DeviceExtensions.size();
         CreateInfo.ppEnabledExtensionNames = DeviceExtensions.data();
@@ -422,13 +425,15 @@ namespace HWPT {
         VkPhysicalDeviceAccelerationStructureFeaturesKHR ASFeature{
                 VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR};
         ASFeature.accelerationStructure = VK_TRUE;
-        // GetBufferDeviceAddress
-        VkPhysicalDeviceBufferDeviceAddressFeatures BufferDeviceAddressFeature{
-                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES};
-        BufferDeviceAddressFeature.bufferDeviceAddress = VK_TRUE;
+        // RunTimeDescriptorArray and BufferDeviceAddress
+        VkPhysicalDeviceVulkan12Features Vulkan12Features = {
+                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
+        Vulkan12Features.runtimeDescriptorArray = VK_TRUE;
+        Vulkan12Features.bufferDeviceAddress = VK_TRUE;
+//        Vulkan12Features.shaderInt
 
         // Link Features
-        ASFeature.pNext = &BufferDeviceAddressFeature;
+        ASFeature.pNext = &Vulkan12Features;
         Sync2Feature.pNext = &ASFeature;
         RayTracingPipelineFeatures.pNext = &Sync2Feature;
         CreateInfo.pNext = &RayTracingPipelineFeatures;
@@ -481,7 +486,8 @@ namespace HWPT {
         CreateInfo.imageExtent = Extent;
         CreateInfo.imageArrayLayers = 1;
         CreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-                                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+                                VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                                VK_IMAGE_USAGE_STORAGE_BIT;
 
         QueueFamilyIndices Indices = m_commandPool->GetQueueFamilyIndices();
         std::unordered_set<uint> QueueFamilySet = {
@@ -1018,14 +1024,16 @@ namespace HWPT {
         ViewUniformBuffer_.ProjTrans = m_camera->GetProjMatrix();
         ViewUniformBuffer_.CameraPos = m_camera->GetCameraPos();
         ViewUniformBuffer_.DebugColor = glm::vec3(.5f, .9f, .6f);
-        ViewUniformBuffer_.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
+        ViewUniformBuffer_.DeltaTime = m_fpsCalculator
+                                       ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
         ViewUniformBuffer_.FrameNum = m_frameNum;
         ViewUniformBuffer_.InvView = glm::transpose(m_camera->GetViewMatrix());
         ViewUniformBuffer_.InvProj = glm::inverse(m_camera->GetProjMatrix());
 
         m_MVPUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            m_MVPUniformBuffers[i] = new UniformBuffer(sizeof(ViewUniformBuffer), &ViewUniformBuffer_);
+            m_MVPUniformBuffers[i] = new UniformBuffer(sizeof(ViewUniformBuffer),
+                                                       &ViewUniformBuffer_);
         }
     }
 
@@ -1085,7 +1093,8 @@ namespace HWPT {
             DescriptorWrites[1].descriptorCount = 1;
             DescriptorWrites[1].pImageInfo = &ImageInfo;
 
-            vkUpdateDescriptorSets(m_device, DescriptorWrites.size(), DescriptorWrites.data(), 0, nullptr);
+            vkUpdateDescriptorSets(m_device, DescriptorWrites.size(), DescriptorWrites.data(), 0,
+                                   nullptr);
         }
     }
 
@@ -1142,7 +1151,8 @@ namespace HWPT {
         ViewUniformBuffer_.ProjTrans = m_camera->GetProjMatrix();
         ViewUniformBuffer_.CameraPos = m_camera->GetCameraPos();
         ViewUniformBuffer_.DebugColor = glm::vec3(.5f, .9f, .6f);
-        ViewUniformBuffer_.DeltaTime = m_fpsCalculator ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
+        ViewUniformBuffer_.DeltaTime = m_fpsCalculator
+                                       ? static_cast<float>(m_fpsCalculator->GetDeltaTime()) : 0.f;
         ViewUniformBuffer_.FrameNum = m_frameNum;
         ViewUniformBuffer_.InvView = glm::transpose(m_camera->GetViewMatrix());
         ViewUniformBuffer_.InvProj = glm::inverse(m_camera->GetProjMatrix());
@@ -1199,7 +1209,12 @@ namespace HWPT {
     void VulkanBackendApp::CreateModelAndSampler() {
         m_vikingRoom = new Model("../../asset/viking_room/viking_room.obj",
                                  "../../asset/viking_room/viking_room.png", true);
-        m_vikingRoom->SetModelTransform(glm::rotate(glm::identity<glm::mat4>(), glm::radians(90.f), glm::vec3(1.f, 0.f, 0.f)));
+        m_vikingRoom->SetModelTransform(
+                glm::translate(
+                        glm::rotate(glm::rotate(glm::identity<glm::mat4>(),
+                                                glm::radians(-90.f), glm::vec3(0.f, 0.f, 1.f)),
+                                    glm::radians(-90.f), glm::vec3(0.f, 1.f, 0.f)),
+                        glm::vec3(0.f, 0.f, 0.f)));
 
         m_sampler = new Sampler();
     }
@@ -1257,8 +1272,6 @@ namespace HWPT {
         } else if (Result != VK_SUCCESS) {
             throw std::runtime_error("Failed to present swap chain images");
         }
-
-        m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
     void VulkanBackendApp::OnWindowResize() {
@@ -1373,10 +1386,20 @@ namespace HWPT {
         SwapChainImages.resize(ImageCount);
         vkGetSwapchainImagesKHR(Device, SwapChainHandle, &ImageCount, SwapChainImages.data());
 
+        RHI::TextureTransitionInput SrcInput, DstInput;
+        SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        SrcInput.AccessMask = 0;
+        SrcInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
+        DstInput.Layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        DstInput.AccessMask = 0;
+        DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
+
+        auto CommandBuffer = RHI::BeginIntermediateCommandBuffer(QueueType::Graphics);
         for (uint ImageIndex = 0; ImageIndex < SwapChainImages.size(); ImageIndex++) {
-            RHI::TransitionTextureLayout(SwapChainImages[ImageIndex], 1, VK_IMAGE_LAYOUT_UNDEFINED,
-                                         VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+            RHI::TransitionTextureLayout(CommandBuffer, SwapChainImages[ImageIndex], 1,
+                                         SrcInput, DstInput);
         }
+        RHI::SubmitIntermediateCommandBuffer(CommandBuffer, QueueType::Graphics);
     }
 
     void SwapChain::CreateImageViews(VkDevice Device) {

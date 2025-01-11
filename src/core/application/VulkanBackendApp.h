@@ -228,7 +228,7 @@ namespace HWPT {
 #if !BUILD_RELEASE && !BUILD_SHIPPING
         inline static bool m_enableValidationLayers = true;
         inline static const std::vector<const char *> ValidationLayers = {
-                "VK_LAYER_KHRONOS_validation"
+                "VK_LAYER_KHRONOS_validation",
         };
 #else
         inline static bool m_enableValidationLayers = false;
@@ -236,7 +236,8 @@ namespace HWPT {
 #endif
         inline static std::vector<const char *> DeviceExtensions = {
                 VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-                VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME
+                VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
+//                VK_EXT_DEBUG_UTILS_EXTENSION_NAME
         };
 
         VkInstance m_instance = VK_NULL_HANDLE;

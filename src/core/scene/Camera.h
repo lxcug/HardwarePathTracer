@@ -30,8 +30,13 @@ namespace HWPT {
         }
 
         void UpdateViewMatrix() {
+            m_viewMatrix = glm::lookAt(m_cameraPos, m_cameraPos + GetForwardDirection(),
+                                       GetUpDirection());
+//            auto camera2world = glm::translate(glm::identity<glm::mat4>(), m_cameraPos) *
+//                                glm::toMat4(GetOrientation());
+//            m_viewMatrix = glm::inverse(camera2world);
             // NOTE: conjugate of quat
-            m_viewMat = glm::toMat4(glm::conjugate(GetOrientation())) * glm::translate(glm::mat4(1.f), -m_cameraPos);
+//            m_viewMatrix = glm::toMat4(glm::conjugate(GetOrientation())) * glm::translate(glm::mat4(1.f), -m_cameraPos);
         }
 
         // Return if camera is moving
@@ -41,24 +46,24 @@ namespace HWPT {
             return {glm::vec3(m_pitch, m_yaw, 0.f)};
         }
 
-        [[nodiscard]] auto GetForwardDirection() const {
+        [[nodiscard]] auto GetForwardDirection() const -> glm::vec3 {
             return glm::rotate(GetOrientation(), glm::vec3(0.f, 0.f, -1.f));
         }
 
-        [[nodiscard]] auto GetUpDirection() const {
+        [[nodiscard]] auto GetUpDirection() const -> glm::vec3 {
             return glm::rotate(GetOrientation(), glm::vec3(0.f, 1.f, 0.f));
         }
 
-        [[nodiscard]] auto GetRightDirection() const {
+        [[nodiscard]] auto GetRightDirection() const -> glm::vec3 {
             return glm::rotate(GetOrientation(), glm::vec3(1.f, 0.f, 0.f));
         }
 
         [[nodiscard]] auto GetViewMatrix() const -> glm::mat4 {
-            return m_viewMat;
+            return m_viewMatrix;
         }
 
         [[nodiscard]] auto GetProjMatrix() const -> glm::mat4 {
-            return m_projMat;
+            return m_projMatrix;
         }
 
         [[nodiscard]] auto GetCameraPos() const -> glm::vec3 {
@@ -77,11 +82,19 @@ namespace HWPT {
             return m_isMoving;
         }
 
+        [[nodiscard]] auto GetPitch() const -> float {
+            return m_pitch;
+        }
+
+        [[nodiscard]] auto GetYaw() const -> float {
+            return m_yaw;
+        }
+
     protected:
         CameraType m_type = CameraType::CameraTypeMax;
         glm::vec3 m_cameraPos;
-        glm::mat4 m_viewMat = glm::identity<glm::mat4>();
-        glm::mat4 m_projMat = glm::identity<glm::mat4>();;
+        glm::mat4 m_viewMatrix = glm::identity<glm::mat4>();
+        glm::mat4 m_projMatrix = glm::identity<glm::mat4>();;
         float m_aspectRatio = 1.f, m_near = 1e-2f, m_far = 1e3f;
         float m_pitch = 0.f, m_yaw = 0.f;
         float m_moveSpeedMultiplier = 1.f, m_rotateSpeedMultiplier = 1.f;
@@ -108,7 +121,9 @@ namespace HWPT {
         }
 
         void UpdateProjMatrix() {
-            m_projMat = glm::perspective(glm::radians(m_fov), m_aspectRatio, m_near, m_far);
+            // NOTE: Right Handedness + z from Zero to One
+            m_projMatrix = glm::perspectiveRH_ZO(glm::radians(m_fov), m_aspectRatio, m_near, m_far);
+            m_projMatrix[1][1] *= -1;  // NOTE: Flip Y Axis for Vulkan
         }
 
     protected:

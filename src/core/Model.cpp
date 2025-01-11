@@ -38,31 +38,35 @@ namespace HWPT {
         for (const auto &Shape: Shapes) {
             Check(!Shape.mesh.indices.empty());
             for (const auto &Index: Shape.mesh.indices) {
-                Vertex _Vertex{};
-                _Vertex.Pos = {
+                Vertex Vertex_{};
+                Vertex_.Pos = {
                         Attrib.vertices[3 * Index.vertex_index + 0],
                         Attrib.vertices[3 * Index.vertex_index + 1],
                         Attrib.vertices[3 * Index.vertex_index + 2]
                 };
-                _Vertex.Color = {1.0f, 1.0f, 1.0f};
-                _Vertex.TexCoord = {
+                Vertex_.Normal = {
+                        Attrib.normals[3 * Index.normal_index + 0],
+                        Attrib.normals[3 * Index.normal_index + 1],
+                        Attrib.normals[3 * Index.normal_index + 2]
+                };
+                Vertex_.TexCoord = {
                         Attrib.texcoords[2 * Index.texcoord_index + 0],
                         1.f - Attrib.texcoords[2 * Index.texcoord_index + 1]
                 };
 
-                if (UniqueVertices.find(_Vertex) == UniqueVertices.end()) {
-                    UniqueVertices[_Vertex] = Vertices.size();
-                    Vertices.push_back(_Vertex);
+                if (UniqueVertices.find(Vertex_) == UniqueVertices.end()) {
+                    UniqueVertices[Vertex_] = Vertices.size();
+                    Vertices.push_back(Vertex_);
                 }
 
-                Indices.push_back(UniqueVertices[_Vertex]);
+                Indices.push_back(UniqueVertices[Vertex_]);
             }
         }
 
         m_vertexBuffer = new VertexBuffer(sizeof(Vertex) * Vertices.size(), Vertices.data());
         m_vertexBuffer->SetLayout({
                                           {VertexAttributeDataType::Float3, "Pos"},
-                                          {VertexAttributeDataType::Float3, "Color"},
+                                          {VertexAttributeDataType::Float3, "Normal"},
                                           {VertexAttributeDataType::Float2, "TexCoord"}
                                   });
         m_indexBuffer = new IndexBuffer(Indices.size(), Indices.data());

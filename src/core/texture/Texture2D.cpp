@@ -54,12 +54,12 @@ namespace HWPT {
             case TextureUsage::SRV:
                 RHI::CreateTexture2D(Width, Height, m_numMips, GetVKSampleCount(m_msaaSamples),
                                      GetVKFormat(m_format),
-                                     VK_IMAGE_USAGE_SAMPLED_BIT,
+                                     VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
                                      VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
                 break;
             case TextureUsage::UAV:
                 RHI::CreateTexture2D(Width, Height, m_numMips, VK_SAMPLE_COUNT_1_BIT,
-                                     VK_FORMAT_R8G8B8A8_UNORM,
+                                     GetVKFormat(m_format),
                                      VK_IMAGE_USAGE_STORAGE_BIT,
                                      VK_IMAGE_TILING_LINEAR, m_texture, m_textureMemory);
                 break;

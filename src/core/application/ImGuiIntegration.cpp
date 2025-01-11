@@ -98,19 +98,19 @@ namespace HWPT {
     }
 
     void ImGuiInfrastructure::RecreateFrameBuffer() {
-        SwapChain _SwapChain = VulkanBackendApp::GetApplication()->GetSwapChain();
+        SwapChain SwapChain_ = VulkanBackendApp::GetApplication()->GetSwapChain();
         for (size_t Index = 0; Index < m_frameBuffers.size(); Index++) {
             vkDestroyFramebuffer(GetVKDevice(), m_frameBuffers[Index], nullptr);
 
             std::array<VkImageView, 1> Attachments = {
-                    _SwapChain.SwapChainImageViews[Index]
+                    SwapChain_.SwapChainImageViews[Index]
             };
 
             VkFramebufferCreateInfo FrameBufferCreateInfo{};
             FrameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
             FrameBufferCreateInfo.renderPass = m_renderPass;
-            FrameBufferCreateInfo.width = _SwapChain.Extent.width;
-            FrameBufferCreateInfo.height = _SwapChain.Extent.height;
+            FrameBufferCreateInfo.width = SwapChain_.Extent.width;
+            FrameBufferCreateInfo.height = SwapChain_.Extent.height;
             FrameBufferCreateInfo.layers = 1;
             FrameBufferCreateInfo.attachmentCount = Attachments.size();
             FrameBufferCreateInfo.pAttachments = Attachments.data();
@@ -191,6 +191,31 @@ namespace HWPT {
 
         vkCmdEndRenderPass(CommandBuffer);
         RHI::SubmitIntermediateCommandBuffer(CommandBuffer);
+
+        // For ImGui MultiView
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+        glfwMakeContextCurrent(App->GetWindow());
+    }
+
+    void ImGuiInfrastructure::EndImGui(VkCommandBuffer CommandBuffer) {
+        auto App = VulkanBackendApp::GetApplication();
+
+        VkRenderPassBeginInfo RenderPassInfo{};
+        RenderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        RenderPassInfo.renderPass = m_renderPass;
+        RenderPassInfo.framebuffer = m_frameBuffers[App->GetImageIndex()];
+        RenderPassInfo.renderArea.offset = {0, 0};
+        RenderPassInfo.renderArea.extent = App->GetSwapChain().Extent;
+        VkClearValue ClearValue = {{{0.0f, 0.0f, 0.0f, 1.0f}}};
+        RenderPassInfo.clearValueCount = 1;
+        RenderPassInfo.pClearValues = &ClearValue;
+        vkCmdBeginRenderPass(CommandBuffer, &RenderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+        ImGui::Render();
+        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), CommandBuffer);
+
+        vkCmdEndRenderPass(CommandBuffer);
 
         // For ImGui MultiView
         ImGui::UpdatePlatformWindows();

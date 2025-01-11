@@ -20,6 +20,7 @@ namespace HWPT {
                           VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                           VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
                           VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                           VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
                           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                           m_vertexBuffer, m_vertexBufferMemory);
@@ -28,6 +29,11 @@ namespace HWPT {
 
         vkDestroyBuffer(GetVKDevice(), StagingBuffer, nullptr);
         vkFreeMemory(GetVKDevice(), StagingBufferMemory, nullptr);
+    }
+
+    VertexBuffer::VertexBuffer(VkDeviceSize Size, const Vertex *Data)
+            : VertexBuffer(Size, static_cast<const void *>(Data)) {
+        m_vertexCount = Size / sizeof(Vertex);
     }
 
     VertexBuffer::~VertexBuffer() {
@@ -39,11 +45,6 @@ namespace HWPT {
     void VertexBuffer::Bind(VkCommandBuffer CommandBuffer) {
         VkDeviceSize Offset = 0;
         vkCmdBindVertexBuffers(CommandBuffer, 0, 1, &m_vertexBuffer, &Offset);
-    }
-
-    VertexBuffer::VertexBuffer(VkDeviceSize Size, const Vertex *Data)
-            : VertexBuffer(Size, static_cast<const void *>(Data)) {
-        m_vertexCount = Size / sizeof(Vertex);
     }
 
     void VertexBuffer::SetLayout(const std::initializer_list<VertexAttribute> &Attributes) {
@@ -72,7 +73,7 @@ namespace HWPT {
         AttributeDescriptions[1].binding = 0;
         AttributeDescriptions[1].location = 1;
         AttributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-        AttributeDescriptions[1].offset = offsetof(Vertex, Color);
+        AttributeDescriptions[1].offset = offsetof(Vertex, Normal);
 
         AttributeDescriptions[2].binding = 0;
         AttributeDescriptions[2].location = 2;
