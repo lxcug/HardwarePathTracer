@@ -18,7 +18,7 @@ float3 uniform_sample_hemisphere(float3 normal, float rnd1, float rnd2) {
     return dir.x * tangent + dir.y * bitangent + dir.z * normal;
 }
 
-#define AO_RAYS 4
+#define NUM_AO_RAYS 4
 
 
 [shader("raygeneration")]
@@ -26,16 +26,15 @@ void main()
 {
     uint2 index = DispatchRaysIndex().xy;
     uint2 dim = DispatchRaysDimensions().xy;
-    float aspect_ratio = float(dim.x) / float(dim.y);
 
-    float2 uv = (index + .5) / dim;
-    // TODO: Bind View Uniform Buffer
+    uint seed = tea(index.y * dim.x + index.y, FrameNum);
+    float2 jitter = float2(rnd(seed), rnd(seed));
+    float2 uv = (index + .5 + jitter * .5f) / dim;
     float3 origin = CameraPos;
     float2 screen_coord = uv * 2.f - 1.f;
 
     // z could be any value in [0, 1]
-    float4 target_view_space = mul(InvProj, float4(screen_coord, 0.f, 1.f));
-    target_view_space /= target_view_space.w;
+    float4 target_view_space = mul(InvProj, float4(screen_coord, 1.f, 1.f));
 
     float3 dir = mul(InvView, float4(normalize(target_view_space.xyz), 0.f)).xyz;
 
@@ -49,39 +48,37 @@ void main()
     uint flags = RAY_FLAG_FORCE_OPAQUE;
     TraceRay(TLAS, flags, 0xff, 0, 0, 0, ray, payload);
 
-    // Short Range RTAO
-    float ao = 1.f;
+    // Short Range RTAO TODO: use RayQuery
+    float ao = 0.f;
     if (payload.is_hit) {
-        float rnds[AO_RAYS * 2];
-        for (int i = 0; i < 10; i++) {
-            rnds[i] = Random(payload.pos + float3(i, FrameNum, FrameNum) + float3(DispatchRaysIndex().xy, FrameNum));
-        }
-
+        float3 hit_pos = payload.pos;
+        float3 hit_normal = payload.normal;
         uint hit_count = 0;
-        for (int i = 0; i < AO_RAYS; i++) {
-            RayDesc ray;
-            ray.Origin = payload.pos ;
-            ray.Direction = uniform_sample_hemisphere(payload.normal, rnds[2 * i], rnds[2 * i + 1]);
-            ray.TMin = 1e-4;
-            ray.TMax = 1.f;
+        for (int i = 0; i < NUM_AO_RAYS; i++) {
+            RayDesc ao_ray;
+            RayPayload ao_payload;
+            ao_ray.Origin = hit_pos;
+            ao_ray.Direction = uniform_sample_hemisphere(hit_normal, rnd(seed), rnd(seed));
+            ao_ray.TMin = 1e-4;
+            ao_ray.TMax = 1.f;
 
-            RayPayload payload;
-            uint flags = RAY_FLAG_FORCE_OPAQUE;
-            TraceRay(TLAS, flags, 0xff, 0, 0, 0, ray, payload);
-            if (payload.is_hit) {
+            TraceRay(TLAS, flags, 0xff, 0, 0, 0, ao_ray, ao_payload);
+            if (ao_payload.is_hit) {
                hit_count++;
             }
         }
-        ao = 1.f - hit_count / AO_RAYS;
-    } else {
-        ao = 0.f;
+        ao = 1.f - (float)hit_count / NUM_AO_RAYS;
     }
 
     if (FrameNum == 0 || ShouldReAccumulate) {
-        OutImage[index] = float4(ao, ao, ao, 1.0);
+        OutImage[index] = float4(ao * payload.color, 1.0);
     } else {
-        float last_ao = InImage[index].r;
-        float new_ao = lerp(last_ao, ao, 1.f / FrameNum);
-        OutImage[index] = float4(new_ao, new_ao, new_ao, 1.0);
+        float3 old_color = InImage[index].rgb;
+        float3 new_color = lerp(old_color, ao * payload.color, 1.f / FrameNum);
+        OutImage[index] = float4(new_color, 1.0);
     }
+
+//     payload.normal.x = payload.normal.z = 0.f;
+//     payload.pos.z = payload.pos.y = 0.f;
+//     OutImage[index] = float4(payload.normal, 1.f);
 }

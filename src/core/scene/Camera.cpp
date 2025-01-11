@@ -11,6 +11,11 @@ namespace HWPT {
     void CameraBase::Tick(float DeltaTime) {
         m_isMoving = false;
         float MoveSpeed = s_moveSpeed * m_moveSpeedMultiplier * DeltaTime;
+        float RotateSpeed = s_rotateSpeed * m_rotateSpeedMultiplier * DeltaTime;
+        if (Input::IsKeyPressed(KeyCode::LeftControl) || Input::IsKeyPressed(KeyCode::RightControl)) {
+            MoveSpeed *= .2f;
+            RotateSpeed *= .2f;
+        }
         if (Input::IsKeyPressed(KeyCode::W)) {
             m_cameraPos += MoveSpeed * GetForwardDirection();
             m_isMoving = true;
@@ -28,16 +33,15 @@ namespace HWPT {
             m_isMoving = true;
         }
         if (Input::IsKeyPressed(KeyCode::Q)) {
-            m_cameraPos += MoveSpeed * GetUpDirection();
+            m_cameraPos -= MoveSpeed * GetUpDirection();
             m_isMoving = true;
         }
         if (Input::IsKeyPressed(KeyCode::E)) {
-            m_cameraPos -= MoveSpeed * GetUpDirection();
+            m_cameraPos += MoveSpeed * GetUpDirection();
             m_isMoving = true;
         }
 
         if (Input::IsMouseButtonPressed(MouseCode::ButtonLeft)) {
-            float RotateSpeed = s_rotateSpeed * m_rotateSpeedMultiplier * DeltaTime;
             if (m_isFirstTouch) {
                 m_lastMousePos = Input::GetMousePosition();
                 m_isFirstTouch = false;
@@ -45,7 +49,7 @@ namespace HWPT {
                 glm::vec2 CurrentPos = Input::GetMousePosition();
                 glm::vec2 Offset = CurrentPos - m_lastMousePos;
                 float yawSign = GetUpDirection().y > 0.f ? 1.f : -1.f;
-                m_pitch += Offset.y * RotateSpeed;
+                m_pitch -= Offset.y * RotateSpeed;
                 m_yaw -= yawSign * Offset.x * RotateSpeed;
                 m_lastMousePos = CurrentPos;
                 m_isMoving = true;

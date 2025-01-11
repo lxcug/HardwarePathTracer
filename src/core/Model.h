@@ -42,6 +42,10 @@ namespace HWPT {
             return m_vertexBuffer;
         }
 
+        auto GetIndexBuffer() -> IndexBuffer * {
+            return m_indexBuffer;
+        }
+
         auto GetVertexBufferLayout() -> VertexBufferLayout * {
             return m_vertexBuffer->GetLayout();
         }

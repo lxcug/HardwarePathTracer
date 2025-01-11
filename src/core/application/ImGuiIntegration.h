@@ -17,7 +17,6 @@ namespace HWPT {
     public:
         ImGuiInfrastructure(uint NumFrames);  // NOLINT
 
-        // TODO
         void RecreateFrameBuffer();
 
         ~ImGuiInfrastructure();
@@ -31,6 +30,8 @@ namespace HWPT {
         void BeginImGui();
 
         void EndImGui();
+
+        void EndImGui(VkCommandBuffer CommandBuffer);
 
         static void Begin(const char* name, bool* p_open = nullptr, ImGuiWindowFlags flags = 0) {
             ImGui::SetNextWindowBgAlpha(m_imguiUIAlpha);

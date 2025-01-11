@@ -61,7 +61,6 @@ namespace HWPT {
     }
 
     auto CommandPool::BeginCommandBuffer(QueueType QueueType_) -> VkCommandBuffer {
-
         VkCommandBufferAllocateInfo AllocateInfo{};
         AllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
         AllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;

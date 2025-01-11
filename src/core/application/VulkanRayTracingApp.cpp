@@ -47,6 +47,7 @@ namespace HWPT {
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             delete m_MVPUniformBuffers[i];
         }
+        delete m_lastFrameSceneColor;
         delete m_accelBuilder;
         delete m_RTSBTBuffer;
         delete m_msaaBuffers;
@@ -77,32 +78,6 @@ namespace HWPT {
     }
 
     void VulkanRayTracingApp::DrawFrame() {
-        if (m_frameBufferResized) {
-            OnWindowResize();
-            m_frameBufferResized = false;
-        }
-
-        // Wait for last frame render finish
-        vkWaitForFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame], VK_TRUE,
-                        UINT64_MAX);
-        vkResetFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame]);
-
-        // Wait for image available
-        VkResult Result = vkAcquireNextImageKHR(m_device, m_swapChain.SwapChainHandle, UINT64_MAX,
-                                                m_imageAvailableSemaphores[m_currentFrame],
-                                                VK_NULL_HANDLE, &m_imageIndex);
-        if (Result == VK_ERROR_OUT_OF_DATE_KHR || Result == VK_SUBOPTIMAL_KHR) {
-            OnWindowResize();
-        } else if (Result != VK_SUCCESS) {
-            throw std::runtime_error("Failed to acquire swap chain images");
-        }
-
-        auto CommandBuffer = m_commandPool->BeginCommandBuffer(QueueType::Graphics);
-        vkResetCommandBuffer(CommandBuffer, 0);
-
-        VkCommandBufferBeginInfo BeginInfo{};
-        BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
         // Update ViewUniformBuffer
         ViewUniformBuffer ViewUniformBuffer_{};
         ViewUniformBuffer_.ModelTrans = m_vikingRoom->GetModelTransform();
@@ -118,37 +93,42 @@ namespace HWPT {
         ViewUniformBuffer_.ShouldReAccumulate = m_camera->IsMoving();
         m_MVPUniformBuffers[m_imageIndex]->Update(&ViewUniformBuffer_);
 
+        // Wait for last frame render finish
+        vkWaitForFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame], VK_TRUE,
+                        UINT64_MAX);
+        vkResetFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame]);
+
+        if (m_frameBufferResized) {
+            OnWindowResize();
+            m_frameBufferResized = false;
+        }
+        // Wait for image available
+        VkResult Result = vkAcquireNextImageKHR(m_device, m_swapChain.SwapChainHandle, UINT64_MAX,
+                                                m_imageAvailableSemaphores[m_currentFrame],
+                                                VK_NULL_HANDLE, &m_imageIndex);
+        if (Result == VK_ERROR_OUT_OF_DATE_KHR || Result == VK_SUBOPTIMAL_KHR) {
+            OnWindowResize();
+        } else if (Result != VK_SUCCESS) {
+            throw std::runtime_error("Failed to acquire swap chain images");
+        }
+
+        auto CommandBuffer = m_graphicsCommandBuffers[m_currentFrame];
+        auto CurrentFrameSceneColor = m_swapChain.SwapChainImages[m_imageIndex];
+        vkResetCommandBuffer(CommandBuffer, 0);
+        VkCommandBufferBeginInfo BeginInfo{};
+        BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         VK_CHECK(vkBeginCommandBuffer(CommandBuffer, &BeginInfo));
 
-        VkClearColorValue ClearColor = {{0.f, 0.f, 0.f, 1.0f}};
-
-        VkImageSubresourceRange SubresourceRange{};
-        SubresourceRange.baseMipLevel = 0;
-        SubresourceRange.levelCount = 1;
-        SubresourceRange.baseArrayLayer = 0;
-        SubresourceRange.layerCount = 1;
-        SubresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-
-        RHI::TextureTransitionInput SrcInput, DstInput;
+        // Transition Current ColorAttach to VK_IMAGE_LAYOUT_GENERAL for RayTracing
+        RHI::TextureTransitionInput SrcInput{}, DstInput{};
         SrcInput.Layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
         SrcInput.AccessMask = 0;
         SrcInput.PipelineStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
         DstInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
-        DstInput.AccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        DstInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        RHI::TransitionTextureLayout(CommandBuffer,
-                                     m_swapChain.SwapChainImages[m_imageIndex], 1,
-                                     SrcInput, DstInput);
-
+        DstInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        DstInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+        RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameSceneColor, 1, SrcInput, DstInput);
         int LastFrameIndex = m_currentFrame == 0 ? MAX_FRAMES_IN_FLIGHT - 1 : m_currentFrame - 1;
-        RHI::TransitionTextureLayout(CommandBuffer,
-                                     m_swapChain.SwapChainImages[LastFrameIndex], 1,
-                                     SrcInput, DstInput);
-
-
-        vkCmdClearColorImage(CommandBuffer, m_swapChain.SwapChainImages[m_imageIndex],
-                             VK_IMAGE_LAYOUT_GENERAL, &ClearColor, 1,
-                             &SubresourceRange);
 
         // TODO: Add RayTracing Code Here
         vkCmdBindPipeline(CommandBuffer,
@@ -167,20 +147,71 @@ namespace HWPT {
                      &m_rayGenRegion, &m_missRegion, &m_hitRegion, &m_callRegion,
                      Extent.width, Extent.height, 1);
 
+        /*
+         * Transition Current ColorAttach to VK_IMAGE_LAYOUT_VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+         * Transition m_lastFrameSceneColor to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL for CopyImage
+         */
         SrcInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
-        SrcInput.AccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        SrcInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        SrcInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+        DstInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        DstInput.AccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        DstInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameSceneColor, 1, SrcInput, DstInput);
+        SrcInput.Layout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+        SrcInput.AccessMask = 0;
+        SrcInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
+        DstInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        DstInput.AccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        DstInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        RHI::TransitionTextureLayout(CommandBuffer, m_lastFrameSceneColor->GetHandle(), 1, SrcInput,
+                                     DstInput);
+        VkImageCopy ImageCopy{};
+        ImageCopy.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        ImageCopy.srcSubresource.baseArrayLayer = 0;
+        ImageCopy.srcSubresource.layerCount = 1;
+        ImageCopy.srcSubresource.mipLevel = 0;
+        ImageCopy.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        ImageCopy.dstSubresource.baseArrayLayer = 0;
+        ImageCopy.dstSubresource.layerCount = 1;
+        ImageCopy.dstSubresource.mipLevel = 0;
+        VkOffset3D Offset{0, 0, 0};
+        ImageCopy.srcOffset = Offset;
+        ImageCopy.dstOffset = Offset;
+        VkExtent3D Extent3D{m_windowWidth, m_windowHeight, 1};
+        ImageCopy.extent = Extent3D;
+        vkCmdCopyImage(
+                CommandBuffer,
+                m_swapChain.SwapChainImages[m_imageIndex], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                m_lastFrameSceneColor->GetHandle(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                1, &ImageCopy
+        );
+
+        /*
+         * Transition Current ColorAttach to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR for ColorAttach and Present
+         * Transition m_lastFrameSceneColor to VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL
+         */
+        SrcInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        SrcInput.AccessMask = VK_ACCESS_TRANSFER_READ_BIT;
         SrcInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
         DstInput.Layout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-        DstInput.AccessMask = 0;
-        DstInput.PipelineStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-        RHI::TransitionTextureLayout(CommandBuffer,
-                                     m_swapChain.SwapChainImages[m_imageIndex], 1,
-                                     SrcInput, DstInput);
-        RHI::TransitionTextureLayout(CommandBuffer,
-                                     m_swapChain.SwapChainImages[LastFrameIndex], 1,
-                                     SrcInput, DstInput);
+        DstInput.AccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        DstInput.PipelineStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameSceneColor, 1, SrcInput, DstInput);
+        SrcInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        SrcInput.AccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        SrcInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        DstInput.Layout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+        DstInput.AccessMask = VK_ACCESS_SHADER_READ_BIT;
+        DstInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+        RHI::TransitionTextureLayout(CommandBuffer, m_lastFrameSceneColor->GetHandle(), 1, SrcInput,
+                                     DstInput);
 
-        VK_CHECK(vkEndCommandBuffer(CommandBuffer));
+        m_imguiInfrastructure->BeginImGui();
+        DrawImGuiFrame();
+        m_imguiInfrastructure->EndImGui(CommandBuffer);
+
+        vkEndCommandBuffer(CommandBuffer);
 
         // Submit Commands
         VkSubmitInfo SubmitInfo{};
@@ -188,7 +219,7 @@ namespace HWPT {
         std::array<VkSemaphore, 1> WaitSemaphores = {
                 m_imageAvailableSemaphores[m_currentFrame]
         };
-        std::array<VkPipelineStageFlags, 2> WaitStages = {
+        std::array<VkPipelineStageFlags, 1> WaitStages = {
                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
         };
         SubmitInfo.pWaitDstStageMask = WaitStages.data();
@@ -199,7 +230,7 @@ namespace HWPT {
         SubmitInfo.pCommandBuffers = &CommandBuffer;
         SubmitInfo.signalSemaphoreCount = 1;
         SubmitInfo.pSignalSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
-        VK_CHECK(vkQueueSubmit(m_queue.GraphicsQueue, 1, &SubmitInfo,
+        VK_CHECK(vkQueueSubmit(m_commandPool->GetGraphicsQueue(), 1, &SubmitInfo,
                                m_graphicsInFlightFences[m_currentFrame]));
     }
 
@@ -225,6 +256,20 @@ namespace HWPT {
     }
 
     void VulkanRayTracingApp::InitRayTracing() {
+        m_lastFrameSceneColor = new Texture2D(m_windowWidth, m_windowHeight, TextureFormat::RGBA,
+                                              TextureUsage::SRV, 1, false);
+        RHI::TextureTransitionInput SrcInput, DstInput;
+        SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        SrcInput.AccessMask = 0;
+        SrcInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
+        DstInput.Layout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+        DstInput.AccessMask = 0;
+        DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
+        auto CommandBuffer = RHI::BeginIntermediateCommandBuffer(QueueType::Graphics);
+        RHI::TransitionTextureLayout(CommandBuffer, m_lastFrameSceneColor->GetHandle(), 1,
+                                     SrcInput, DstInput);
+        RHI::SubmitIntermediateCommandBuffer(CommandBuffer, QueueType::Graphics);
+
         // Requesting ray tracing properties
         VkPhysicalDeviceProperties2 Props2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
         Props2.pNext = &m_RTProps;
@@ -242,6 +287,7 @@ namespace HWPT {
     void VulkanRayTracingApp::DrawImGuiFrame() {
         ImGuiInfrastructure::Begin("Settings");
         ImGui::Text("FPS: %d", m_fpsCalculator->GetFPS());
+        ImGui::Text("Accumulated Frames %d", m_frameNum);
         static bool BorderlessWindow = false;
         if (ImGui::Checkbox("Borderless Window", &BorderlessWindow)) {
             glfwSetWindowAttrib(m_window, GLFW_DECORATED, !BorderlessWindow);
@@ -262,7 +308,11 @@ namespace HWPT {
                 glfwSetWindowSize(m_window, WindowWidth, WindowHeight);
             }
         }
+        ImGuiInfrastructure::End();
 
+        ImGuiInfrastructure::Begin("Camera Info");
+        auto CameraPos = m_camera->GetCameraPos();
+        ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", CameraPos.x, CameraPos.y, CameraPos.z);
         ImGuiInfrastructure::End();
     }
 
@@ -271,8 +321,7 @@ namespace HWPT {
         ViewUniformBufferBinding.binding = 0;
         ViewUniformBufferBinding.descriptorCount = 1;
         ViewUniformBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        ViewUniformBufferBinding.stageFlags =
-                VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+        ViewUniformBufferBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
         VkDescriptorSetLayoutBinding TLASBinding{};
         TLASBinding.binding = 1;
@@ -293,8 +342,27 @@ namespace HWPT {
         InImageBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
         InImageBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
-        std::array<VkDescriptorSetLayoutBinding, 4> Bindings = {
-                ViewUniformBufferBinding, TLASBinding, OutImageBinding, InImageBinding
+        VkDescriptorSetLayoutBinding VertexBufferBinding{};
+        VertexBufferBinding.binding = 4;
+        VertexBufferBinding.descriptorCount = 1;
+        VertexBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        VertexBufferBinding.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+
+        VkDescriptorSetLayoutBinding IndexBufferBinding{};
+        IndexBufferBinding.binding = 5;
+        IndexBufferBinding.descriptorCount = 1;
+        IndexBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        IndexBufferBinding.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+
+        VkDescriptorSetLayoutBinding ModelInfoBinding{};
+        ModelInfoBinding.binding = 6;
+        ModelInfoBinding.descriptorCount = 1;
+        ModelInfoBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        ModelInfoBinding.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+
+        std::array<VkDescriptorSetLayoutBinding, 7> Bindings = {
+                ViewUniformBufferBinding, TLASBinding, OutImageBinding, InImageBinding,
+                VertexBufferBinding, IndexBufferBinding, ModelInfoBinding
         };
 
         VkDescriptorSetLayoutCreateInfo CreateInfo{};
@@ -318,7 +386,16 @@ namespace HWPT {
     }
 
     void VulkanRayTracingApp::BindRTDescriptorSets() {
-        std::array<VkWriteDescriptorSet, 4> DescriptorWrites{};
+        std::array<VkWriteDescriptorSet, 7> DescriptorWrites{};
+        ModelDesc Desc{};
+        Desc.VertexBufferAddress = RHI::GetBufferDeviceAddress(
+                m_vikingRoom->GetVertexBuffer()->GetHandle());
+        Desc.IndexBufferAddress = RHI::GetBufferDeviceAddress(
+                m_vikingRoom->GetIndexBuffer()->GetHandle());
+        auto *ModelDescBuffer = new ArbitraryBuffer(sizeof(ModelDesc), &Desc,
+                                                    VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                                                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                                                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkDescriptorBufferInfo BufferInfo{};
             BufferInfo.buffer = m_MVPUniformBuffers[i]->GetHandle();
@@ -357,9 +434,9 @@ namespace HWPT {
             DescriptorWrites[2].pImageInfo = &OutImageInfo;
 
             VkDescriptorImageInfo InImageInfo{};
-            InImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            InImageInfo.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
             int LastFrameIndex = i == 0 ? MAX_FRAMES_IN_FLIGHT - 1 : i - 1;
-            InImageInfo.imageView = m_swapChain.SwapChainImageViews[LastFrameIndex];
+            InImageInfo.imageView = m_lastFrameSceneColor->CreateSRV();
             DescriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             DescriptorWrites[3].dstSet = m_RTDescriptorSets[i];
             DescriptorWrites[3].dstBinding = 3;
@@ -367,6 +444,42 @@ namespace HWPT {
             DescriptorWrites[3].descriptorCount = 1;
             DescriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
             DescriptorWrites[3].pImageInfo = &InImageInfo;
+
+            VkDescriptorBufferInfo VertexBufferInfo{};
+            VertexBufferInfo.buffer = m_vikingRoom->GetVertexBuffer()->GetHandle();
+            VertexBufferInfo.offset = 0;
+            VertexBufferInfo.range = VK_WHOLE_SIZE;
+            DescriptorWrites[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            DescriptorWrites[4].dstSet = m_RTDescriptorSets[i];
+            DescriptorWrites[4].dstBinding = 4;
+            DescriptorWrites[4].dstArrayElement = 0;
+            DescriptorWrites[4].descriptorCount = 1;
+            DescriptorWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            DescriptorWrites[4].pBufferInfo = &VertexBufferInfo;
+
+            VkDescriptorBufferInfo IndexBufferInfo{};
+            IndexBufferInfo.buffer = m_vikingRoom->GetIndexBuffer()->GetHandle();
+            IndexBufferInfo.offset = 0;
+            IndexBufferInfo.range = VK_WHOLE_SIZE;
+            DescriptorWrites[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            DescriptorWrites[5].dstSet = m_RTDescriptorSets[i];
+            DescriptorWrites[5].dstBinding = 5;
+            DescriptorWrites[5].dstArrayElement = 0;
+            DescriptorWrites[5].descriptorCount = 1;
+            DescriptorWrites[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            DescriptorWrites[5].pBufferInfo = &IndexBufferInfo;
+
+            VkDescriptorBufferInfo ModelDescBufferInfo{};
+            ModelDescBufferInfo.buffer = ModelDescBuffer->GetHandle();
+            ModelDescBufferInfo.offset = 0;
+            ModelDescBufferInfo.range = VK_WHOLE_SIZE;
+            DescriptorWrites[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            DescriptorWrites[6].dstSet = m_RTDescriptorSets[i];
+            DescriptorWrites[6].dstBinding = 6;
+            DescriptorWrites[6].dstArrayElement = 0;
+            DescriptorWrites[6].descriptorCount = 1;
+            DescriptorWrites[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            DescriptorWrites[6].pBufferInfo = &ModelDescBufferInfo;
 
             vkUpdateDescriptorSets(m_device, DescriptorWrites.size(), DescriptorWrites.data(), 0,
                                    nullptr);
@@ -529,7 +642,22 @@ namespace HWPT {
 
     void VulkanRayTracingApp::OnWindowResize() {
         VulkanBackendApp::OnWindowResize();
+        delete m_lastFrameSceneColor;
+        m_lastFrameSceneColor = new Texture2D(m_windowWidth, m_windowHeight, TextureFormat::RGBA,
+                                              TextureUsage::SRV, 1, false);
+        RHI::TextureTransitionInput SrcInput, DstInput;
+        SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        SrcInput.AccessMask = 0;
+        SrcInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
+        DstInput.Layout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+        DstInput.AccessMask = 0;
+        DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
+        auto CommandBuffer = RHI::BeginIntermediateCommandBuffer(QueueType::Graphics);
+        RHI::TransitionTextureLayout(CommandBuffer, m_lastFrameSceneColor->GetHandle(), 1,
+                                     SrcInput, DstInput);
+        RHI::SubmitIntermediateCommandBuffer(CommandBuffer, QueueType::Graphics);
         BindRTDescriptorSets();
+        m_frameNum = 0;
     }
 
 
