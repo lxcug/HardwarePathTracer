@@ -20,58 +20,70 @@
 #endif
 
 
-namespace HWPT {
+namespace HWPT
+{
     // Collect from Mesh as BLASBuildInput
-    struct BLASBuildInput {
+    struct BLASBuildInput
+    {
         std::vector<VkAccelerationStructureGeometryKHR> ASGeometries;
         std::vector<VkAccelerationStructureBuildRangeInfoKHR> ASBuildRangeInfos;
         VkBuildAccelerationStructureFlagsKHR Flags{0};
     };
 
     // The Data Needed to Build TLAS and BLAS
-    struct ASBuildData {
+    struct ASBuildData
+    {
         std::vector<VkAccelerationStructureGeometryKHR> ASGeometries;
         std::vector<VkAccelerationStructureBuildRangeInfoKHR> ASBuildRangeInfos;
 
         VkAccelerationStructureTypeKHR ASType = VK_ACCELERATION_STRUCTURE_TYPE_MAX_ENUM_KHR;
         VkAccelerationStructureBuildGeometryInfoKHR BuildInfo{
-                VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR};
+            VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR
+        };
         VkAccelerationStructureBuildSizesInfoKHR SizeInfo{
-                VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR};
+            VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR
+        };
 
         auto FinalizeGeometry(
-                VkBuildAccelerationStructureFlagsKHR BuildFlags) -> VkAccelerationStructureBuildSizesInfoKHR &;
+            VkBuildAccelerationStructureFlagsKHR BuildFlags) ->
+            VkAccelerationStructureBuildSizesInfoKHR&;
 
-        auto
+        [[nodiscard]] auto
         MakeInstanceGeometry(uint InstanceCount, VkDeviceAddress InstanceBufferAddress) const ->
-        std::tuple<VkAccelerationStructureGeometryKHR, VkAccelerationStructureBuildRangeInfoKHR>;
+            std::tuple<VkAccelerationStructureGeometryKHR,
+                       VkAccelerationStructureBuildRangeInfoKHR>;
 
-        void AddGeometry(const VkAccelerationStructureGeometryKHR &Geometry,
-                         const VkAccelerationStructureBuildRangeInfoKHR &BuildRange);
+        void AddGeometry(const VkAccelerationStructureGeometryKHR& Geometry,
+                         const VkAccelerationStructureBuildRangeInfoKHR& BuildRange);
     };
 
-    struct Accel {
+    struct Accel
+    {
         VkAccelerationStructureKHR AccelHandle = VK_NULL_HANDLE;
-        ArbitraryBuffer *Buffer = nullptr;
+        ArbitraryBuffer* Buffer = nullptr;
         VkDeviceAddress Address = 0;
 
-        ~Accel() {
+        ~Accel()
+        {
             delete Buffer;
 
             auto Func = reinterpret_cast<PFN_vkDestroyAccelerationStructureKHR>(vkGetDeviceProcAddr(
-                    GetVKDevice(), "vkDestroyAccelerationStructureKHR"));
+                GetVKDevice(), "vkDestroyAccelerationStructureKHR"));
             Func(GetVKDevice(), AccelHandle, nullptr);
         }
     };
 
-    struct ScratchSizeInfo {
+    struct ScratchSizeInfo
+    {
         VkDeviceSize MaxScratchSize = 0;
         VkDeviceSize TotalScratchSize = 0;
     };
 
-    class ASBuilder {
+    class ASBuilder
+    {
     public:
-        ASBuilder() {
+        ASBuilder()
+        {
             this->Init();
         }
 
@@ -79,62 +91,66 @@ namespace HWPT {
 
         void Init();
 
-        void BuildBLAS(std::vector<BLASBuildInput> &BuildInput,
-                       VkBuildAccelerationStructureFlagsKHR BuildFlags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+        void BuildBLAS(std::vector<BLASBuildInput>& BuildInput,
+                       VkBuildAccelerationStructureFlagsKHR BuildFlags =
+                           VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 
         // TODO
         void UpdateBLAS(uint BLASIndex,
-                        BLASBuildInput &BuildInput,
+                        BLASBuildInput& BuildInput,
                         VkBuildAccelerationStructureFlagsKHR BuildFlags);
 
-        void BuildTLAS(std::vector<VkAccelerationStructureInstanceKHR> &Instances,
-                       VkBuildAccelerationStructureFlagsKHR BuildFlags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
+        void BuildTLAS(std::vector<VkAccelerationStructureInstanceKHR>& Instances,
+                       VkBuildAccelerationStructureFlagsKHR BuildFlags =
+                           VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
                        bool Update = false);
 
-        [[nodiscard]] auto GetTLAS() const -> VkAccelerationStructureKHR {
+        [[nodiscard]] auto GetTLAS() const -> VkAccelerationStructureKHR
+        {
             return m_TLAS.AccelHandle;
         }
 
         [[nodiscard]] auto GetBLASDeviceAddress(uint BLASIndex) const -> VkDeviceAddress;
 
     protected:
-        static auto ComputeScratchAlignedSize(const std::vector<ASBuildData> &BuildData,
+        static auto ComputeScratchAlignedSize(const std::vector<ASBuildData>& BuildData,
                                               uint Alignment) -> ScratchSizeInfo;
 
         [[nodiscard]] static auto
         GetScratchSize(VkDeviceSize MemBudget,
-                       const std::vector<ASBuildData> &BuildData,
+                       const std::vector<ASBuildData>& BuildData,
                        uint Alignment = 128) -> VkDeviceSize;
 
         static void GetScratchAddress(VkDeviceSize MemBudget,
-                                      std::vector<ASBuildData> &BuildData,
+                                      std::vector<ASBuildData>& BuildData,
                                       VkDeviceAddress ScratchBufferAddress,
-                                      std::vector<VkDeviceAddress> &ScratchAddresses,
+                                      std::vector<VkDeviceAddress>& ScratchAddresses,
                                       uint Alignment);
 
         static auto ParallelCreateBLAS(VkCommandBuffer CommandBuffer,
-                                       std::vector<ASBuildData> &BuildData,
-                                       std::vector<Accel> &BLAS,
-                                       const std::vector<VkDeviceAddress> &ScratchAddresses,
+                                       std::vector<ASBuildData>& BuildData,
+                                       std::vector<Accel>& BLAS,
+                                       const std::vector<VkDeviceAddress>& ScratchAddresses,
                                        VkDeviceSize MemBudget) -> bool;
 
         static auto BuildAccelerationStructures(VkCommandBuffer CommandBuffer,
-                                                std::vector<ASBuildData> &BuildData,
-                                                std::vector<Accel> &BLAS,
-                                                const std::vector<VkDeviceAddress> &ScratchAddresses,
+                                                std::vector<ASBuildData>& BuildData,
+                                                std::vector<Accel>& BLAS,
+                                                const std::vector<VkDeviceAddress>&
+                                                ScratchAddresses,
                                                 VkDeviceSize MemBudget,
                                                 VkDeviceSize CurrentBudget) -> VkDeviceSize;
 
     protected:
         std::vector<Accel> m_BLAS;
         Accel m_TLAS;
-        CommandPool *m_commandPool = nullptr;
+        CommandPool* m_commandPool = nullptr;
         static inline uint s_currentBLASIndex = 0;
 
 #if PROFILE_AS_BUILD
         static inline VkQueryPool m_queryPool = VK_NULL_HANDLE;
 #endif
     };
-}  // namespace HWPT
+} // namespace HWPT
 
 #endif //HARDWAREPATHTRACER_ACCELERATIONSTRUCTURE_H

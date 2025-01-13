@@ -9,7 +9,7 @@ namespace HWPT {
     auto GetTextureFormat(int Channels) -> TextureFormat {
         switch (Channels) {
             case 3:
-                return TextureFormat::RGB;
+//                return TextureFormat::RGB;
             case 4:
                 return TextureFormat::RGBA;
             default:
@@ -21,7 +21,6 @@ namespace HWPT {
     auto GetVKFormat(TextureFormat Format) -> VkFormat {
         switch (Format) {
             case TextureFormat::RGB:
-                [[fallthrough]];
             case TextureFormat::RGBA:
                 return VK_FORMAT_R8G8B8A8_UNORM;  // SRGB or UNORM
             case TextureFormat::Depth32:

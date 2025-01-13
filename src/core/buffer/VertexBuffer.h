@@ -22,6 +22,7 @@ namespace HWPT {
     struct Vertex {
         glm::vec3 Pos;
         glm::vec3 Normal;
+        glm::vec3 Color;
         glm::vec2 TexCoord;
 
         Vertex() = default;
@@ -32,7 +33,7 @@ namespace HWPT {
 
         static auto GetBindingDescription() -> VkVertexInputBindingDescription;
 
-        static auto GetAttributeDescriptions() -> std::array<VkVertexInputAttributeDescription, 3>;
+        static auto GetAttributeDescriptions() -> std::array<VkVertexInputAttributeDescription, 4>;
     };
 
     class VertexBuffer {

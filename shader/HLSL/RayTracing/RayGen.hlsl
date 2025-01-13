@@ -32,10 +32,7 @@ void main()
     float2 uv = (index + .5 + jitter * .5f) / dim;
     float3 origin = CameraPos;
     float2 screen_coord = uv * 2.f - 1.f;
-
-    // z could be any value in [0, 1]
     float4 target_view_space = mul(InvProj, float4(screen_coord, 1.f, 1.f));
-
     float3 dir = mul(InvView, float4(normalize(target_view_space.xyz), 0.f)).xyz;
 
     RayDesc ray;
@@ -48,7 +45,7 @@ void main()
     uint flags = RAY_FLAG_FORCE_OPAQUE;
     TraceRay(TLAS, flags, 0xff, 0, 0, 0, ray, payload);
 
-    // Short Range RTAO TODO: use RayQuery
+    // Short Range RTAO
     float ao = 0.f;
     if (payload.is_hit) {
         float3 hit_pos = payload.pos;
@@ -70,15 +67,17 @@ void main()
         ao = 1.f - (float)hit_count / NUM_AO_RAYS;
     }
 
-    if (FrameNum == 0 || ShouldReAccumulate) {
-        OutImage[index] = float4(ao * payload.color, 1.0);
-    } else {
-        float3 old_color = InImage[index].rgb;
-        float3 new_color = lerp(old_color, ao * payload.color, 1.f / FrameNum);
-        OutImage[index] = float4(new_color, 1.0);
-    }
+    if (payload.is_hit) {
+        if (FrameNum == 0 || ShouldReAccumulate) {
+            OutImage[index] = float4(ao * payload.albedo, 1.0);
+        } else {
+            float3 old_color = InImage[index].rgb;
+            float3 new_color = lerp(old_color, ao * payload.albedo, 1.f / FrameNum);
+            OutImage[index] = float4(new_color, 1.0);
+        }
 
-//     payload.normal.x = payload.normal.z = 0.f;
-//     payload.pos.z = payload.pos.y = 0.f;
-//     OutImage[index] = float4(payload.normal, 1.f);
+        // OutImage[index] = float4(payload.albedo, 1.f);
+    } else {
+        OutImage[index] = float4(0.f, 0.f, 0.f, 0.f);
+    }
 }

@@ -8,17 +8,13 @@
 #include "VulkanBackendApp.h"
 #include "core/buffer/ArbitraryBuffer.h"
 #include "core/acceleration_structure/AccelerationStructure.h"
+#include "core/scene/Scene.h"
 
 
-namespace HWPT {
-
-    struct ModelDesc {
-        VkDeviceAddress VertexBufferAddress;
-        VkDeviceAddress IndexBufferAddress;
-        // TODO: Material
-    };
-
-    class VulkanRayTracingApp : public VulkanBackendApp {
+namespace HWPT
+{
+    class VulkanRayTracingApp : public VulkanBackendApp
+    {
     public:
         VulkanRayTracingApp();
 
@@ -49,11 +45,17 @@ namespace HWPT {
 
         void CreateAccelerationStructure();
 
+        void CreateViewportImages();
+
+        void ResizeViewportImages();
+
         VkDescriptorSetLayout m_RTDescriptorSetLayout = VK_NULL_HANDLE;
         std::vector<VkDescriptorSet> m_RTDescriptorSets;
         VkPipelineLayout m_RTPipelineLayout = VK_NULL_HANDLE;
         VkPipeline m_RTPipeline = VK_NULL_HANDLE;
-        enum StageIndices : uint8_t {
+
+        enum StageIndices : uint8_t
+        {
             RayGen,
             Miss,
             ClosestHit,
@@ -61,20 +63,30 @@ namespace HWPT {
             Intersection,
             StageIndicesMax
         };
+
         std::vector<VkRayTracingShaderGroupCreateInfoKHR> m_RTShaderGroups;
 
-        ArbitraryBuffer *m_RTSBTBuffer = nullptr;
+        ArbitraryBuffer* m_RTSBTBuffer = nullptr;
         VkStridedDeviceAddressRegionKHR m_rayGenRegion{};
         VkStridedDeviceAddressRegionKHR m_missRegion{};
         VkStridedDeviceAddressRegionKHR m_hitRegion{};
         VkStridedDeviceAddressRegionKHR m_callRegion{};
         VkPhysicalDeviceRayTracingPipelinePropertiesKHR m_RTProps{
-                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
-        ASBuilder *m_accelBuilder = nullptr;
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR
+        };
 
         Texture2D* m_lastFrameSceneColor = nullptr;
-    };
+        Scene* m_RTScene = nullptr;
 
-}  // namespace HWPT
+        std::vector<Texture2D*> m_viewportImages;
+        Texture2D* m_lastFrameViewportImage = nullptr;
+
+        glm::vec2 m_viewportSize = glm::vec2(100.f, 100.f);
+        glm::vec2 m_viewportOffset = glm::vec2(0.f, 0.f);
+        bool m_shouldRecreateViewportImages = false;
+        std::vector<VkDescriptorSet> m_viewportImageDescriptorSets;
+        bool m_hoveredOnViewport = false;
+    };
+} // namespace HWPT
 
 #endif //HARDWAREPATHTRACER_VULKANRAYTRACINGAPP_H

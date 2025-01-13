@@ -1,36 +1,41 @@
 #define PI 3.1415926
-#define HIT_COLOR float3(1., 1., 1.)
-#define MISS_COLOR float3(0., 0., 0.)
 
 struct Vertex {
     float3 Pos;
     float3 Normal;
+    float3 Color;
     float2 TexCoord;
 };
 
 struct ModelDesc {
     uint64_t VertexBufferAddress;
     uint64_t IndexBufferAddress;
-    // TODO: Material
+    uint64_t MaterialBufferAddress;
+    uint64_t MaterialIndexBufferAddress;
+    int TextureIndexOffset;
 };
 
 RaytracingAccelerationStructure TLAS : register(t1, space0);
 RWTexture2D<float4> OutImage : register(u2, space0);
 Texture2D<float4> InImage : register(t3, space0);
 
-// TODO: move to space1
-StructuredBuffer<Vertex> Vertices[] : register(t4, space0);
-StructuredBuffer<uint> Indices[] : register(t5, space0);
-Texture2D<float4> Materials[] : register(t6, space0);
-StructuredBuffer<ModelDesc> ModelInfo : register(t6, space0);
+// TODO: Move to space1
+StructuredBuffer<ModelDesc> ModelInfo : register(t4, space0);
+Texture2D<float4> MaterialTextures[] : register(t5, space0);
+SamplerState Samplers[] : register(s5, space0);
+
 
 struct RayPayload
 {
     float3 pos;
     float hit_t;
+
     float3 normal;
     uint instance_id;
-    float3 color;
+
+    float3 albedo;
+    uint triangle_index;
+
     bool is_hit;
     bool is_front_face;
 };
@@ -38,6 +43,13 @@ struct RayPayload
 struct HitAttribute
 {
     float2 bary;
+};
+
+struct Material {
+    float3 Albedo;
+    float3 Emissive;
+    float Opacity;
+    int TextureID;
 };
 
 // Generate a random unsigned int from two unsigned int values, using 16 pairs
