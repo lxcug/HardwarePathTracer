@@ -28,7 +28,7 @@ namespace HWPT {
         VkAttachmentDescription ColorAttachment{};
         ColorAttachment.format = VulkanBackendApp::GetApplication()->GetSwapChain().Format;
         ColorAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
-        ColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+        ColorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         ColorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         ColorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
         ColorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -138,7 +138,7 @@ namespace HWPT {
                                         ImGuiWindowFlags_NoBringToFrontOnFocus |
                                         ImGuiWindowFlags_NoNavFocus;
         // NOTE: No Background
-        window_flags |= ImGuiWindowFlags_NoBackground;
+        // window_flags |= ImGuiWindowFlags_NoBackground;
 
         // Important: note that we proceed even if Begin() returns false (aka window is collapsed).
         // This is because we want to keep our DockSpace() active. If a DockSpace() is inactive,

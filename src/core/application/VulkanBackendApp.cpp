@@ -55,7 +55,8 @@ namespace HWPT
         m_camera->Tick(m_fpsCalculator->GetDeltaTime());
 
         {
-            ImGuiInfrastructure::Begin("Settings");
+            bool Open;
+            ImGuiInfrastructure::Begin("Settings", &Open, ImGuiDockNodeFlags_AutoHideTabBar);
 
             ImGuiInfrastructure::End();
         }
