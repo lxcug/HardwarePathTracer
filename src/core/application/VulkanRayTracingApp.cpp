@@ -3,6 +3,9 @@
 //
 
 #include "VulkanRayTracingApp.h"
+
+#include <imgui_internal.h>
+
 #include "core/RHI.h"
 #include "core/shader/ShaderBase.h"
 #include "core/shaderCompiler/CompilerHLSL.h"
@@ -149,6 +152,16 @@ namespace HWPT
         // DstInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
         // RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameSceneColor, 1, SrcInput, DstInput);
 
+        RHI::TextureTransitionInput SrcInput{}, DstInput{};
+        SrcInput.Layout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+        SrcInput.AccessMask = 0;
+        SrcInput.PipelineStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        DstInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
+        DstInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        DstInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+        RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameViewportImage->GetHandle(), 1,
+                                     SrcInput, DstInput);
+
         // TODO: Add RayTracing Code Here
         vkCmdBindPipeline(CommandBuffer,
                           VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
@@ -161,15 +174,14 @@ namespace HWPT
                                 0, nullptr);
         auto RayTraceFunc = reinterpret_cast<PFN_vkCmdTraceRaysKHR>(vkGetDeviceProcAddr(m_device,
             "vkCmdTraceRaysKHR"));
-        RayTraceFunc(CommandBuffer,
-                     &m_rayGenRegion, &m_missRegion, &m_hitRegion, &m_callRegion,
-                     m_viewportSize.x, m_viewportSize.y, 1);
+        RayTraceFunc(CommandBuffer, &m_rayGenRegion, &m_missRegion, &m_hitRegion,
+                     &m_callRegion, m_viewportSize.x, m_viewportSize.y, 1);
 
         /*
          * Transition Current ColorAttach to VK_IMAGE_LAYOUT_VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
          * Transition m_lastFrameSceneColor to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL for CopyImage
          */
-        RHI::TextureTransitionInput SrcInput{}, DstInput{};
+        // RHI::TextureTransitionInput SrcInput{}, DstInput{};
         SrcInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
         SrcInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
         SrcInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
@@ -219,7 +231,8 @@ namespace HWPT
         SrcInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
         DstInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         DstInput.AccessMask = VK_ACCESS_SHADER_READ_BIT;
-        DstInput.PipelineStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        DstInput.PipelineStage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
         RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameViewportImage->GetHandle(), 1,
                                      SrcInput, DstInput);
         SrcInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -231,31 +244,21 @@ namespace HWPT
         RHI::TransitionTextureLayout(CommandBuffer, m_lastFrameViewportImage->GetHandle(),
                                      1, SrcInput, DstInput);
 
-        // SrcInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
-        // SrcInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-        // SrcInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
-        // DstInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        // DstInput.AccessMask = VK_ACCESS_SHADER_READ_BIT;
-        // DstInput.PipelineStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
-        // RHI::TransitionTextureLayout(CommandBuffer, m_viewportImages[m_imageIndex]->GetHandle(),
-        //                              1, SrcInput, DstInput);
-
         m_imguiInfrastructure->BeginImGui();
         DrawImGuiFrame();
         m_imguiInfrastructure->EndImGui(CommandBuffer);
 
-        SrcInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        SrcInput.AccessMask = VK_ACCESS_SHADER_READ_BIT;
-        SrcInput.PipelineStage = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
-        DstInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
-        DstInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;;
-        DstInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
-        RHI::TransitionTextureLayout(CommandBuffer, m_viewportImages[m_imageIndex]->GetHandle(),
-                                     1, SrcInput, DstInput);
+        // SrcInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        // SrcInput.AccessMask = VK_ACCESS_SHADER_READ_BIT;
+        // SrcInput.PipelineStage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+        //     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        // DstInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
+        // DstInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        // DstInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+        // RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameViewportImage->GetHandle(),
+        //                              1, SrcInput, DstInput);
 
         vkEndCommandBuffer(CommandBuffer);
-
-
         // Submit Commands
         VkSubmitInfo SubmitInfo{};
         SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -336,21 +339,22 @@ namespace HWPT
     {
         ImGuiInfrastructure::Begin("Viewport");
         ImVec2 ViewportSize = ImGui::GetContentRegionAvail();
-        m_hoveredOnViewport = ImGui::IsWindowHovered();
-
-        if (m_hoveredOnViewport)
-        {
-            m_camera->Tick(m_fpsCalculator->GetDeltaTime());
-        }
+        ImVec2 ViewportPos = ImGui::GetWindowPos();
+        static bool IsWindowHovered = false;
+        IsWindowHovered = ImGui::IsWindowHovered();
+        static bool IsWindowDocked = false;
+        IsWindowDocked = ImGui::IsWindowDocked();
 
         if (ViewportSize.x != m_viewportSize.x || ViewportSize.y != m_viewportSize.y)
         {
-            m_viewportSize.x = ViewportSize.x;
-            m_viewportSize.y = ViewportSize.y;
-            ImVec2 ViewportPos = ImGui::GetWindowPos();
-            m_viewportOffset.x = ViewportPos.x;
-            m_viewportOffset.y = ViewportPos.y;
+            m_viewportSize.x = max(ViewportSize.x, 1.f);
+            m_viewportSize.y = max(ViewportSize.y, 1.f);
             m_shouldRecreateViewportImages = true;
+        }
+
+        if (IsWindowHovered)
+        {
+            m_camera->Tick(m_fpsCalculator->GetDeltaTime());
         }
 
         ImGui::Image(m_viewportImageDescriptorSets[m_imageIndex],
@@ -725,9 +729,9 @@ namespace HWPT
             SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
             SrcInput.AccessMask = 0;
             SrcInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
-            DstInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
-            DstInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-            DstInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+            DstInput.Layout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
+            DstInput.AccessMask = 0;
+            DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
             RHI::TransitionTextureLayout(CommandBuffer, m_viewportImages[i]->GetHandle(), 1,
                                          SrcInput, DstInput);
 
@@ -745,8 +749,8 @@ namespace HWPT
         SrcInput.AccessMask = 0;
         SrcInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
         DstInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        DstInput.AccessMask = VK_ACCESS_SHADER_READ_BIT;
-        DstInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+        DstInput.AccessMask = 0;
+        DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
         RHI::TransitionTextureLayout(CommandBuffer, m_lastFrameViewportImage->GetHandle(), 1,
                                      SrcInput, DstInput);
         RHI::SubmitIntermediateCommandBuffer(CommandBuffer);

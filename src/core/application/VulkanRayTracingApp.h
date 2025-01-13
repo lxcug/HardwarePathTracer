@@ -81,11 +81,10 @@ namespace HWPT
         std::vector<Texture2D*> m_viewportImages;
         Texture2D* m_lastFrameViewportImage = nullptr;
 
-        glm::vec2 m_viewportSize = glm::vec2(100.f, 100.f);
+        glm::vec2 m_viewportSize = glm::vec2(1.f, 1.f);
         glm::vec2 m_viewportOffset = glm::vec2(0.f, 0.f);
         bool m_shouldRecreateViewportImages = false;
         std::vector<VkDescriptorSet> m_viewportImageDescriptorSets;
-        bool m_hoveredOnViewport = false;
     };
 } // namespace HWPT
 
