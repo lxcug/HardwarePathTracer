@@ -7,16 +7,11 @@
 
 #include "core/Core.h"
 #include <vector>
-#include "core/Model.h"
+#include "Model.h"
 
 
 namespace HWPT {
     class ASBuilder;
-
-    struct SceneModel {
-        std::string ModelName;
-        Model ModelInstance;
-    };
 
     class Scene {
     public:
@@ -24,22 +19,64 @@ namespace HWPT {
 
         ~Scene() = default;
 
-        template <typename... Args>
-        void AddModel(const std::string& ModelName, Args&&... Args_) {
-            Model ModelInstance(std::forward<Args>(Args_)...);
-            SceneModel SceneModel_{ModelName, ModelInstance};
-            m_models.push_back(std::make_shared<SceneModel>(SceneModel_));
+        void AddModel(Model *ModelPtr) {
+            std::shared_ptr<Model> SharedModel(ModelPtr);
+            AddModel(SharedModel);
+        }
+
+        template<typename... Args>
+        void AddModel(const std::string &ModelName, Args &&... Args_) {
+            auto SharedModel = std::make_shared<Model>(Args_...);
+            SharedModel->SetModelName(ModelName);
+            AddModel(SharedModel);
+        }
+
+        template<typename... Args>
+        void AddModel(Args &&... Args_) {
+            auto SharedModel = std::make_shared<Model>(Args_...);
+            AddModel(SharedModel);
+        }
+
+        void AddModel(std::shared_ptr<Model>& SharedModel) {
+            SharedModel->SetInstanceID(s_instanceIDCounter++);
+            // NOTE: Set Global Texture Offset for each ModelDesc
+            SharedModel->SetModelDescTextureOffset(static_cast<int>(m_sceneModelTextures.size()));
+            CreateModelTextures(SharedModel->GetModelTexturePaths());
+
+            m_models.emplace_back(SharedModel);
+            m_modelDescs.emplace_back(SharedModel->GetModelDesc());
         }
 
         void FinalizeScene() {
             CreateAccel();
+            CreateModelDescBuffer();
         }
 
         void CreateAccel();
 
+        auto GetAccelBuilder() -> std::shared_ptr<ASBuilder> & {
+            return m_accelBuilder;
+        }
+
+        [[nodiscard]] auto GetSceneModelTextures() const -> const std::vector<std::shared_ptr<Texture2D>>& {
+            return m_sceneModelTextures;
+        }
+
+        void CreateModelDescBuffer();
+
+        auto GetModelDescBuffer() -> std::shared_ptr<ArbitraryBuffer> & {
+            return m_sceneModelDescBuffer;
+        }
+
+        void CreateModelTextures(const std::vector<std::string> &TexturePaths);
+
     private:
         std::shared_ptr<ASBuilder> m_accelBuilder;
-        std::vector<std::shared_ptr<SceneModel>> m_models;
+        std::vector<std::shared_ptr<Model>> m_models;
+        std::vector<ModelDesc> m_modelDescs;
+        std::shared_ptr<ArbitraryBuffer> m_sceneModelDescBuffer = nullptr;
+        static inline uint s_instanceIDCounter = 0;  // TODO: dispatch instance index to models
+        std::vector<std::shared_ptr<Texture2D>> m_sceneModelTextures;
     };
 }  // namespace HWPT
 

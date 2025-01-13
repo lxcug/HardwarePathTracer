@@ -30,13 +30,13 @@ namespace HWPT {
         }
 
         void UpdateViewMatrix() {
-            m_viewMatrix = glm::lookAt(m_cameraPos, m_cameraPos + GetForwardDirection(),
-                                       GetUpDirection());
+//            m_viewMatrix = glm::lookAt(m_cameraPos, m_cameraPos + GetForwardDirection(),
+//                                       GetUpDirection());
 //            auto camera2world = glm::translate(glm::identity<glm::mat4>(), m_cameraPos) *
 //                                glm::toMat4(GetOrientation());
 //            m_viewMatrix = glm::inverse(camera2world);
             // NOTE: conjugate of quat
-//            m_viewMatrix = glm::toMat4(glm::conjugate(GetOrientation())) * glm::translate(glm::mat4(1.f), -m_cameraPos);
+            m_viewMatrix = glm::toMat4(glm::conjugate(GetOrientation())) * glm::translate(glm::mat4(1.f), -m_cameraPos);
         }
 
         // Return if camera is moving
@@ -90,6 +90,10 @@ namespace HWPT {
             return m_yaw;
         }
 
+        virtual void OnWindowResize(uint Width, uint Height) {
+            m_aspectRatio = static_cast<float>(Width) / static_cast<float>(Height);
+        }
+
     protected:
         CameraType m_type = CameraType::CameraTypeMax;
         glm::vec3 m_cameraPos;
@@ -99,7 +103,7 @@ namespace HWPT {
         float m_pitch = 0.f, m_yaw = 0.f;
         float m_moveSpeedMultiplier = 1.f, m_rotateSpeedMultiplier = 1.f;
         static inline float s_moveSpeed = 5.f;
-        static inline float s_rotateSpeed = 1.f;
+        static inline float s_rotateSpeed = 1.5f;
         glm::vec2 m_lastMousePos;
         bool m_isFirstTouch = true;
         bool m_isMoving = false;
@@ -117,6 +121,11 @@ namespace HWPT {
 
         void Init() override {
             CameraBase::Init();
+            UpdateProjMatrix();
+        }
+
+        void OnWindowResize(uint Width, uint Height) override {
+            CameraBase::OnWindowResize(Width, Height);
             UpdateProjMatrix();
         }
 

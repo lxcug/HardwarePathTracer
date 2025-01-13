@@ -58,8 +58,8 @@ add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/FPSCalculator.h
         src/core/application/ImGuiIntegration.cpp
         src/core/application/ImGuiIntegration.h
-        src/core/Model.cpp
-        src/core/Model.h
+        src/core/scene/Model.cpp
+        src/core/scene/Model.h
         src/core/buffer/VertexBufferLayout.cpp
         src/core/buffer/VertexBufferLayout.h
         src/core/application/VulkanRayTracingApp.cpp
@@ -84,6 +84,10 @@ add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/input/Input.h
         src/core/SwapChain.cpp
         src/core/SwapChain.h
+        src/core/material/Material.cpp
+        src/core/material/Material.h
+        src/core/debug/Debugger.cpp
+        src/core/debug/Debugger.h
 )
 
 include_directories(

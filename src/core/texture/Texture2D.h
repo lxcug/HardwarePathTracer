@@ -10,6 +10,7 @@
 #include "core/texture/Sampler.h"
 
 
+// TODO: Reconstruct this...
 namespace HWPT {
     // TODO
 //    class Texture2DDesc {
@@ -21,8 +22,6 @@ namespace HWPT {
 
     class Texture2D {
     public:
-        Texture2D();
-
         explicit Texture2D(const std::filesystem::path& TexturePath, uint MSAASamples = 1, bool GenerateMips = false);
 
         Texture2D(uint Width, uint Height, TextureFormat Format, TextureUsage Usage,
@@ -45,7 +44,6 @@ namespace HWPT {
         VkDeviceMemory m_textureMemory = VK_NULL_HANDLE;
         uint m_width = 0, m_height = 0;
         TextureFormat m_format = TextureFormat::None;
-        void* m_mappedData = nullptr;
         bool IsSRVCreated = false;
         VkImageView m_textureView = VK_NULL_HANDLE;
         uint m_numMips = 1;

@@ -22,27 +22,32 @@
 #include "core/texture/Texture2D.h"
 #include "core/texture/Sampler.h"
 #include "ImGuiIntegration.h"
-#include "core/Model.h"
+#include "core/scene/Model.h"
 #include "core/Commands/CommandPool.h"
 #include "core/scene/Camera.h"
+#include "core/debug/Debugger.h"
 
 
-namespace HWPT {
+namespace HWPT
+{
     const int MAX_FRAMES_IN_FLIGHT = 2;
 
-    struct SwapChainSupportDetails {
+    struct SwapChainSupportDetails
+    {
         VkSurfaceCapabilitiesKHR Capabilities;
         std::vector<VkSurfaceFormatKHR> Formats;
         std::vector<VkPresentModeKHR> PresentModes;
     };
 
-    struct Queue {
+    struct Queue
+    {
         VkQueue GraphicsQueue = VK_NULL_HANDLE;
         VkQueue ComputeQueue = VK_NULL_HANDLE;
         VkQueue PresentQueue = VK_NULL_HANDLE;
     };
 
-    struct SwapChain {
+    struct SwapChain
+    {
         VkSwapchainKHR SwapChainHandle = VK_NULL_HANDLE;
         VkExtent2D Extent;
         VkFormat Format;
@@ -54,17 +59,20 @@ namespace HWPT {
         void GetImages(VkDevice Device);
     };
 
-    struct MSAABuffer {
+    struct MSAABuffer
+    {
         Texture2D* MSAAColorBuffer = nullptr;
         Texture2D* MSAADepthBuffer = nullptr;
 
-        ~MSAABuffer() {
+        ~MSAABuffer()
+        {
             delete MSAAColorBuffer;
             delete MSAADepthBuffer;
         }
     };
 
-    struct ViewUniformBuffer {
+    struct ViewUniformBuffer
+    {
         glm::mat4 ModelTrans;
         glm::mat4 ViewTrans;
         glm::mat4 ProjTrans;
@@ -81,7 +89,8 @@ namespace HWPT {
         bool ShouldReAccumulate;
     };
 
-    class VulkanBackendApp : public ApplicationBase {
+    class VulkanBackendApp : public ApplicationBase
+    {
     public:
         void Run() override;
 
@@ -91,47 +100,58 @@ namespace HWPT {
 
         virtual void DrawImGuiFrame();
 
-        auto GetVkInstance() -> VkInstance {
+        auto GetVkInstance() -> VkInstance
+        {
             return m_instance;
         }
 
-        auto GetVkDevice() -> VkDevice {
+        auto GetVkDevice() -> VkDevice
+        {
             return m_device;
         }
 
-        auto GetPhysicalDevice() -> VkPhysicalDevice {
+        auto GetPhysicalDevice() -> VkPhysicalDevice
+        {
             return m_physicalDevice;
         }
 
-        static auto GetApplication() -> VulkanBackendApp* {
+        static auto GetApplication() -> VulkanBackendApp*
+        {
             return s_application;
         }
 
-        auto GetSwapChain() -> SwapChain {
+        auto GetSwapChain() -> SwapChain
+        {
             return m_swapChain;
         }
 
-        auto GetQueue() -> Queue {
+        auto GetQueue() -> Queue
+        {
             return m_queue;
         }
 
-        auto GetFrameBuffers(uint Index) -> VkFramebuffer {
+        auto GetFrameBuffers(uint Index) -> VkFramebuffer
+        {
             return m_swapChainFrameBuffers[Index];
         }
 
-        auto GetWindow() -> GLFWwindow* {
+        auto GetWindow() -> GLFWwindow*
+        {
             return m_window;
         }
 
-        [[nodiscard]] auto GetImageIndex() const -> uint {
+        [[nodiscard]] auto GetImageIndex() const -> uint
+        {
             return m_imageIndex;
         }
 
-        auto GetCommandPool() -> CommandPool* {
+        auto GetCommandPool() -> CommandPool*
+        {
             return m_commandPool;
         }
 
-        auto GetSurface() -> VkSurfaceKHR {
+        auto GetSurface() -> VkSurfaceKHR
+        {
             return m_surface;
         }
 
@@ -227,17 +247,18 @@ namespace HWPT {
 
 #if !BUILD_RELEASE && !BUILD_SHIPPING
         inline static bool m_enableValidationLayers = true;
-        inline static const std::vector<const char *> ValidationLayers = {
-                "VK_LAYER_KHRONOS_validation",
+        inline static const std::vector<const char*> ValidationLayers = {
+            "VK_LAYER_KHRONOS_validation",
         };
 #else
         inline static bool m_enableValidationLayers = false;
         inline static const std::vector<const char *> ValidationLayers = {};
 #endif
-        inline static std::vector<const char *> DeviceExtensions = {
-                VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-                VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
-//                VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+        inline static std::vector<const char*> DeviceExtensions = {
+            VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+            VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
+            // VK_EXT_DEBUG_MARKER_EXTENSION_NAME
+            // VK_EXT_DEBUG_UTILS_EXTENSION_NAME
         };
 
         VkInstance m_instance = VK_NULL_HANDLE;
@@ -294,7 +315,9 @@ namespace HWPT {
         std::shared_ptr<VertexBufferLayout> m_particleVertexBufferLayout;
 
         std::shared_ptr<CameraBase> m_camera;
+
+        Debugger* m_debugger = nullptr;
     };
-}  // namespace HWPT
+} // namespace HWPT
 
 #endif //HARDWAREPATHTRACER_VULKANBACKENDAPP_H

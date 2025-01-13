@@ -38,7 +38,7 @@ namespace HWPT {
                 " -T " + ShaderStageString +
                 " -Fo " + absolute(s_hlslDirectory).string() + "/" + OutFile + ".spv " +
                 " -fspv-extension=SPV_KHR_ray_tracing" +
-                " -fspv-target-env=vulkan1.2 " +
+                " -fspv-target-env=vulkan1.3 " +
                 " -spirv " +
                 " -fspv-extension=SPV_KHR_physical_storage_buffer " +
                 " -fspv-extension=SPV_EXT_descriptor_indexing " +

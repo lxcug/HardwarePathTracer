@@ -13,8 +13,7 @@ namespace HWPT {
         float MoveSpeed = s_moveSpeed * m_moveSpeedMultiplier * DeltaTime;
         float RotateSpeed = s_rotateSpeed * m_rotateSpeedMultiplier * DeltaTime;
         if (Input::IsKeyPressed(KeyCode::LeftControl) || Input::IsKeyPressed(KeyCode::RightControl)) {
-            MoveSpeed *= .2f;
-            RotateSpeed *= .2f;
+            MoveSpeed *= .1f;
         }
         if (Input::IsKeyPressed(KeyCode::W)) {
             m_cameraPos += MoveSpeed * GetForwardDirection();
@@ -52,7 +51,9 @@ namespace HWPT {
                 m_pitch -= Offset.y * RotateSpeed;
                 m_yaw -= yawSign * Offset.x * RotateSpeed;
                 m_lastMousePos = CurrentPos;
-                m_isMoving = true;
+                if (std::abs(Offset.x) > 1e-10f || std::abs(Offset.y) > 1e-10f) {
+                    m_isMoving = true;
+                }
             }
         } else {
             m_isFirstTouch = true;

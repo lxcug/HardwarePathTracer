@@ -63,8 +63,8 @@ namespace HWPT {
         return BindingDescription;
     }
 
-    auto Vertex::GetAttributeDescriptions() -> std::array<VkVertexInputAttributeDescription, 3> {
-        std::array<VkVertexInputAttributeDescription, 3> AttributeDescriptions{};
+    auto Vertex::GetAttributeDescriptions() -> std::array<VkVertexInputAttributeDescription, 4> {
+        std::array<VkVertexInputAttributeDescription, 4> AttributeDescriptions{};
         AttributeDescriptions[0].binding = 0;
         AttributeDescriptions[0].location = 0;
         AttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -77,8 +77,13 @@ namespace HWPT {
 
         AttributeDescriptions[2].binding = 0;
         AttributeDescriptions[2].location = 2;
-        AttributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-        AttributeDescriptions[2].offset = offsetof(Vertex, TexCoord);
+        AttributeDescriptions[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+        AttributeDescriptions[2].offset = offsetof(Vertex, Color);
+
+        AttributeDescriptions[3].binding = 0;
+        AttributeDescriptions[3].location = 3;
+        AttributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
+        AttributeDescriptions[3].offset = offsetof(Vertex, TexCoord);
 
         return AttributeDescriptions;
     }
