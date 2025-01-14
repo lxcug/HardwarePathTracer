@@ -44,8 +44,8 @@ namespace HWPT {
             SrcInput.AccessMask = 0;
             DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
             DstInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            DstInput.AccessMask = VK_ACCESS_SHADER_READ_BIT;
-            DstInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+            DstInput.AccessMask = 0;
+            DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
             RHI::TransitionTextureLayout(CommandBuffer, SharedTexture->GetHandle(), 1, SrcInput,
                                          DstInput);
             m_sceneModelTextures.emplace_back(SharedTexture);

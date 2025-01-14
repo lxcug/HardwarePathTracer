@@ -21,8 +21,11 @@
 namespace HWPT {
     struct Vertex {
         glm::vec3 Pos;
+        uint PosPadding;
         glm::vec3 Normal;
+        uint NormalPadding;
         glm::vec3 Color;
+        uint ColorPadding;
         glm::vec2 TexCoord;
 
         Vertex() = default;

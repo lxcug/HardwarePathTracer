@@ -38,20 +38,18 @@ void main(inout RayPayload payload, in HitAttribute attrib)
     float3 albedo = triangle_material.Albedo;
     int TextureID = triangle_material.TextureID;
 
-// //     if (TextureID >= 0) {
-//     // TODO: Why TextureID < 0 ?
-    // float2 hit_uv = v0.TexCoord * bary_centrics.x + v1.TexCoord * bary_centrics.y + v2.TexCoord * bary_centrics.z;
-
-    // int TextureIndex = TextureID + TextureIndexOffset;
-    // albedo = MaterialTextures[0].SampleLevel(Samplers[0], hit_uv, 0).rgb;
-// //     }
+    if (TextureID >= 0) {
+        float2 hit_uv = v0.TexCoord * bary_centrics.x + v1.TexCoord * bary_centrics.y + v2.TexCoord * bary_centrics.z;
+        int TextureIndex = TextureID + TextureIndexOffset;
+        albedo = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0).rgb;
+    }
 
     float3 hit_pos_obj_space = v0.Pos * bary_centrics.x + v1.Pos * bary_centrics.y + v2.Pos * bary_centrics.z;
     float3 hit_normal_obj_space = v0.Normal * bary_centrics.x + v1.Normal * bary_centrics.y + v2.Normal * bary_centrics.z;
     float3 hit_normal = normalize(mul(WorldToObject4x3(), hit_normal_obj_space).xyz);
 
     float3 hit_pos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
-//     hit_pos = mul(float4(hit_pos_obj_space, 1.f), ObjectToWorld4x3());
+    hit_pos = mul(float4(hit_pos_obj_space, 1.f), ObjectToWorld4x3());
 
     float3 color = v0.Color * bary_centrics.x + v1.Color * bary_centrics.y + v2.Color * bary_centrics.z;
 
