@@ -9,6 +9,7 @@
 #include "core/buffer/ArbitraryBuffer.h"
 #include "core/acceleration_structure/AccelerationStructure.h"
 #include "core/scene/Scene.h"
+#include "core/gbuffer/GBuffer.h"
 
 
 namespace HWPT
@@ -49,6 +50,8 @@ namespace HWPT
 
         void ResizeViewportImages();
 
+        void CreateGBuffer();
+
         VkDescriptorSetLayout m_RTDescriptorSetLayout = VK_NULL_HANDLE;
         std::vector<VkDescriptorSet> m_RTDescriptorSets;
         VkPipelineLayout m_RTPipelineLayout = VK_NULL_HANDLE;
@@ -75,7 +78,6 @@ namespace HWPT
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR
         };
 
-        Texture2D* m_lastFrameSceneColor = nullptr;
         Scene* m_RTScene = nullptr;
 
         std::vector<Texture2D*> m_viewportImages;
@@ -85,6 +87,8 @@ namespace HWPT
         glm::vec2 m_viewportOffset = glm::vec2(0.f, 0.f);
         bool m_shouldRecreateViewportImages = false;
         std::vector<VkDescriptorSet> m_viewportImageDescriptorSets;
+        GBuffer* m_gBuffer = nullptr;
+        glm::vec2 m_gbufferViewPortSize = glm::vec2(1.f, 1.f);
     };
 } // namespace HWPT
 

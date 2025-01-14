@@ -88,6 +88,8 @@ add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/material/Material.h
         src/core/debug/Debugger.cpp
         src/core/debug/Debugger.h
+        src/core/gbuffer/GBuffer.cpp
+        src/core/gbuffer/GBuffer.h
 )
 
 include_directories(

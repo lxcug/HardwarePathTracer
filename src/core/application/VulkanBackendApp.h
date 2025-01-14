@@ -100,17 +100,17 @@ namespace HWPT
 
         virtual void DrawImGuiFrame();
 
-        auto GetVkInstance() -> VkInstance
+        [[nodiscard]] auto GetVkInstance() const -> VkInstance
         {
             return m_instance;
         }
 
-        auto GetVkDevice() -> VkDevice
+        [[nodiscard]] auto GetVkDevice() const -> VkDevice
         {
             return m_device;
         }
 
-        auto GetPhysicalDevice() -> VkPhysicalDevice
+        [[nodiscard]] auto GetPhysicalDevice() const -> VkPhysicalDevice
         {
             return m_physicalDevice;
         }
@@ -125,17 +125,17 @@ namespace HWPT
             return m_swapChain;
         }
 
-        auto GetQueue() -> Queue
+        [[nodiscard]] auto GetQueue() const -> Queue
         {
             return m_queue;
         }
 
-        auto GetFrameBuffers(uint Index) -> VkFramebuffer
+        [[nodiscard]] auto GetFrameBuffers(uint Index) const -> VkFramebuffer
         {
             return m_swapChainFrameBuffers[Index];
         }
 
-        auto GetWindow() -> GLFWwindow*
+        [[nodiscard]] auto GetWindow() const -> GLFWwindow*
         {
             return m_window;
         }
@@ -145,14 +145,19 @@ namespace HWPT
             return m_imageIndex;
         }
 
-        auto GetCommandPool() -> CommandPool*
+        [[nodiscard]] auto GetCommandPool() const -> CommandPool*
         {
             return m_commandPool;
         }
 
-        auto GetSurface() -> VkSurfaceKHR
+        [[nodiscard]] auto GetSurface() const -> VkSurfaceKHR
         {
             return m_surface;
+        }
+
+        [[nodiscard]] auto GetSampler() const -> Sampler*
+        {
+            return m_sampler;
         }
 
     protected:
@@ -238,7 +243,7 @@ namespace HWPT
         VkDevice m_device = VK_NULL_HANDLE;
 
         std::string m_windowTitle = "VulkanBackend Application";
-        uint m_windowWidth = 1600, m_windowHeight = 900;
+        uint m_windowWidth = 2133, m_windowHeight = 1200;
         GLFWwindow* m_window = nullptr;
         bool m_frameBufferResized = false;
         bool m_contextInited = false;
