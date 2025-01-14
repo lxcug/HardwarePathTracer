@@ -238,7 +238,7 @@ namespace HWPT
 
         void RecordCommandBuffer(VkCommandBuffer CommandBuffer, uint ImageIndex);
 
-        void CreateUniformBuffers();
+        void CreateViewUniformBuffers();
 
         void CreateModelAndSampler();
 
@@ -324,6 +324,7 @@ namespace HWPT
         void CreateParticleStorageBuffers();
         std::shared_ptr<VertexBufferLayout> m_particleVertexBufferLayout;
 
+    public:
         std::shared_ptr<CameraBase> m_camera;
 
         Debugger* m_debugger = nullptr;

@@ -18,6 +18,11 @@ void main(inout RayPayload payload, in HitAttribute attrib)
     float3 hit_pos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
     // hit_pos = mul(float4(hit_pos_obj_space, 1.f), ObjectToWorld4x3());
 
+    uint64_t MaterialBufferAddress = ModelInfo[InstanceID()].MaterialBufferAddress;
+    uint64_t MaterialIndexBufferAddress = ModelInfo[InstanceID()].MaterialIndexBufferAddress;
+
+    int material_index = vk::RawBufferLoad<int>(MaterialIndexBufferAddress + sizeof(int) * PrimitiveIndex());
+
     Material material = GetMaterial(InstanceID(), PrimitiveIndex());
     float3 albedo = material.Albedo;
     if (material.AlbedoTextureID >= 0) {
