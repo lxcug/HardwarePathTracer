@@ -17,3 +17,5 @@ HardwarePathTracer using Vulkan RayTracing API
 2025.1.15: Texture Support
 
 ![](imgs/TextureSupport.png)
+
+2025.1.15: Refactor Material, Add PBR Parameters and Multi Mesh Texture Access
