@@ -68,6 +68,15 @@ void main()
     }
 
     if (payload.is_hit) {
+        GBuffer[0][index] = float4(payload.albedo, 1.f);
+        GBuffer[1][index] = float4(payload.normal, 1.f);
+        GBuffer[2][index] = float4(payload.pos, 1.f);
+
+        float4 ViewPos = mul(ViewTrans, float4(payload.pos, 1.0f));
+        float4 ClipPos = mul(ProjTrans, float4(ViewPos.xyz, 1.f));
+        float depth = ClipPos.z / ClipPos.w;
+        GBuffer[3][index] = float4(depth, depth, depth, 1.f);
+
         if (FrameNum == 0 || ShouldReAccumulate) {
             OutImage[index] = float4(ao * payload.albedo, 1.0);
         } else {
@@ -79,5 +88,10 @@ void main()
         // OutImage[index] = float4(payload.albedo, 1.f);
     } else {
         OutImage[index] = float4(0.f, 0.f, 0.f, 0.f);
+
+        GBuffer[0][index] = float4(0.f, 0.f, 0.f, 0.f);
+        GBuffer[1][index] = float4(0.f, 0.f, 0.f, 0.f);
+        GBuffer[2][index] = float4(0.f, 0.f, 0.f, 0.f);
+        GBuffer[3][index] = float4(0.f, 0.f, 0.f, 0.f);
     }
 }

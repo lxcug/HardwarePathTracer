@@ -40,10 +40,10 @@ void main(inout RayPayload payload, in HitAttribute attrib)
 
 // //     if (TextureID >= 0) {
 //     // TODO: Why TextureID < 0 ?
-    float2 hit_uv = v0.TexCoord * bary_centrics.x + v1.TexCoord * bary_centrics.y + v2.TexCoord * bary_centrics.z;
+    // float2 hit_uv = v0.TexCoord * bary_centrics.x + v1.TexCoord * bary_centrics.y + v2.TexCoord * bary_centrics.z;
 
-    int TextureIndex = TextureID + TextureIndexOffset;
-    albedo = MaterialTextures[0].SampleLevel(Samplers[0], hit_uv, 0).rgb;
+    // int TextureIndex = TextureID + TextureIndexOffset;
+    // albedo = MaterialTextures[0].SampleLevel(Samplers[0], hit_uv, 0).rgb;
 // //     }
 
     float3 hit_pos_obj_space = v0.Pos * bary_centrics.x + v1.Pos * bary_centrics.y + v2.Pos * bary_centrics.z;
@@ -57,7 +57,7 @@ void main(inout RayPayload payload, in HitAttribute attrib)
 
     float TexID = triangle_material.TextureID;
     payload.pos = hit_pos;
-    payload.albedo = color;
+    payload.albedo = albedo;
     payload.normal = hit_normal;
     payload.is_hit = true;
     payload.hit_t = RayTCurrent();

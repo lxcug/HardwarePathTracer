@@ -48,7 +48,7 @@ namespace HWPT {
 
     private:
         uint m_numFrames = 0;
-        inline static uint MaxNumTextures = 10;
+        inline static uint MaxNumTextures = 20;
         inline static float m_imguiUIAlpha = 1.f;
     };
 }  // namespace HWPT

@@ -24,6 +24,8 @@ StructuredBuffer<ModelDesc> ModelInfo : register(t4, space0);
 Texture2D<float4> MaterialTextures[] : register(t5, space0);
 SamplerState Samplers[] : register(s5, space0);
 
+RWTexture2D<float4> GBuffer[] : register(u6, space0);
+
 
 struct RayPayload
 {
