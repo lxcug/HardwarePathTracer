@@ -10,6 +10,10 @@ struct Vertex {
     float2 TexCoord;
 };
 
+struct Vertex3 {
+    Vertex V0, V1, V2;
+};
+
 struct ModelDesc {
     uint64_t VertexBufferAddress;
     uint64_t IndexBufferAddress;
@@ -52,10 +56,45 @@ struct HitAttribute
 
 struct Material {
     float3 Albedo;
-    float Opacity;
+    int AlbedoTextureID;
+
     float3 Emissive;
-    int TextureID;
+    int EmissiveTextureID;
+
+    float3 Transmittance;
+    float Opacity;
+
+    float Roughness;
+    float Metallic;
+    int RoughnessTextureID;
+    int MetallicTextureID;
 };
+
+Vertex3 GetVertices(uint InstanceID, uint PrimitiveIndex) {
+    uint64_t VertexBufferAddress = ModelInfo[InstanceID].VertexBufferAddress;
+    uint64_t IndexBufferAddress = ModelInfo[InstanceID].IndexBufferAddress;
+    uint3 Indices = {
+        vk::RawBufferLoad<uint>(IndexBufferAddress + sizeof(uint) * (PrimitiveIndex * 3 + 0)),
+        vk::RawBufferLoad<uint>(IndexBufferAddress + sizeof(uint) * (PrimitiveIndex * 3 + 1)),
+        vk::RawBufferLoad<uint>(IndexBufferAddress + sizeof(uint) * (PrimitiveIndex * 3 + 2))
+    };
+
+    Vertex3 Ret = {
+        vk::RawBufferLoad<Vertex>(VertexBufferAddress + sizeof(Vertex) * Indices.x),
+        vk::RawBufferLoad<Vertex>(VertexBufferAddress + sizeof(Vertex) * Indices.y),
+        vk::RawBufferLoad<Vertex>(VertexBufferAddress + sizeof(Vertex) * Indices.z)
+    };
+    return Ret;
+}
+
+Material GetMaterial(uint InstanceID, uint PrimitiveIndex) {
+    uint64_t MaterialBufferAddress = ModelInfo[InstanceID].MaterialBufferAddress;
+    uint64_t MaterialIndexBufferAddress = ModelInfo[InstanceID].MaterialIndexBufferAddress;
+
+    int material_index = vk::RawBufferLoad<int>(MaterialIndexBufferAddress + sizeof(int) * PrimitiveIndex);
+    return vk::RawBufferLoad<Material>(MaterialBufferAddress + sizeof(Material) * material_index);
+}
+
 
 // Generate a random unsigned int from two unsigned int values, using 16 pairs
 // of rounds of the Tiny Encryption Algorithm. See Zafar, Olano, and Curtis,

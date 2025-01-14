@@ -29,7 +29,7 @@ void main()
 
     uint seed = FrameNum + index.x * dim.y + index.y * dim.x;
     float2 jitter = float2(rnd(seed), rnd(seed));
-    float2 uv = (index + .5 + jitter * .5f) / dim;
+    float2 uv = (index + .5 + jitter) / dim;
     float3 origin = CameraPos;
     float2 screen_coord = uv * 2.f - 1.f;
     float4 target_view_space = mul(InvProj, float4(screen_coord, 1.f, 1.f));
@@ -84,8 +84,6 @@ void main()
             float3 new_color = lerp(old_color, ao * payload.albedo, 1.f / FrameNum);
             OutImage[index] = float4(new_color, 1.0);
         }
-
-        // OutImage[index] = float4(payload.albedo, 1.f);
     } else {
         OutImage[index] = float4(0.f, 0.f, 0.f, 0.f);
 

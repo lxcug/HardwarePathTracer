@@ -92,6 +92,11 @@ namespace HWPT
     class VulkanBackendApp : public ApplicationBase
     {
     public:
+        explicit VulkanBackendApp(const std::string& Title = "VulkanBackend Application"):
+            m_windowTitle(Title)
+        {
+        }
+
         void Run() override;
 
         void Init() override;
@@ -242,7 +247,7 @@ namespace HWPT
     protected:
         VkDevice m_device = VK_NULL_HANDLE;
 
-        std::string m_windowTitle = "VulkanBackend Application";
+        std::string m_windowTitle;
         uint m_windowWidth = 2133, m_windowHeight = 1200;
         GLFWwindow* m_window = nullptr;
         bool m_frameBufferResized = false;

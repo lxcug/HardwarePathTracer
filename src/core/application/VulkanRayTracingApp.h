@@ -17,7 +17,7 @@ namespace HWPT
     class VulkanRayTracingApp : public VulkanBackendApp
     {
     public:
-        VulkanRayTracingApp();
+        explicit VulkanRayTracingApp(const std::string& Title = "Ray Tracing Application");
 
         void InitVulkan() override;
 

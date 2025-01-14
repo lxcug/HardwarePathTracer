@@ -86,28 +86,59 @@ namespace HWPT {
                                       });
             m_indexBuffer = new IndexBuffer(Indices.size(), Indices.data());
         }
-        // Fixing Material Indices
-        for (auto &MatIndex: m_materialIndex) {
-            if (MatIndex < 0 || MatIndex > m_materials.size()) {
-                MatIndex = 0;
-            }
-        }
 
         // Load Materials
         {
             for (const auto &Material: Materials) {
-                // TODO: Read More Material Properties
                 struct Material Mat{};
+                if (Material.diffuse)
+                {
+                    Mat.Albedo = Utils::Float3ArrayToGLM(Material.diffuse);
+                }
                 if (!Material.diffuse_texname.empty()) {
                     m_textureNames.push_back(MtlPath + '/' + Material.diffuse_texname);
+                    Mat.AlbedoTextureID = static_cast<int>(m_textureNames.size()) - 1;
                 }
-                Mat.TextureID = static_cast<int>(m_textureNames.size()) - 1;
+                if (Material.emission)
+                {
+                    Mat.Emissive = Utils::Float3ArrayToGLM(Material.emission);
+                }
+                if (!Material.emissive_texname.empty())
+                {
+                    m_textureNames.push_back(MtlPath + '/' + Material.emissive_texname);
+                    Mat.EmissiveTextureID = static_cast<int>(m_textureNames.size()) - 1;
+                }
+                if (Material.transmittance)
+                {
+                    Mat.Transmittance = Utils::Float3ArrayToGLM(Material.transmittance);
+                }
+                Mat.Opacity = Material.dissolve;
+                Mat.Roughness = Material.roughness;
+                Mat.Metallic = Material.metallic;
+                if (!Material.roughness_texname.empty())
+                {
+                    m_textureNames.push_back(MtlPath + '/' + Material.roughness_texname);
+                    Mat.RoughnessTextureID = static_cast<int>(m_textureNames.size()) - 1;
+                }
+                if (!Material.metallic_texname.empty())
+                {
+                    m_textureNames.push_back(MtlPath + '/' + Material.metallic_texname);
+                    Mat.MetallicTextureID = static_cast<int>(m_textureNames.size()) - 1;
+                }
+
                 m_materials.push_back(Mat);
             }
 
             // Add Default Material
             if (m_materials.empty()) {
                 m_materials.emplace_back();
+            }
+
+            // Fixing Material Indices
+            for (auto &MatIndex: m_materialIndex) {
+                if (MatIndex < 0 || MatIndex >= m_materials.size()) {
+                    MatIndex = 0;
+                }
             }
 
             m_materialBuffer = new ArbitraryBuffer(sizeof(ModelDesc) * m_materials.size(),

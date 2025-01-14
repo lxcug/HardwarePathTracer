@@ -9,7 +9,7 @@
 #include <core/buffer/VertexBuffer.h>
 #include "core/RHI.h"
 #include <random>
-#include "core/shaderCompiler/CompilerHLSL.h"
+#include "core/shader_compiler/CompilerHLSL.h"
 #include "core/Utils.h"
 
 
@@ -1074,7 +1074,7 @@ namespace HWPT
     {
         glm::vec3 CameraPos = glm::vec3(0.f, 0.f, 3.f);
         float AspectRatio = static_cast<float>(m_windowWidth) / static_cast<float>(m_windowHeight);
-        m_camera = std::make_shared<PerspectiveCamera>(CameraPos, AspectRatio, 1e-2f, 1e3f, 45);
+        m_camera = std::make_shared<PerspectiveCamera>(CameraPos, AspectRatio, .2f, 1e3f, 45);
         m_camera->Init();
 
         ViewUniformBuffer ViewUniformBuffer_{};
@@ -1282,14 +1282,10 @@ namespace HWPT
 
     void VulkanBackendApp::CreateModelAndSampler()
     {
-        m_vikingRoom = new Model("../../asset/viking_room/viking_room.obj",
-                                 "../../asset/viking_room/viking_room.png", true);
-        m_vikingRoom->SetModelTransform(
-            glm::translate(
-                glm::rotate(glm::rotate(glm::identity<glm::mat4>(),
-                                        glm::radians(-90.f), glm::vec3(0.f, 0.f, 1.f)),
-                            glm::radians(-90.f), glm::vec3(0.f, 1.f, 0.f)),
-                glm::vec3(0.f, 0.f, 0.f)));
+        m_vikingRoom = new Model("../../asset/viking_room_new/viking_room.obj",
+                                 "../../asset/viking_room_new/viking_room.png", true);
+        m_vikingRoom->SetModelTransform(glm::rotate(glm::identity<glm::mat4>(), glm::radians(180.f),
+                                                    glm::vec3(0., 1., 0.)));
 
         m_sampler = new Sampler();
     }
@@ -1329,34 +1325,34 @@ namespace HWPT
         IO.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // IF using Multi View
 
         auto& Colors = ImGui::GetStyle().Colors;
-        Colors[ImGuiCol_WindowBg] = ImVec4{ 0.1f, 0.105f, 0.11f, 1.0f };
+        Colors[ImGuiCol_WindowBg] = ImVec4{0.1f, 0.105f, 0.11f, 1.0f};
 
         // Headers
-        Colors[ImGuiCol_Header] = ImVec4{ 0.2f, 0.205f, 0.21f, 1.0f };
-        Colors[ImGuiCol_HeaderHovered] = ImVec4{ 0.3f, 0.305f, 0.31f, 1.0f };
-        Colors[ImGuiCol_HeaderActive] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+        Colors[ImGuiCol_Header] = ImVec4{0.2f, 0.205f, 0.21f, 1.0f};
+        Colors[ImGuiCol_HeaderHovered] = ImVec4{0.3f, 0.305f, 0.31f, 1.0f};
+        Colors[ImGuiCol_HeaderActive] = ImVec4{0.15f, 0.1505f, 0.151f, 1.0f};
 
         // Buttons
-        Colors[ImGuiCol_Button] = ImVec4{ 0.2f, 0.205f, 0.21f, 1.0f };
-        Colors[ImGuiCol_ButtonHovered] = ImVec4{ 0.3f, 0.305f, 0.31f, 1.0f };
-        Colors[ImGuiCol_ButtonActive] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+        Colors[ImGuiCol_Button] = ImVec4{0.2f, 0.205f, 0.21f, 1.0f};
+        Colors[ImGuiCol_ButtonHovered] = ImVec4{0.3f, 0.305f, 0.31f, 1.0f};
+        Colors[ImGuiCol_ButtonActive] = ImVec4{0.15f, 0.1505f, 0.151f, 1.0f};
 
         // Frame BG
-        Colors[ImGuiCol_FrameBg] = ImVec4{ 0.2f, 0.205f, 0.21f, 1.0f };
-        Colors[ImGuiCol_FrameBgHovered] = ImVec4{ 0.3f, 0.305f, 0.31f, 1.0f };
-        Colors[ImGuiCol_FrameBgActive] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+        Colors[ImGuiCol_FrameBg] = ImVec4{0.2f, 0.205f, 0.21f, 1.0f};
+        Colors[ImGuiCol_FrameBgHovered] = ImVec4{0.3f, 0.305f, 0.31f, 1.0f};
+        Colors[ImGuiCol_FrameBgActive] = ImVec4{0.15f, 0.1505f, 0.151f, 1.0f};
 
         // Tabs
-        Colors[ImGuiCol_Tab] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
-        Colors[ImGuiCol_TabHovered] = ImVec4{ 0.38f, 0.3805f, 0.381f, 1.0f };
-        Colors[ImGuiCol_TabActive] = ImVec4{ 0.28f, 0.2805f, 0.281f, 1.0f };
-        Colors[ImGuiCol_TabUnfocused] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
-        Colors[ImGuiCol_TabUnfocusedActive] = ImVec4{ 0.2f, 0.205f, 0.21f, 1.0f };
+        Colors[ImGuiCol_Tab] = ImVec4{0.15f, 0.1505f, 0.151f, 1.0f};
+        Colors[ImGuiCol_TabHovered] = ImVec4{0.38f, 0.3805f, 0.381f, 1.0f};
+        Colors[ImGuiCol_TabActive] = ImVec4{0.28f, 0.2805f, 0.281f, 1.0f};
+        Colors[ImGuiCol_TabUnfocused] = ImVec4{0.15f, 0.1505f, 0.151f, 1.0f};
+        Colors[ImGuiCol_TabUnfocusedActive] = ImVec4{0.2f, 0.205f, 0.21f, 1.0f};
 
         // Title
-        Colors[ImGuiCol_TitleBg] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
-        Colors[ImGuiCol_TitleBgActive] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
-        Colors[ImGuiCol_TitleBgCollapsed] = ImVec4{ 0.15f, 0.1505f, 0.151f, 1.0f };
+        Colors[ImGuiCol_TitleBg] = ImVec4{0.15f, 0.1505f, 0.151f, 1.0f};
+        Colors[ImGuiCol_TitleBgActive] = ImVec4{0.15f, 0.1505f, 0.151f, 1.0f};
+        Colors[ImGuiCol_TitleBgCollapsed] = ImVec4{0.15f, 0.1505f, 0.151f, 1.0f};
     }
 
     void VulkanBackendApp::CleanUpImGui()
