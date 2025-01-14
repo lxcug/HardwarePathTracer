@@ -8,13 +8,13 @@
 
 #include "core/RHI.h"
 #include "core/shader/ShaderBase.h"
-#include "core/shaderCompiler/CompilerHLSL.h"
+#include "core/shader_compiler/CompilerHLSL.h"
 #include "core/Utils.h"
 
 
 namespace HWPT
 {
-    VulkanRayTracingApp::VulkanRayTracingApp()
+    VulkanRayTracingApp::VulkanRayTracingApp(const std::string& Title) : VulkanBackendApp(Title)
     {
         DeviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
         DeviceExtensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);

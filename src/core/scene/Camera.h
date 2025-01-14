@@ -99,7 +99,7 @@ namespace HWPT {
         glm::vec3 m_cameraPos;
         glm::mat4 m_viewMatrix = glm::identity<glm::mat4>();
         glm::mat4 m_projMatrix = glm::identity<glm::mat4>();;
-        float m_aspectRatio = 1.f, m_near = 1e-2f, m_far = 1e3f;
+        float m_aspectRatio = 1.f, m_near = 1e-1f, m_far = 1e3f;
         float m_pitch = 0.f, m_yaw = 0.f;
         float m_moveSpeedMultiplier = 1.f, m_rotateSpeedMultiplier = 1.f;
         static inline float s_moveSpeed = 5.f;

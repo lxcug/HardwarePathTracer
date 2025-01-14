@@ -15,8 +15,8 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/vendor)
 
 add_executable(
         CompileHLSL
-        src/core/shaderCompiler/CompileScript.cpp
-        src/core/shaderCompiler/CompilerHLSL.cpp
+        src/core/shader_compiler/CompileScript.cpp
+        src/core/shader_compiler/CompilerHLSL.cpp
 )
 
 target_link_libraries(
@@ -66,8 +66,8 @@ add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/application/VulkanRayTracingApp.h
         src/core/acceleration_structure/AccelerationStructure.cpp
         src/core/acceleration_structure/AccelerationStructure.h
-        src/core/shaderCompiler/CompilerHLSL.cpp
-        src/core/shaderCompiler/CompilerHLSL.h
+        src/core/shader_compiler/CompilerHLSL.cpp
+        src/core/shader_compiler/CompilerHLSL.h
         src/core/buffer/ArbitraryBuffer.cpp
         src/core/buffer/ArbitraryBuffer.h
         src/core/commands/CommandPool.cpp
