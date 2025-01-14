@@ -5,46 +5,49 @@
 #include "CompilerHLSL.h"
 
 
-namespace HWPT {
-
-    void HLSLCompiler::CompileShader(const std::string &ShaderFile, const std::string &Entry,
-                                     ShaderType Type, const std::string &OutFile) {
+namespace HWPT
+{
+    void HLSLCompiler::CompileShader(const std::string& ShaderFile, const std::string& Entry,
+                                     ShaderType Type, const std::string& OutFile)
+    {
         std::string ShaderStageString;
-        switch (Type) {
-            case ShaderType::Vertex:
-                ShaderStageString = "vs_6_0";
-                break;
-            case ShaderType::Fragment:
-                ShaderStageString = "ps_6_0";
-                break;
-            case ShaderType::Geometry:
-                ShaderStageString = "gs_6_0";
-                break;
-            case ShaderType::Compute:
-                ShaderStageString = "cs_6_0";
-                break;
-            case ShaderType::RayGen:
-                [[fallthrough]];
-            case ShaderType::Miss:
-                [[fallthrough]];
-            case ShaderType::ClosestHit:
-                ShaderStageString = "lib_6_3";
-                break;
+        switch (Type)
+        {
+        case ShaderType::Vertex:
+            ShaderStageString = "vs_6_0";
+            break;
+        case ShaderType::Fragment:
+            ShaderStageString = "ps_6_0";
+            break;
+        case ShaderType::Geometry:
+            ShaderStageString = "gs_6_0";
+            break;
+        case ShaderType::Compute:
+            ShaderStageString = "cs_6_0";
+            break;
+        case ShaderType::RayGen:
+            [[fallthrough]];
+        case ShaderType::Miss:
+            [[fallthrough]];
+        case ShaderType::ClosestHit:
+            ShaderStageString = "lib_6_3";
+            break;
         }
 
         std::string CompileCommand =
-                absolute(s_dxcPath).string() + "/bin/x64/dxc.exe" +
-                " -E " + Entry +
-                " -T " + ShaderStageString +
-                " -Fo " + absolute(s_hlslDirectory).string() + "/" + OutFile + ".spv " +
-                " -fspv-extension=SPV_KHR_ray_tracing" +
-                " -fspv-target-env=vulkan1.3 " +
-                " -spirv " +
-                " -fspv-extension=SPV_KHR_physical_storage_buffer " +
-                " -fspv-extension=SPV_EXT_descriptor_indexing " +
-                absolute(s_hlslDirectory).string() + "/" + ShaderFile;
+            absolute(s_dxcPath).string() + "/bin/x64/dxc.exe" +
+            " -E " + Entry +
+            " -T " + ShaderStageString +
+            " -Fo " + absolute(s_hlslDirectory).string() + "/" + OutFile + ".spv " +
+            " -fspv-extension=SPV_KHR_ray_tracing" +
+            " -fspv-target-env=vulkan1.3 " +
+            " -spirv " +
+            " -fspv-extension=SPV_KHR_physical_storage_buffer " +
+            " -fspv-extension=SPV_EXT_descriptor_indexing " +
+            // " -fvk-use-dx-layout " +
+            absolute(s_hlslDirectory).string() + "/" + ShaderFile;
 
-//        std::cout << CompileCommand << '\n';
+        //        std::cout << CompileCommand << '\n';
 
         auto RetString = HLSLCompiler::ExecCmd(CompileCommand);
 
@@ -52,7 +55,8 @@ namespace HWPT {
         std::cout.flush();
     }
 
-    auto HLSLCompiler::ExecCmd(const std::string &cmd) -> std::string {
+    auto HLSLCompiler::ExecCmd(const std::string& cmd) -> std::string
+    {
         HANDLE hStdOutRead = NULL;
         HANDLE hStdOutWrite = NULL;
         SECURITY_ATTRIBUTES saAttr;
@@ -61,12 +65,14 @@ namespace HWPT {
         saAttr.bInheritHandle = TRUE;
         saAttr.lpSecurityDescriptor = NULL;
 
-        if (!CreatePipe(&hStdOutRead, &hStdOutWrite, &saAttr, 0)) {
+        if (!CreatePipe(&hStdOutRead, &hStdOutWrite, &saAttr, 0))
+        {
             std::cerr << "CreatePipe failed\n";
             return "";
         }
 
-        if (!SetHandleInformation(hStdOutRead, HANDLE_FLAG_INHERIT, 0)) {
+        if (!SetHandleInformation(hStdOutRead, HANDLE_FLAG_INHERIT, 0))
+        {
             std::cerr << "SetHandleInformation failed\n";
             return "";
         }
@@ -82,7 +88,7 @@ namespace HWPT {
         siStartInfo.dwFlags |= STARTF_USESTDHANDLES;
 
         if (!CreateProcessA(NULL,
-                            const_cast<char *>(cmd.c_str()),
+                            const_cast<char*>(cmd.c_str()),
                             NULL,
                             NULL,
                             TRUE,
@@ -90,7 +96,8 @@ namespace HWPT {
                             NULL,
                             NULL,
                             &siStartInfo,
-                            &piProcInfo)) {
+                            &piProcInfo))
+        {
             std::cerr << "CreateProcess failed (" << GetLastError() << ")\n";
             return "";
         }
@@ -101,7 +108,8 @@ namespace HWPT {
         DWORD dwRead;
         CHAR chBuf[4096];
         BOOL bSuccess = FALSE;
-        for (;;) {
+        for (;;)
+        {
             bSuccess = ReadFile(hStdOutRead, chBuf, sizeof(chBuf) - 1, &dwRead, NULL);
             if (!bSuccess || dwRead == 0) break;
             chBuf[dwRead] = '\0';
@@ -114,4 +122,4 @@ namespace HWPT {
 
         return output;
     }
-}  // namespace HWPT
+} // namespace HWPT

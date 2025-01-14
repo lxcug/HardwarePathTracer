@@ -365,7 +365,7 @@ namespace HWPT
             ImGuiInfrastructure::End();
         }
 
-        static bool ShowGBuffer = false;
+        static bool ShowGBuffer = true;
         {
             if (ShowGBuffer)
             {

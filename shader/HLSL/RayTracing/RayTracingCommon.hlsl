@@ -2,8 +2,11 @@
 
 struct Vertex {
     float3 Pos;
+    uint PosPadding;
     float3 Normal;
+    uint NormalPadding;
     float3 Color;
+    uint ColorPadding;
     float2 TexCoord;
 };
 
@@ -49,8 +52,8 @@ struct HitAttribute
 
 struct Material {
     float3 Albedo;
-    float3 Emissive;
     float Opacity;
+    float3 Emissive;
     int TextureID;
 };
 

@@ -88,7 +88,6 @@ namespace HWPT
         bool m_shouldRecreateViewportImages = false;
         std::vector<VkDescriptorSet> m_viewportImageDescriptorSets;
         GBuffer* m_gBuffer = nullptr;
-        glm::vec2 m_gbufferViewPortSize = glm::vec2(1.f, 1.f);
     };
 } // namespace HWPT
 
