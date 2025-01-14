@@ -59,9 +59,4 @@ namespace HWPT::Utils {
     auto Align(uint Size, uint Alignment) -> uint {
         return (Size + Alignment - 1) & ~(Alignment - 1);
     }
-
-    auto Float3ArrayToGLM(const float Value[3]) -> glm::vec3
-    {
-        return glm::vec3(*Value);
-    }
 }  // namespace HWPT::Utils

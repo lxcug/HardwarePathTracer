@@ -9,88 +9,110 @@
 #include "core/input/KeyCode.h"
 
 
-namespace HWPT {
-    enum class CameraType {
+namespace HWPT
+{
+    enum class CameraType
+    {
         Orthographic = 0x0,
         Perspective,
         CameraTypeMax = 0x7fffffff
     };
 
-    class CameraBase {
+    class CameraBase
+    {
     public:
-        CameraBase(CameraType Type, const glm::vec3 &CameraPos, float AspectRatio,
+        CameraBase(CameraType Type, const glm::vec3& CameraPos, float AspectRatio,
                    float NearPlane, float FarPlane) : m_cameraPos(CameraPos), m_type(Type),
                                                       m_aspectRatio(AspectRatio), m_near(NearPlane),
-                                                      m_far(FarPlane) {
-
+                                                      m_far(FarPlane)
+        {
         }
 
-        virtual void Init() {
+        virtual void Init()
+        {
             UpdateViewMatrix();
         }
 
-        void UpdateViewMatrix() {
-//            m_viewMatrix = glm::lookAt(m_cameraPos, m_cameraPos + GetForwardDirection(),
-//                                       GetUpDirection());
-//            auto camera2world = glm::translate(glm::identity<glm::mat4>(), m_cameraPos) *
-//                                glm::toMat4(GetOrientation());
-//            m_viewMatrix = glm::inverse(camera2world);
-            // NOTE: conjugate of quat
-            m_viewMatrix = glm::toMat4(glm::conjugate(GetOrientation())) * glm::translate(glm::mat4(1.f), -m_cameraPos);
-        }
+        void UpdateViewMatrix();
 
         // Return if camera is moving
         virtual void Tick(float DeltaTime);
 
-        [[nodiscard]] auto GetOrientation() const -> glm::quat {
+        void SetPosition(const glm::vec3& Pos)
+        {
+            m_cameraPos = Pos;
+            UpdateViewMatrix();
+        }
+
+        void SetRotation(float Pitch, float Yaw)
+        {
+            m_pitch = Pitch;
+            m_yaw = Yaw;
+            UpdateViewMatrix();
+        }
+
+        [[nodiscard]] auto GetOrientation() const -> glm::quat
+        {
             return {glm::vec3(m_pitch, m_yaw, 0.f)};
         }
 
-        [[nodiscard]] auto GetForwardDirection() const -> glm::vec3 {
+        [[nodiscard]] auto GetForwardDirection() const -> glm::vec3
+        {
             return glm::rotate(GetOrientation(), glm::vec3(0.f, 0.f, -1.f));
         }
 
-        [[nodiscard]] auto GetUpDirection() const -> glm::vec3 {
+        [[nodiscard]] auto GetUpDirection() const -> glm::vec3
+        {
             return glm::rotate(GetOrientation(), glm::vec3(0.f, 1.f, 0.f));
         }
 
-        [[nodiscard]] auto GetRightDirection() const -> glm::vec3 {
+        [[nodiscard]] auto GetRightDirection() const -> glm::vec3
+        {
             return glm::rotate(GetOrientation(), glm::vec3(1.f, 0.f, 0.f));
         }
 
-        [[nodiscard]] auto GetViewMatrix() const -> glm::mat4 {
+        [[nodiscard]] auto GetViewMatrix() const -> glm::mat4
+        {
             return m_viewMatrix;
         }
 
-        [[nodiscard]] auto GetProjMatrix() const -> glm::mat4 {
+        [[nodiscard]] auto GetProjMatrix() const -> glm::mat4
+        {
             return m_projMatrix;
         }
 
-        [[nodiscard]] auto GetCameraPos() const -> glm::vec3 {
+        [[nodiscard]] auto GetCameraPos() const -> glm::vec3
+        {
             return m_cameraPos;
         }
 
-        void SetCameraMoveMultiplier(float Value) {
+        void SetCameraMoveMultiplier(float Value)
+        {
             m_moveSpeedMultiplier = Value;
         }
 
-        void SetCameraRotateMultiplier(float Value) {
+        void SetCameraRotateMultiplier(float Value)
+        {
             m_rotateSpeedMultiplier = Value;
         }
 
-        [[nodiscard]] auto IsMoving() const -> bool {
+        [[nodiscard]] auto IsMoving() const -> bool
+        {
             return m_isMoving;
         }
 
-        [[nodiscard]] auto GetPitch() const -> float {
+        [[nodiscard]] auto GetPitch() const -> float
+        {
             return m_pitch;
         }
 
-        [[nodiscard]] auto GetYaw() const -> float {
+        [[nodiscard]] auto GetYaw() const -> float
+        {
             return m_yaw;
         }
 
-        virtual void OnWindowResize(uint Width, uint Height) {
+        virtual void OnWindowResize(uint Width, uint Height)
+        {
             m_aspectRatio = static_cast<float>(Width) / static_cast<float>(Height);
         }
 
@@ -110,37 +132,34 @@ namespace HWPT {
     };
 
 
-    class PerspectiveCamera : public CameraBase {
+    class PerspectiveCamera : public CameraBase
+    {
     public:
-        PerspectiveCamera(const glm::vec3 &CameraPos, float AspectRatio,
+        PerspectiveCamera(const glm::vec3& CameraPos, float AspectRatio,
                           float NearPlane, float FarPlane, float FOV)
-                : CameraBase(CameraType::Perspective, CameraPos, AspectRatio, NearPlane, FarPlane),
-                  m_fov(FOV) {
-
+            : CameraBase(CameraType::Perspective, CameraPos, AspectRatio, NearPlane, FarPlane),
+              m_fov(FOV)
+        {
         }
 
-        void Init() override {
+        void Init() override
+        {
             CameraBase::Init();
             UpdateProjMatrix();
         }
 
-        void OnWindowResize(uint Width, uint Height) override {
+        void OnWindowResize(uint Width, uint Height) override
+        {
             CameraBase::OnWindowResize(Width, Height);
             UpdateProjMatrix();
         }
 
-        void UpdateProjMatrix() {
-            // NOTE: Right Handedness + z from Zero to One
-            m_projMatrix = glm::perspectiveRH_ZO(glm::radians(m_fov), m_aspectRatio, m_near, m_far);
-            m_projMatrix[1][1] *= -1;  // NOTE: Flip Y Axis for Vulkan
-        }
+        void UpdateProjMatrix();
 
     protected:
         float m_fov = 45.f;
     };
-
-
-}  // namespace HWPT
+} // namespace HWPT
 
 
 #endif //HARDWAREPATHTRACER_CAMERA_H

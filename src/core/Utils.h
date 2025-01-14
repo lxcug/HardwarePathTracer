@@ -29,8 +29,6 @@ namespace HWPT::Utils {
     auto GLMToVulkanMatrix(const glm::mat4& Mat) -> VkTransformMatrixKHR;
 
     auto Align(uint Size, uint Alignment) -> uint;
-
-    auto Float3ArrayToGLM(const float Value[3]) -> glm::vec3;
 }  // namespace HWPT::Utils
 
 #endif //HARDWAREPATHTRACER_UTILS_H

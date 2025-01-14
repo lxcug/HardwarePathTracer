@@ -117,7 +117,7 @@ namespace HWPT
 
         CreateDescriptorPool();
 
-        CreateUniformBuffers();
+        CreateViewUniformBuffers();
         CreateModelAndSampler();
 
         CreateGraphicsDescriptorSetLayout();
@@ -1070,7 +1070,7 @@ namespace HWPT
             &m_computePipeline));
     }
 
-    void VulkanBackendApp::CreateUniformBuffers()
+    void VulkanBackendApp::CreateViewUniformBuffers()
     {
         glm::vec3 CameraPos = glm::vec3(0.f, 0.f, 3.f);
         float AspectRatio = static_cast<float>(m_windowWidth) / static_cast<float>(m_windowHeight);
@@ -1284,8 +1284,6 @@ namespace HWPT
     {
         m_vikingRoom = new Model("../../asset/viking_room_new/viking_room.obj",
                                  "../../asset/viking_room_new/viking_room.png", true);
-        m_vikingRoom->SetModelTransform(glm::rotate(glm::identity<glm::mat4>(), glm::radians(180.f),
-                                                    glm::vec3(0., 1., 0.)));
 
         m_sampler = new Sampler();
     }

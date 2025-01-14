@@ -41,12 +41,15 @@ namespace HWPT
 
         CreateDescriptorPool();
 
-        CreateUniformBuffers();
+        CreateViewUniformBuffers();
         CreateModelAndSampler();
 
         CreateSyncObjects();
 
         InitRayTracing();
+
+        m_camera->SetPosition(glm::vec3(2.f, 1.f, 2.5f));
+        m_camera->SetRotation(-glm::radians(15.f), glm::radians(30.f));
     }
 
     void VulkanRayTracingApp::CleanUp()
@@ -449,6 +452,7 @@ namespace HWPT
             auto CameraPos = m_camera->GetCameraPos();
             ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", CameraPos.x, CameraPos.y,
                         CameraPos.z);
+            ImGui::Text("Pitch %.2f:  Yaw %.2f", m_camera->GetPitch(), m_camera->GetYaw());
             ImGuiInfrastructure::End();
         }
     }
