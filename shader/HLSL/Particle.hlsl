@@ -1,7 +1,7 @@
 #pragma Vertex VSMain
 #pragma Fragment PSMain
 
-#include "ViewUniformBuffer.hlsl"
+#include "../../src/host_device_shared/ViewUniformBuffer.h"
 
 struct VSInput {
     float3 Position : POSITION;
