@@ -182,6 +182,7 @@ namespace HWPT
                                 BindingDescriptorSets.data(),
                                 0, nullptr);
         m_renderOptions.ShouldReAccumulate = m_camera->IsMoving();
+        m_renderOptions.NumLights = m_RTScene->GetSceneLights().size();
         vkCmdPushConstants(CommandBuffer, m_RTPipelineLayout,
                            VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
                            VK_SHADER_STAGE_MISS_BIT_KHR,
@@ -809,6 +810,17 @@ namespace HWPT
         m_RTScene = new Scene();
         m_vikingRoom->SetModelName("VikingRoom");
         m_RTScene->AddModel(m_vikingRoom);
+        m_RTScene->AddLight(
+            glm::normalize(glm::vec3(1.f, -1.f, 0.f)),
+            LightType::Directional,
+            glm::vec3(.5f, .5f, .5f),
+            0.f,
+            glm::vec3(1.f, 1.f, 1.f),
+            10.f,
+            0.f,
+            0.f,
+            0.f
+        );
         m_RTScene->FinalizeScene();
     }
 

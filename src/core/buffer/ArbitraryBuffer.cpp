@@ -10,11 +10,13 @@ namespace HWPT {
 
     ArbitraryBuffer::ArbitraryBuffer(VkDeviceSize Size, VkBufferUsageFlags Usage,
                                      VkMemoryPropertyFlags MemProps = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
+        Size = std::max(Size, static_cast<uint64_t>(1));
         RHI::CreateBuffer(Size, Usage, MemProps, m_buffer, m_bufferMemory);
     }
 
     ArbitraryBuffer::ArbitraryBuffer(VkDeviceSize Size, void *Data, VkBufferUsageFlags Usage,
                                      VkMemoryPropertyFlags MemProps) {
+        Size = std::max(Size, static_cast<uint64_t>(1));
         auto [StagingBuffer, StagingBufferMemory] = RHI::CreateStagingBuffer(Size);
 
         void *MappedData;

@@ -42,22 +42,26 @@ void main()
 
     // Distance Based RT AO
     float ao = 0.f;
-    if (payload.is_hit) {
-        uint hit_count = 0;
-        float3 hit_pos = payload.pos;
-        float3 tangent, bitangent;
-        GetCoordBasis(payload.normal, tangent, bitangent);
-        for (int i = 0; i < render_options.NumAORays; i++) {
-            RayDesc ao_ray;
-            ao_ray.Origin = hit_pos;
-            float3 dir_local = uniform_sample_hemisphere(rnd(seed), rnd(seed));
-            ao_ray.Direction = dir_local.x * tangent + dir_local.y * bitangent + dir_local.z * payload.normal;
-            ao_ray.TMin = 1e-3;
-            ao_ray.TMax = render_options.AORayLength;
+    if (render_options.EnableAO) {
+        if (payload.is_hit) {
+            uint hit_count = 0;
+            float3 hit_pos = payload.pos;
+            float3 tangent, bitangent;
+            GetCoordBasis(payload.normal, tangent, bitangent);
+            for (int i = 0; i < render_options.NumAORays; i++) {
+                RayDesc ao_ray;
+                ao_ray.Origin = hit_pos;
+                float3 dir_local = uniform_sample_hemisphere(rnd(seed), rnd(seed));
+                ao_ray.Direction = dir_local.x * tangent + dir_local.y * bitangent + dir_local.z * payload.normal;
+                ao_ray.TMin = 1e-3;
+                ao_ray.TMax = render_options.AORayLength;
 
-            ao += TraceAORay(ao_ray);
+                ao += TraceAORay(ao_ray);
+            }
+            ao /= (render_options.NumAORays * render_options.AORayLength);
         }
-        ao /= (render_options.NumAORays * render_options.AORayLength);
+    } else {
+        ao = 1.f;
     }
 
     if (payload.is_hit) {
@@ -70,10 +74,7 @@ void main()
         float depth = ClipPos.z / ClipPos.w;
         GBuffer[3][index] = float4(depth, depth, depth, 1.f);
 
-        float3 color = payload.albedo;
-        if (render_options.EnableAO) {
-            color *= ao;
-        }
+        float3 color = payload.albedo * ao;
 
         if (view_uniform_buffer.FrameNum <= 2 || render_options.ShouldReAccumulate) {
             OutImage[index] = float4(color, 1.0);

@@ -15,6 +15,8 @@ BEGIN_HWPT_NAMESPACE
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, ShouldReAccumulate, 1);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, NumAORays, 4);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, AORayLength, 5.f);
+
+        uint NumLights;
     };
 
 #if IS_COMPILING_SHADER
