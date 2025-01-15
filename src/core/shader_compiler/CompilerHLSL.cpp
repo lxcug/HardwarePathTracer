@@ -44,6 +44,7 @@ namespace HWPT
             " -spirv " +
             " -fspv-extension=SPV_KHR_physical_storage_buffer " +
             " -fspv-extension=SPV_EXT_descriptor_indexing " +
+            " -D USING_DXC " +
             // " -fvk-use-dx-layout " +
             absolute(s_hlslDirectory).string() + "/" + ShaderFile;
 

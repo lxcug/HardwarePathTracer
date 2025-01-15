@@ -22,6 +22,11 @@ namespace HWPT
         m_texture = new Texture2D(TexturePath, 1, m_generateMips);
     }
 
+    Model::Model(const std::filesystem::path& ModelPath)
+    {
+        LoadModel(ModelPath);
+    }
+
     void Model::LoadModel(const std::filesystem::path& ModelPath)
     {
         tinyobj::attrib_t Attrib;

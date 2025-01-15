@@ -3,21 +3,6 @@
 #include "RayTracingCommon.hlsl"
 #include "../ViewUniformBuffer.hlsl"
 
-
-float Random(float3 seed) {
-    float x = dot(seed, float3(12.9898, 78.233, 54.53));
-    x = frac(sin(x) * 43758.5453);
-    return x;
-}
-
-float3 uniform_sample_hemisphere(float3 normal, float rnd1, float rnd2) {
-    float3 up = abs(normal.z) < 0.999 ? float3(0.0, 0.0, 1.0) : float3(1.0, 0.0, 0.0);
-    float3 tangent = normalize(cross(up, normal));
-    float3 bitangent = cross(normal, tangent);
-    float3 dir = float3(cos(2 * PI * rnd1) * sqrt(1 - rnd2), sin(2 * PI * rnd1) * sqrt(1 - rnd2), sqrt(rnd2));
-    return dir.x * tangent + dir.y * bitangent + dir.z * normal;
-}
-
 #define NUM_AO_RAYS 4
 
 

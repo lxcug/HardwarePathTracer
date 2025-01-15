@@ -17,9 +17,15 @@ namespace HWPT {
 
         void CreateSampler();
 
-        auto GetHandle() -> VkSampler {
+        [[nodiscard]] auto GetHandle() const -> VkSampler {
             return m_sampler;
         }
+
+        inline static auto GetDefaultSample() -> Sampler&
+        {
+            static class Sampler Sampler;
+            return Sampler;
+        };
 
     private:
         VkSampler m_sampler = VK_NULL_HANDLE;

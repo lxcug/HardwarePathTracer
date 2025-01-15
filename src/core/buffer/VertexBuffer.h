@@ -12,32 +12,11 @@
 
 #define GLM_ENABLE_EXPERIMENTAL
 
-#include <glm/gtx/hash.hpp>
-#include <unordered_map>
-#include <utility>
 #include "VertexBufferLayout.h"
+#include "host_device_shared/Vertex.h"
 
 
 namespace HWPT {
-    struct Vertex {
-        glm::vec3 Pos;
-        uint PosPadding;
-        glm::vec3 Normal;
-        uint NormalPadding;
-        glm::vec3 Color;
-        uint ColorPadding;
-        glm::vec2 TexCoord;
-
-        Vertex() = default;
-
-        auto operator==(const Vertex &Other) const -> bool {
-            return Pos == Other.Pos && Normal == Other.Normal;
-        }
-
-        static auto GetBindingDescription() -> VkVertexInputBindingDescription;
-
-        static auto GetAttributeDescriptions() -> std::array<VkVertexInputAttributeDescription, 4>;
-    };
 
     class VertexBuffer {
     public:
@@ -72,16 +51,5 @@ namespace HWPT {
         uint m_vertexCount = 0;
     };
 }  // namespace HWPT
-
-namespace std {
-    template<>
-    struct hash<HWPT::Vertex> {
-        auto operator()(HWPT::Vertex const &_Vertex) const -> size_t {
-            return ((hash<glm::vec3>()(_Vertex.Pos) ^
-                     (hash<glm::vec3>()(_Vertex.Normal) << 1)) >> 1) ^
-                   (hash<glm::vec2>()(_Vertex.TexCoord) << 1);
-        }
-    };
-}  // namespace std
 
 #endif //HARDWAREPATHTRACER_VERTEXBUFFER_H

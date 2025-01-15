@@ -118,7 +118,7 @@ namespace HWPT
         CreateDescriptorPool();
 
         CreateViewUniformBuffers();
-        CreateModelAndSampler();
+        CreateModels();
 
         CreateGraphicsDescriptorSetLayout();
         CreateGraphicsPipeline();
@@ -149,7 +149,6 @@ namespace HWPT
             delete m_MVPUniformBuffers[i];
             delete m_particleStorageBuffers[i];
         }
-        delete m_sampler;
 
         CleanUpImGui();
         CleanUpSwapChain();
@@ -1154,7 +1153,7 @@ namespace HWPT
             VkDescriptorImageInfo ImageInfo{};
             ImageInfo.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
             ImageInfo.imageView = m_vikingRoom->GetTexture()->CreateSRV();
-            ImageInfo.sampler = m_sampler->GetHandle();
+            ImageInfo.sampler = Sampler::GetDefaultSample().GetHandle();
             DescriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             DescriptorWrites[1].dstSet = m_graphicsDescriptorSets[i];
             DescriptorWrites[1].dstBinding = 1;
@@ -1280,12 +1279,10 @@ namespace HWPT
         CreateFrameBuffers();
     }
 
-    void VulkanBackendApp::CreateModelAndSampler()
+    void VulkanBackendApp::CreateModels()
     {
-        m_vikingRoom = new Model("../../asset/viking_room_new/viking_room.obj",
-                                 "../../asset/viking_room_new/viking_room.png", true);
-
-        m_sampler = new Sampler();
+        // m_vikingRoom = new Model("../../asset/viking_room_new/viking_room_new.obj");
+        m_vikingRoom = new Model("../../asset/house_with_tree/house_with_tree.obj");
     }
 
     void VulkanBackendApp::InitImGui()
