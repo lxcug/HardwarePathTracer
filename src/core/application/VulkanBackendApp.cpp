@@ -35,7 +35,7 @@ namespace HWPT
 
             if (m_camera->IsMoving())
             {
-                m_frameNum = 0;
+                ResetFrameNum();
             }
 
             glfwPollEvents();
@@ -45,8 +45,8 @@ namespace HWPT
             m_frameNum++;
             m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
         }
-        vkDeviceWaitIdle(m_device);
 
+        vkDeviceWaitIdle(m_device);
         CleanUp();
     }
 
@@ -97,6 +97,7 @@ namespace HWPT
 
         glfwSetWindowUserPointer(m_window, this);
         glfwSetFramebufferSizeCallback(m_window, FrameBufferResizeCallback);
+        glfwSetScrollCallback(m_window, MouseScrollCallBack);
     }
 
     void VulkanBackendApp::InitVulkan()
@@ -140,8 +141,16 @@ namespace HWPT
         App->m_frameBufferResized = true;
     }
 
+    void VulkanBackendApp::MouseScrollCallBack(GLFWwindow* Window, double XOffset, double YOffset)
+    {
+        auto App =
+            reinterpret_cast<VulkanBackendApp*>(glfwGetWindowUserPointer(Window));
+        App->GetCamera()->OnMouseScroll(XOffset, YOffset);
+    }
+
     void VulkanBackendApp::CleanUp()
     {
+        Sampler::ReleaseSamplers();
         delete m_msaaBuffers;
         delete m_vikingRoom;
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
@@ -1077,7 +1086,6 @@ namespace HWPT
         m_camera->Init();
 
         ViewUniformBuffer ViewUniformBuffer_{};
-        ViewUniformBuffer_.ModelTrans = glm::identity<glm::mat4>();
         ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();
         ViewUniformBuffer_.ProjTrans = m_camera->GetProjMatrix();
         ViewUniformBuffer_.CameraPos = m_camera->GetCameraPos();
@@ -1153,7 +1161,7 @@ namespace HWPT
             VkDescriptorImageInfo ImageInfo{};
             ImageInfo.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
             ImageInfo.imageView = m_vikingRoom->GetTexture()->CreateSRV();
-            ImageInfo.sampler = Sampler::GetDefaultSample().GetHandle();
+            ImageInfo.sampler = Sampler::GetDefaultSample()->GetHandle();
             DescriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             DescriptorWrites[1].dstSet = m_graphicsDescriptorSets[i];
             DescriptorWrites[1].dstBinding = 1;
@@ -1218,7 +1226,6 @@ namespace HWPT
         vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_graphicsPipeline);
 
         ViewUniformBuffer ViewUniformBuffer_{};
-        ViewUniformBuffer_.ModelTrans = m_vikingRoom->GetModelTransform();
         ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();
         ViewUniformBuffer_.ProjTrans = m_camera->GetProjMatrix();
         ViewUniformBuffer_.CameraPos = m_camera->GetCameraPos();

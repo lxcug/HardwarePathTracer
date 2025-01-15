@@ -86,6 +86,11 @@ namespace HWPT
 
         virtual void DrawImGuiFrame();
 
+        void ResetFrameNum()
+        {
+            m_frameNum = 0;
+        }
+
         [[nodiscard]] auto GetVkInstance() const -> VkInstance
         {
             return m_instance;
@@ -146,6 +151,11 @@ namespace HWPT
             return m_descriptorPool;
         }
 
+        auto GetCamera() const -> std::shared_ptr<CameraBase>
+        {
+            return m_camera;
+        }
+
     protected:
         // Init GLFW Windows
         void InitWindow();
@@ -159,6 +169,8 @@ namespace HWPT
 
         // FrameBuffer Resize Callback
         static void FrameBufferResizeCallback(GLFWwindow* Window, int Width, int Height);
+
+        static void MouseScrollCallBack(GLFWwindow* Window, double XOffset, double YOffset);
 
         void RecreateSwapChain();
 

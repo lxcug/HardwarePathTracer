@@ -22,13 +22,14 @@ BEGIN_HWPT_NAMESPACE
     struct Light
     {
         float3 Direction;
-        LightType Type;
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(LightType, Type, LightType::LightTypeMax);
 
         float3 Position;
         float Radius;
 
-        float3 Color;
-        float Intensity;
+        // Set Default Color to Red for Debug
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float3, Color, float3(1.f, 0.f, 0.f));
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, Intensity, 1.f);
 
         float AngleSizeOrInvRange;
         float InnerAngle;

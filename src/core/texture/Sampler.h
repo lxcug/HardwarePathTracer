@@ -21,11 +21,16 @@ namespace HWPT {
             return m_sampler;
         }
 
-        inline static auto GetDefaultSample() -> Sampler&
+        static auto GetDefaultSample() -> Sampler*
         {
-            static class Sampler Sampler;
+            static class Sampler* Sampler = new class Sampler;
             return Sampler;
         };
+
+        static void ReleaseSamplers()
+        {
+            delete GetDefaultSample();
+        }
 
     private:
         VkSampler m_sampler = VK_NULL_HANDLE;

@@ -10,27 +10,25 @@
 
 BEGIN_HWPT_NAMESPACE
 
-#if IS_COMPILING_CPP
-    struct ViewUniformBuffer
-#else
-cbuffer ViewUniformBuffer : register(b0)
+struct ViewUniformBuffer
+{
+    // float4x4 ModelTrans;
+    float4x4 ViewTrans;
+    float4x4 ProjTrans;
+
+    float3 DebugColor;
+    float DeltaTime;
+
+    float3 CameraPos;
+    uint FrameNum;
+
+    float4x4 InvView;
+    float4x4 InvProj;
+};
+
+#if IS_COMPILING_SHADER
+ConstantBuffer<ViewUniformBuffer> view_uniform_buffer : register(b0, space0);
 #endif
-    {
-        float4x4 ModelTrans;
-        float4x4 ViewTrans;
-        float4x4 ProjTrans;
-
-        float3 DebugColor;
-        float DeltaTime;
-
-        float3 CameraPos;
-        uint FrameNum;
-
-        float4x4 InvView;
-        float4x4 InvProj;
-
-        bool ShouldReAccumulate;
-    };
 
 END_HWPT_NAME_SPACE
 

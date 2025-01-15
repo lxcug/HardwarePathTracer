@@ -9,6 +9,15 @@
 
 
 BEGIN_HWPT_NAMESPACE
+    struct ModelDesc
+    {
+        // NOLINT
+        uint64_t VertexBufferAddress;
+        uint64_t IndexBufferAddress;
+        uint64_t MaterialBufferAddress;
+        uint64_t MaterialIndexBufferAddress;
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, TextureIndexOffset, -1);
+    };
 
     struct Material
     {
@@ -29,14 +38,7 @@ BEGIN_HWPT_NAMESPACE
 
 #if IS_COMPILING_SHADER
 
-struct ModelDesc {
-    uint64_t VertexBufferAddress;
-    uint64_t IndexBufferAddress;
-    uint64_t MaterialBufferAddress;
-    uint64_t MaterialIndexBufferAddress;
-    int TextureIndexOffset;
-};
-
+// TODO: Fixed Binding to space1, Should be Consistent with the PipelineLayoutBinding Index
 StructuredBuffer<ModelDesc> ModelInfo : register(t0, space1);
 Texture2D<float4> MaterialTextures[] : register(t1, space1);
 SamplerState Samplers[] : register(s1, space1);

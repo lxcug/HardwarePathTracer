@@ -42,15 +42,15 @@ namespace HWPT
             " -fspv-extension=SPV_KHR_ray_tracing" +
             " -fspv-target-env=vulkan1.3 " +
             " -spirv " +
-            " -fspv-extension=SPV_KHR_physical_storage_buffer " +
-            " -fspv-extension=SPV_EXT_descriptor_indexing " +
+            " -fspv-extension=SPV_KHR_physical_storage_buffer " +  // Enable Load Data from StorageBuffer
+            " -fspv-extension=SPV_EXT_descriptor_indexing " +  // Enable Bindless
             " -D USING_DXC " +
             // " -fvk-use-dx-layout " +
             absolute(s_hlslDirectory).string() + "/" + ShaderFile;
 
         //        std::cout << CompileCommand << '\n';
 
-        auto RetString = HLSLCompiler::ExecCmd(CompileCommand);
+        auto RetString = ExecCmd(CompileCommand);
 
         std::cout << RetString << "\n";
         std::cout.flush();

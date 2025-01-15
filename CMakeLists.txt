@@ -94,6 +94,7 @@ add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/host_device_shared/Vertex.cpp
         src/host_device_shared/Material.h
         src/host_device_shared/ViewUniformBuffer.h
+        src/host_device_shared/RenderOptions.h
 )
 
 include_directories(

@@ -17,14 +17,6 @@
 
 namespace HWPT {
 
-    struct ModelDesc {
-        VkDeviceAddress VertexBufferAddress;
-        VkDeviceAddress IndexBufferAddress;
-        VkDeviceAddress MaterialBufferAddress;  // Material Array of All Triangles' Address
-        VkDeviceAddress MaterialIndexBufferAddress;  // Material Index of a Triangle
-        int TextureIndexOffset = -1;
-    };
-
     class Model {
     public:
         Model(const std::filesystem::path &ModelPath, const std::filesystem::path &TexturePath,
