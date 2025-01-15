@@ -5,13 +5,24 @@
 #include "../../../src/host_device_shared/RenderOptions.h"
 
 
+float TraceAORay(in RayDesc ray) {
+    RayPayload payload;
+    TraceRay(TLAS, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xff, 0, 0, 0, ray, payload);
+    if (!payload.is_hit) {
+        return render_options.AORayLength;
+    }
+    return payload.hit_t;
+}
+
+
 [shader("raygeneration")]
 void main()
 {
     uint2 index = DispatchRaysIndex().xy;
     uint2 dim = DispatchRaysDimensions().xy;
 
-    uint seed = view_uniform_buffer.FrameNum + index.x * dim.y + index.y * dim.x;
+    uint seed = tea(index.x * dim.y + index.y * dim.x, view_uniform_buffer.FrameNum);
+
     float2 jitter = float2(rnd(seed), rnd(seed));
     float2 uv = (index + .5 + jitter) / dim;
     float3 origin = view_uniform_buffer.CameraPos;
@@ -29,26 +40,24 @@ void main()
     uint flags = RAY_FLAG_FORCE_OPAQUE;
     TraceRay(TLAS, flags, 0xff, 0, 0, 0, ray, payload);
 
-    // Short Range RTAO
+    // Distance Based RT AO
     float ao = 0.f;
     if (payload.is_hit) {
-        float3 hit_pos = payload.pos;
-        float3 hit_normal = payload.normal;
         uint hit_count = 0;
+        float3 hit_pos = payload.pos;
+        float3 tangent, bitangent;
+        GetCoordBasis(payload.normal, tangent, bitangent);
         for (int i = 0; i < render_options.NumAORays; i++) {
             RayDesc ao_ray;
-            RayPayload ao_payload;
             ao_ray.Origin = hit_pos;
-            ao_ray.Direction = uniform_sample_hemisphere(hit_normal, rnd(seed), rnd(seed));
-            ao_ray.TMin = 1e-4;
+            float3 dir_local = uniform_sample_hemisphere(rnd(seed), rnd(seed));
+            ao_ray.Direction = dir_local.x * tangent + dir_local.y * bitangent + dir_local.z * payload.normal;
+            ao_ray.TMin = 1e-3;
             ao_ray.TMax = render_options.AORayLength;
 
-            TraceRay(TLAS, flags, 0xff, 0, 0, 0, ao_ray, ao_payload);
-            if (ao_payload.is_hit) {
-               hit_count++;
-            }
+            ao += TraceAORay(ao_ray);
         }
-        ao = 1.f - (float)hit_count / render_options.NumAORays;
+        ao /= (render_options.NumAORays * render_options.AORayLength);
     }
 
     if (payload.is_hit) {

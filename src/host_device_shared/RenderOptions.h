@@ -13,8 +13,8 @@ BEGIN_HWPT_NAMESPACE
         // TODO: Pack Bool into Int/UInt
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableAO, 1);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, ShouldReAccumulate, 1);
-        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, NumAORays, 16);
-        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, AORayLength, 1.f);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, NumAORays, 4);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, AORayLength, 5.f);
     };
 
 #if IS_COMPILING_SHADER
