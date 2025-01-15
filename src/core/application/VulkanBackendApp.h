@@ -160,11 +160,6 @@ namespace HWPT
             return m_surface;
         }
 
-        [[nodiscard]] auto GetSampler() const -> Sampler*
-        {
-            return m_sampler;
-        }
-
     protected:
         // Init GLFW Windows
         void InitWindow();
@@ -240,7 +235,7 @@ namespace HWPT
 
         void CreateViewUniformBuffers();
 
-        void CreateModelAndSampler();
+        void CreateModels();
 
         virtual void OnWindowResize();
 
@@ -302,7 +297,6 @@ namespace HWPT
         inline static VulkanBackendApp* s_application = nullptr;
 
         std::vector<UniformBuffer*> m_MVPUniformBuffers;
-        Sampler* m_sampler = nullptr;
 
         std::vector<VkSemaphore> m_imageAvailableSemaphores;
         std::vector<VkSemaphore> m_renderFinishedSemaphores;

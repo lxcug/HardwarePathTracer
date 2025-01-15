@@ -42,7 +42,7 @@ namespace HWPT
         CreateDescriptorPool();
 
         CreateViewUniformBuffers();
-        CreateModelAndSampler();
+        CreateModels();
 
         CreateSyncObjects();
 
@@ -63,7 +63,6 @@ namespace HWPT
         delete m_RTScene;
         delete m_RTSBTBuffer;
         delete m_msaaBuffers;
-        delete m_sampler;
         CleanUpImGui();
         CleanUpSwapChain();
 
@@ -603,7 +602,7 @@ namespace HWPT
                 VkDescriptorImageInfo TextureInfo{};
                 TextureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 TextureInfo.imageView = SceneModelTextures[index]->CreateSRV();
-                TextureInfo.sampler = m_sampler->GetHandle(); // TODO: Create Static Samplers
+                TextureInfo.sampler = Sampler::GetDefaultSample().GetHandle();
                 TexturesInfos.emplace_back(TextureInfo);
             }
             DescriptorWrites[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -618,7 +617,7 @@ namespace HWPT
             for (int index = 0; index < GBufferInfos.size(); index++)
             {
                 GBufferInfos[index].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-                GBufferInfos[index].sampler = m_sampler->GetHandle();
+                GBufferInfos[index].sampler = Sampler::GetDefaultSample().GetHandle();
             }
             GBufferInfos[0].imageView = m_gBuffer->GetGBufferAlbedo(i)->CreateSRV();
             GBufferInfos[1].imageView = m_gBuffer->GetGBufferNormal(i)->CreateSRV();
@@ -824,7 +823,7 @@ namespace HWPT
                                          SrcInput, DstInput);
 
             m_viewportImageDescriptorSets[i] = ImGui_ImplVulkan_AddTexture(
-                m_sampler->GetHandle(),
+                Sampler::GetDefaultSample().GetHandle(),
                 m_viewportImages[i]->
                 CreateSRV(),
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);

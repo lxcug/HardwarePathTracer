@@ -10,6 +10,7 @@
 #include "core/acceleration_structure/AccelerationStructure.h"
 #include "core/scene/Scene.h"
 #include "core/gbuffer/GBuffer.h"
+#include "host_device_shared/Light.h"
 
 
 namespace HWPT

@@ -12,7 +12,7 @@
 #include <filesystem>
 #include <vector>
 #include "core/acceleration_structure/AccelerationStructure.h"
-#include "core/material/Material.h"
+#include "host_device_shared/Material.h"
 
 
 namespace HWPT {
@@ -29,6 +29,8 @@ namespace HWPT {
     public:
         Model(const std::filesystem::path &ModelPath, const std::filesystem::path &TexturePath,
               bool GenerateMips = false);
+
+        explicit Model(const std::filesystem::path &ModelPath);
 
         ~Model();
 

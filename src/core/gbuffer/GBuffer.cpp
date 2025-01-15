@@ -29,7 +29,7 @@ namespace HWPT
         DstInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         DstInput.AccessMask = 0;
         DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
-        auto Sampler = VulkanBackendApp::GetApplication()->GetSampler()->GetHandle();
+        auto Sampler = Sampler::GetDefaultSample().GetHandle();
         for (int i = 0; i < m_frameCount; i++)
         {
             m_albedo[i] = new Texture2D(m_size.x, m_size.y,

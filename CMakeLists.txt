@@ -17,6 +17,7 @@ add_executable(
         CompileHLSL
         src/core/shader_compiler/CompileScript.cpp
         src/core/shader_compiler/CompilerHLSL.cpp
+        src/host_device_shared/BaseDefinitions.h
 )
 
 target_link_libraries(
@@ -84,12 +85,14 @@ add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/input/Input.h
         src/core/SwapChain.cpp
         src/core/SwapChain.h
-        src/core/material/Material.cpp
-        src/core/material/Material.h
         src/core/debug/Debugger.cpp
         src/core/debug/Debugger.h
         src/core/gbuffer/GBuffer.cpp
         src/core/gbuffer/GBuffer.h
+        src/host_device_shared/Light.h
+        src/host_device_shared/Vertex.h
+        src/host_device_shared/Vertex.cpp
+        src/host_device_shared/Material.h
 )
 
 include_directories(
