@@ -33,11 +33,21 @@ namespace HWPT
 
     void Scene::CreateModelDescBuffer()
     {
-        m_sceneModelDescBuffer = std::make_shared<ArbitraryBuffer>(
-            sizeof(ModelDesc) * m_modelDescs.size(),
-            m_modelDescs.data(),
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        if (!m_modelDescs.empty())
+        {
+            m_sceneModelDescBuffer = std::make_shared<ArbitraryBuffer>(
+                sizeof(ModelDesc) * m_modelDescs.size(),
+                m_modelDescs.data(),
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        }
+        else
+        {
+            m_sceneModelDescDummyBuffer = std::make_shared<ArbitraryBuffer>(
+                sizeof(ModelDesc), &m_dummyDesc,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        }
     }
 
     void Scene::CreateModelTextures(const std::vector<std::string>& TexturePaths)
@@ -72,11 +82,18 @@ namespace HWPT
         TexturesBinding.binding = 1;
         TexturesBinding.descriptorCount = m_sceneModelTextures.size();
         TexturesBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        TexturesBinding.stageFlags =
-            VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+        TexturesBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+            VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
-        std::array<VkDescriptorSetLayoutBinding, 2> Bindings = {
-            ModelInfoBinding, TexturesBinding
+        VkDescriptorSetLayoutBinding SceneLightsBinding{};
+        SceneLightsBinding.binding = 2;
+        SceneLightsBinding.descriptorCount = 1;
+        SceneLightsBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        SceneLightsBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+            VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+
+        std::array<VkDescriptorSetLayoutBinding, 3> Bindings = {
+            ModelInfoBinding, TexturesBinding, SceneLightsBinding
         };
 
         VkDescriptorSetLayoutCreateInfo CreateInfo{};
@@ -101,13 +118,15 @@ namespace HWPT
             ));
     }
 
-    void Scene::BindModelDescDescriptorSets()
+    void Scene::BindModelDescDescriptorSets() const
     {
-        std::array<VkWriteDescriptorSet, 2> DescriptorWrites{};
+        std::array<VkWriteDescriptorSet, 3> DescriptorWrites{};
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
             VkDescriptorBufferInfo ModelDescBufferInfo{};
-            ModelDescBufferInfo.buffer = m_sceneModelDescBuffer->GetHandle();
+            ModelDescBufferInfo.buffer = m_models.empty()
+                                             ? m_sceneModelDescDummyBuffer->GetHandle()
+                                             : m_sceneModelDescBuffer->GetHandle();
             ModelDescBufferInfo.offset = 0;
             ModelDescBufferInfo.range = VK_WHOLE_SIZE;
             DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -137,9 +156,42 @@ namespace HWPT
             DescriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             DescriptorWrites[1].pImageInfo = TexturesInfos.data();
 
+            VkDescriptorBufferInfo SceneLightsBufferInfo{};
+            SceneLightsBufferInfo.buffer = m_sceneLights.empty()
+                                               ? m_sceneLightsDummyBuffer->GetHandle()
+                                               : m_sceneLightsBuffer->GetHandle();
+            SceneLightsBufferInfo.offset = 0;
+            SceneLightsBufferInfo.range = VK_WHOLE_SIZE;
+            DescriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            DescriptorWrites[2].dstSet = m_modelDescDescriptorSets[i];
+            DescriptorWrites[2].dstBinding = 2;
+            DescriptorWrites[2].dstArrayElement = 0;
+            DescriptorWrites[2].descriptorCount = 1;
+            DescriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            DescriptorWrites[2].pBufferInfo = &SceneLightsBufferInfo;
+
             vkUpdateDescriptorSets(GetVKDevice(), DescriptorWrites.size(), DescriptorWrites.data(),
                                    0,
                                    nullptr);
+        }
+    }
+
+    void Scene::CreateSceneLightsBuffer()
+    {
+        if (!m_sceneLights.empty())
+        {
+            m_sceneLightsBuffer = std::make_shared<ArbitraryBuffer>(
+                sizeof(Light) * m_sceneLights.size(),
+                m_sceneLights.data(),
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        }
+        else
+        {
+            m_sceneLightsDummyBuffer = std::make_shared<ArbitraryBuffer>(
+                sizeof(Light), &m_dummyLight,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         }
     }
 } // namespace HWPT

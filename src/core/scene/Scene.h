@@ -8,6 +8,7 @@
 #include "core/Core.h"
 #include <vector>
 #include "Model.h"
+#include "host_device_shared/Light.h"
 
 
 namespace HWPT
@@ -56,10 +57,17 @@ namespace HWPT
             m_modelDescs.emplace_back(SharedModel->GetModelDesc());
         }
 
+        template <typename... Args>
+        void AddLight(Args&&... Args_)
+        {
+            m_sceneLights.emplace_back(Light{Args_...});
+        }
+
         void FinalizeScene()
         {
             CreateAccel();
             CreateModelDescBuffer();
+            CreateSceneLightsBuffer();
         }
 
         void CreateAccel();
@@ -86,7 +94,7 @@ namespace HWPT
 
         void CreateModelDescDescriptorSet();
 
-        void BindModelDescDescriptorSets();
+        void BindModelDescDescriptorSets() const;
 
         [[nodiscard]] auto GetModelDescDescriptorSetLayout() const -> VkDescriptorSetLayout
         {
@@ -99,16 +107,38 @@ namespace HWPT
             return m_modelDescDescriptorSets[ImageIndex];
         }
 
+        void CreateSceneLightsBuffer();
+
+        [[nodiscard]] auto GetSceneLightsBuffer() const -> const std::shared_ptr<ArbitraryBuffer>&
+        {
+            return m_sceneLightsBuffer;
+        }
+
+        [[nodiscard]] auto GetSceneLights() const -> const std::vector<Light>&
+        {
+            return m_sceneLights;
+        }
+
     private:
         std::shared_ptr<ASBuilder> m_accelBuilder;
         std::vector<std::shared_ptr<Model>> m_models;
         std::vector<ModelDesc> m_modelDescs;
-        std::shared_ptr<ArbitraryBuffer> m_sceneModelDescBuffer = nullptr;
+        std::shared_ptr<ArbitraryBuffer> m_sceneModelDescBuffer;
         static inline uint s_instanceIDCounter = 0; // TODO: dispatch instance index to models
         std::vector<std::shared_ptr<Texture2D>> m_sceneModelTextures;
 
         VkDescriptorSetLayout m_modelDescDescriptorSetLayout = VK_NULL_HANDLE;
         std::vector<VkDescriptorSet> m_modelDescDescriptorSets;
+
+        std::vector<Light> m_sceneLights;
+        std::shared_ptr<ArbitraryBuffer> m_sceneLightsBuffer;
+
+    private:
+        Light m_dummyLight;
+        ModelDesc m_dummyDesc;
+        std::shared_ptr<ArbitraryBuffer> m_sceneModelDescDummyBuffer; // Used when m_models.empty()
+        std::shared_ptr<ArbitraryBuffer> m_sceneLightsDummyBuffer;
+        // Used when m_sceneLights.empty()
     };
 } // namespace HWPT
 

@@ -58,7 +58,7 @@ namespace HWPT::RHI {
             AllocateInfo.pNext = &AllocFlagsInfo;
         }
 
-        VK_CHECK(vkAllocateMemory(GlobalDevice, &AllocateInfo, nullptr, &BufferMemory));
+        VkResult Res = vkAllocateMemory(GlobalDevice, &AllocateInfo, nullptr, &BufferMemory);
 
         vkBindBufferMemory(GlobalDevice, Buffer, BufferMemory, 0);
     }

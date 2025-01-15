@@ -6,6 +6,7 @@
 #define MATERIAL_H
 
 #include "BaseDefinitions.h"
+#include "Light.h"
 
 
 BEGIN_HWPT_NAMESPACE
@@ -42,6 +43,7 @@ BEGIN_HWPT_NAMESPACE
 StructuredBuffer<ModelDesc> ModelInfo : register(t0, space1);
 Texture2D<float4> MaterialTextures[] : register(t1, space1);
 SamplerState Samplers[] : register(s1, space1);
+StructuredBuffer<Light> Lights : register(t2, space1);
 
 Material GetMaterial(uint InstanceID, uint PrimitiveIndex) {
     uint64_t MaterialBufferAddress = ModelInfo[InstanceID].MaterialBufferAddress;
