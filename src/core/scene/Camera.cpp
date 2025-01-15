@@ -95,7 +95,12 @@ namespace HWPT
 
     void CameraBase::OnMouseScroll(float XOffset, float YOffset)
     {
-        m_cameraPos += GetForwardDirection() * YOffset * m_scrollSpeedMultiplier;
+        float ScrollSpeed = YOffset * m_scrollSpeedMultiplier;
+        if (Input::IsKeyPressed(KeyCode::LeftControl))
+        {
+            ScrollSpeed *= .1f;
+        }
+        m_cameraPos += GetForwardDirection() * ScrollSpeed;
         UpdateViewMatrix();
         VulkanBackendApp::GetApplication()->ResetFrameNum();
         m_isMoving = true;
