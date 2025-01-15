@@ -11,6 +11,7 @@
 #include "core/scene/Scene.h"
 #include "core/gbuffer/GBuffer.h"
 #include "host_device_shared/Light.h"
+#include "host_device_shared/RenderOptions.h"
 
 
 namespace HWPT
@@ -89,6 +90,7 @@ namespace HWPT
         bool m_shouldRecreateViewportImages = false;
         std::vector<VkDescriptorSet> m_viewportImageDescriptorSets;
         GBuffer* m_gBuffer = nullptr;
+        RenderOptions m_renderOptions;
     };
 } // namespace HWPT
 

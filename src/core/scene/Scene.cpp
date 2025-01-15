@@ -60,7 +60,7 @@ namespace HWPT
         RHI::SubmitIntermediateCommandBuffer(CommandBuffer);
     }
 
-    void Scene::CreateModelDescDescriptorSet(uint BindingSpace)
+    void Scene::CreateModelDescDescriptorSet()
     {
         VkDescriptorSetLayoutBinding ModelInfoBinding{};
         ModelInfoBinding.binding = 0;
@@ -101,7 +101,7 @@ namespace HWPT
             ));
     }
 
-    void Scene::BindModelDescDescriptorSets(uint BindingSpace)
+    void Scene::BindModelDescDescriptorSets()
     {
         std::array<VkWriteDescriptorSet, 2> DescriptorWrites{};
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
@@ -126,7 +126,7 @@ namespace HWPT
                 VkDescriptorImageInfo TextureInfo{};
                 TextureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 TextureInfo.imageView = SceneModelTextures[index]->CreateSRV();
-                TextureInfo.sampler = Sampler::GetDefaultSample().GetHandle();
+                TextureInfo.sampler = Sampler::GetDefaultSample()->GetHandle();
                 TexturesInfos.emplace_back(TextureInfo);
             }
             DescriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

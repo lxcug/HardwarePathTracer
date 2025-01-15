@@ -54,6 +54,7 @@ namespace HWPT
 
     void VulkanRayTracingApp::CleanUp()
     {
+        Sampler::ReleaseSamplers();
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
             delete m_viewportImages[i];
@@ -93,7 +94,6 @@ namespace HWPT
     {
         // Update ViewUniformBuffer
         ViewUniformBuffer ViewUniformBuffer_{};
-        ViewUniformBuffer_.ModelTrans = m_vikingRoom->GetModelTransform();
         ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();
         ViewUniformBuffer_.ProjTrans = m_camera->GetProjMatrix();
         ViewUniformBuffer_.CameraPos = m_camera->GetCameraPos();
@@ -104,7 +104,6 @@ namespace HWPT
         ViewUniformBuffer_.FrameNum = m_frameNum;
         ViewUniformBuffer_.InvView = glm::transpose(m_camera->GetViewMatrix());
         ViewUniformBuffer_.InvProj = glm::inverse(m_camera->GetProjMatrix());
-        ViewUniformBuffer_.ShouldReAccumulate = m_camera->IsMoving();
         m_MVPUniformBuffers[m_imageIndex]->Update(&ViewUniformBuffer_);
 
         // Wait for last frame render finish
@@ -182,6 +181,11 @@ namespace HWPT
                                 0, BindingDescriptorSets.size(),
                                 BindingDescriptorSets.data(),
                                 0, nullptr);
+        m_renderOptions.ShouldReAccumulate = m_camera->IsMoving();
+        vkCmdPushConstants(CommandBuffer, m_RTPipelineLayout,
+                           VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+                           VK_SHADER_STAGE_MISS_BIT_KHR,
+                           0, sizeof(RenderOptions), &m_renderOptions);
         auto RayTraceFunc = reinterpret_cast<PFN_vkCmdTraceRaysKHR>(vkGetDeviceProcAddr(m_device,
             "vkCmdTraceRaysKHR"));
         RayTraceFunc(CommandBuffer, &m_rayGenRegion, &m_missRegion, &m_hitRegion,
@@ -418,14 +422,33 @@ namespace HWPT
             ImGui::Text("FPS: %d", m_fpsCalculator->GetFPS());
             ImGui::Text("Accumulated Frames: %d", m_frameNum);
 
+            ImGui::NewLine();
+            ImGui::Separator();
+            ImGui::NewLine();
+            ImGui::Text("RenderOptions");
             ImGui::Checkbox("Show GBuffer", &ShowGBuffer);
+            if (ImGui::Checkbox("Enable AO", reinterpret_cast<bool*>(&m_renderOptions.EnableAO)))
+            {
+                ResetFrameNum();
+            }
+            if (ImGui::InputInt("Num AO Rays", &m_renderOptions.NumAORays, 1.f))
+            {
+                ResetFrameNum();
+            }
+            if (ImGui::InputFloat("AO Ray Length", &m_renderOptions.AORayLength, .5f, 1.f, "%.1f"))
+            {
+                ResetFrameNum();
+            }
 
+            ImGui::NewLine();
+            ImGui::Separator();
+            ImGui::NewLine();
+            ImGui::Text("WindowOptions");
             static bool BorderlessWindow = false;
             if (ImGui::Checkbox("Borderless Window", &BorderlessWindow))
             {
                 glfwSetWindowAttrib(m_window, GLFW_DECORATED, !BorderlessWindow);
             }
-
             static bool FullScreen = false;
             static int WindowWidth, WindowHeight, WindowPosX, WindowPosY;
             if (!FullScreen)
@@ -451,11 +474,28 @@ namespace HWPT
         }
 
         {
-            ImGuiInfrastructure::Begin("Camera Info");
+            ImGuiInfrastructure::Begin("Scene Info");
+            ImGui::Text("Camera Info");
             auto CameraPos = m_camera->GetCameraPos();
-            ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", CameraPos.x, CameraPos.y,
+            ImGui::Text("Camera Position (%.2f, %.2f, %.2f)", CameraPos.x, CameraPos.y,
                         CameraPos.z);
             ImGui::Text("Pitch %.2f:  Yaw %.2f", m_camera->GetPitch(), m_camera->GetYaw());
+            ImGui::SliderFloat("Move Speed", &m_camera->GetCameraMoveSpeed(), .05f, 2.f, "%.1f");
+            ImGui::SliderFloat("Rotate Speed", &m_camera->GetCameraRotateSpeed(), .05f, 2.f,
+                               "%.1f");
+            ImGui::SliderFloat("Scroll Speed", &m_camera->GetCameraScrollSpeed(), .05f, 2.f,
+                               "%.1f");
+
+            ImGui::NewLine();
+            ImGui::Separator();
+            ImGui::NewLine();
+            ImGui::Text("Model Info");
+
+            ImGui::NewLine();
+            ImGui::Separator();
+            ImGui::NewLine();
+            ImGui::Text("Light Info");
+
             ImGuiInfrastructure::End();
         }
     }
@@ -579,7 +619,7 @@ namespace HWPT
             for (int index = 0; index < GBufferInfos.size(); index++)
             {
                 GBufferInfos[index].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-                GBufferInfos[index].sampler = Sampler::GetDefaultSample().GetHandle();
+                GBufferInfos[index].sampler = Sampler::GetDefaultSample()->GetHandle();
             }
             GBufferInfos[0].imageView = m_gBuffer->GetGBufferAlbedo(i)->CreateSRV();
             GBufferInfos[1].imageView = m_gBuffer->GetGBufferNormal(i)->CreateSRV();
@@ -604,8 +644,11 @@ namespace HWPT
 
     void VulkanRayTracingApp::CreateRTPipelineLayout()
     {
-        // TODO: Light Info as push constants
-        //        VkPushConstantRange PushConstant{};
+        VkPushConstantRange RenderOptionRange{};
+        RenderOptionRange.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+            VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR;
+        RenderOptionRange.offset = 0;
+        RenderOptionRange.size = sizeof(RenderOptions);
 
         VkPipelineLayoutCreateInfo CreateInfo{};
         CreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -615,6 +658,8 @@ namespace HWPT
         };
         CreateInfo.setLayoutCount = Layouts.size();
         CreateInfo.pSetLayouts = Layouts.data();
+        CreateInfo.pushConstantRangeCount = 1;
+        CreateInfo.pPushConstantRanges = &RenderOptionRange;
 
         VK_CHECK(vkCreatePipelineLayout(m_device, &CreateInfo, nullptr, &m_RTPipelineLayout));
     }
@@ -792,7 +837,7 @@ namespace HWPT
                                          SrcInput, DstInput);
 
             m_viewportImageDescriptorSets[i] = ImGui_ImplVulkan_AddTexture(
-                Sampler::GetDefaultSample().GetHandle(),
+                Sampler::GetDefaultSample()->GetHandle(),
                 m_viewportImages[i]->
                 CreateSRV(),
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
@@ -824,7 +869,7 @@ namespace HWPT
         CreateViewportImages();
         m_gBuffer->OnResize(m_viewportSize.x, m_viewportSize.y);
         BindRTDescriptorSets();
-        m_frameNum = 0;
+        ResetFrameNum();
 
         m_camera->OnWindowResize(m_viewportSize.x, m_viewportSize.y);
     }
@@ -838,6 +883,6 @@ namespace HWPT
     {
         VulkanBackendApp::OnWindowResize();
         BindRTDescriptorSets();
-        m_frameNum = 0;
+        ResetFrameNum();
     }
 } // namespace HWPT

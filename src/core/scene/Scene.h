@@ -84,9 +84,9 @@ namespace HWPT
 
         void CreateModelTextures(const std::vector<std::string>& TexturePaths);
 
-        void CreateModelDescDescriptorSet(uint BindingSpace = 1);
+        void CreateModelDescDescriptorSet();
 
-        void BindModelDescDescriptorSets(uint BindingSpace = 1);
+        void BindModelDescDescriptorSets();
 
         [[nodiscard]] auto GetModelDescDescriptorSetLayout() const -> VkDescriptorSetLayout
         {

@@ -44,6 +44,8 @@ namespace HWPT
             UpdateViewMatrix();
         }
 
+        void OnMouseScroll(float XOffset, float YOffset);
+
         void SetRotation(float Pitch, float Yaw)
         {
             m_pitch = Pitch;
@@ -116,6 +118,21 @@ namespace HWPT
             m_aspectRatio = static_cast<float>(Width) / static_cast<float>(Height);
         }
 
+        auto GetCameraMoveSpeed() -> float&
+        {
+            return m_moveSpeedMultiplier;
+        }
+
+        auto GetCameraRotateSpeed() -> float&
+        {
+            return m_rotateSpeedMultiplier;
+        }
+
+        auto GetCameraScrollSpeed() -> float&
+        {
+            return m_scrollSpeedMultiplier;
+        }
+
     protected:
         CameraType m_type = CameraType::CameraTypeMax;
         glm::vec3 m_cameraPos;
@@ -124,6 +141,7 @@ namespace HWPT
         float m_aspectRatio = 1.f, m_near = 1e-1f, m_far = 1e3f;
         float m_pitch = 0.f, m_yaw = 0.f;
         float m_moveSpeedMultiplier = 1.f, m_rotateSpeedMultiplier = 1.f;
+        float m_scrollSpeedMultiplier = 1.f;
         static inline float s_moveSpeed = 5.f;
         static inline float s_rotateSpeed = 1.5f;
         glm::vec2 m_lastMousePos;

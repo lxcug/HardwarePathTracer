@@ -4,6 +4,7 @@
 
 #include "Camera.h"
 #include "core/input/Input.h"
+#include "core/application/VulkanBackendApp.h"
 
 
 namespace HWPT
@@ -90,6 +91,14 @@ namespace HWPT
         {
             UpdateViewMatrix();
         }
+    }
+
+    void CameraBase::OnMouseScroll(float XOffset, float YOffset)
+    {
+        m_cameraPos += GetForwardDirection() * YOffset * m_scrollSpeedMultiplier;
+        UpdateViewMatrix();
+        VulkanBackendApp::GetApplication()->ResetFrameNum();
+        m_isMoving = true;
     }
 
     void PerspectiveCamera::UpdateProjMatrix()
