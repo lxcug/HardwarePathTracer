@@ -22,6 +22,8 @@
 #define BUILD_SHIPPING 0
 #define BUILD_RELEASE 0
 
+#define MAX_FRAMES_IN_FLIGHT (2)
+
 // NOTE: Should be implemented in Application
 namespace HWPT {
     auto GetVKDevice() -> VkDevice;

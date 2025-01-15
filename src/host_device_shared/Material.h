@@ -27,6 +27,47 @@ BEGIN_HWPT_NAMESPACE
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, MetallicTextureID, -1);
     };
 
+#if IS_COMPILING_SHADER
+
+struct ModelDesc {
+    uint64_t VertexBufferAddress;
+    uint64_t IndexBufferAddress;
+    uint64_t MaterialBufferAddress;
+    uint64_t MaterialIndexBufferAddress;
+    int TextureIndexOffset;
+};
+
+StructuredBuffer<ModelDesc> ModelInfo : register(t0, space1);
+Texture2D<float4> MaterialTextures[] : register(t1, space1);
+SamplerState Samplers[] : register(s1, space1);
+
+Material GetMaterial(uint InstanceID, uint PrimitiveIndex) {
+    uint64_t MaterialBufferAddress = ModelInfo[InstanceID].MaterialBufferAddress;
+    uint64_t MaterialIndexBufferAddress = ModelInfo[InstanceID].MaterialIndexBufferAddress;
+
+    int material_index = vk::RawBufferLoad<int>(MaterialIndexBufferAddress + sizeof(int) * PrimitiveIndex);
+    return vk::RawBufferLoad<Material>(MaterialBufferAddress + sizeof(Material) * material_index);
+}
+
+Vertex3 GetVertices(uint InstanceID, uint PrimitiveIndex) {
+    uint64_t VertexBufferAddress = ModelInfo[InstanceID].VertexBufferAddress;
+    uint64_t IndexBufferAddress = ModelInfo[InstanceID].IndexBufferAddress;
+    uint3 Indices = {
+        vk::RawBufferLoad<uint>(IndexBufferAddress + sizeof(uint) * (PrimitiveIndex * 3 + 0)),
+        vk::RawBufferLoad<uint>(IndexBufferAddress + sizeof(uint) * (PrimitiveIndex * 3 + 1)),
+        vk::RawBufferLoad<uint>(IndexBufferAddress + sizeof(uint) * (PrimitiveIndex * 3 + 2))
+    };
+
+    Vertex3 Ret = {
+        vk::RawBufferLoad<Vertex>(VertexBufferAddress + sizeof(Vertex) * Indices.x),
+        vk::RawBufferLoad<Vertex>(VertexBufferAddress + sizeof(Vertex) * Indices.y),
+        vk::RawBufferLoad<Vertex>(VertexBufferAddress + sizeof(Vertex) * Indices.z)
+    };
+    return Ret;
+}
+
+#endif
+
 END_HWPT_NAME_SPACE
 
 #endif //MATERIAL_H

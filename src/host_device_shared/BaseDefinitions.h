@@ -11,6 +11,7 @@
 using float4 = glm::vec4;
 using float3 = glm::vec3;
 using float2 = glm::vec2;
+using float4x4 = glm::mat4;
 using uint = uint32_t;
 #define PI M_PI
 #else
@@ -40,7 +41,7 @@ using uint = uint32_t;
 
 #if IS_COMPILING_CPP
 #define BEGIN_HWPT_NAMESPACE namespace HWPT {
-#define END_HWPT_NAME_SPACE }
+#define END_HWPT_NAME_SPACE }  // namespace HWPT
 #else
 #define BEGIN_HWPT_NAMESPACE
 #define END_HWPT_NAME_SPACE

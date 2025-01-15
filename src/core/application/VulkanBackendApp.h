@@ -26,12 +26,11 @@
 #include "core/Commands/CommandPool.h"
 #include "core/scene/Camera.h"
 #include "core/debug/Debugger.h"
+#include <host_device_shared/ViewUniformBuffer.h>
 
 
 namespace HWPT
 {
-    const int MAX_FRAMES_IN_FLIGHT = 2;
-
     struct SwapChainSupportDetails
     {
         VkSurfaceCapabilitiesKHR Capabilities;
@@ -69,24 +68,6 @@ namespace HWPT
             delete MSAAColorBuffer;
             delete MSAADepthBuffer;
         }
-    };
-
-    struct ViewUniformBuffer
-    {
-        glm::mat4 ModelTrans;
-        glm::mat4 ViewTrans;
-        glm::mat4 ProjTrans;
-
-        glm::vec3 DebugColor;
-        float DeltaTime;
-
-        glm::vec3 CameraPos;
-        uint FrameNum;
-
-        glm::mat4 InvView;
-        glm::mat4 InvProj;
-
-        bool ShouldReAccumulate;
     };
 
     class VulkanBackendApp : public ApplicationBase
@@ -158,6 +139,11 @@ namespace HWPT
         [[nodiscard]] auto GetSurface() const -> VkSurfaceKHR
         {
             return m_surface;
+        }
+
+        [[nodiscard]] auto GetDescriptorPool() const -> VkDescriptorPool
+        {
+            return m_descriptorPool;
         }
 
     protected:

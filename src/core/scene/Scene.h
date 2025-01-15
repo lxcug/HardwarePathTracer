@@ -10,34 +10,43 @@
 #include "Model.h"
 
 
-namespace HWPT {
+namespace HWPT
+{
     class ASBuilder;
 
-    class Scene {
+    class Scene
+    {
     public:
         Scene() = default;
 
-        ~Scene() = default;
+        ~Scene()
+        {
+            vkDestroyDescriptorSetLayout(GetVKDevice(), m_modelDescDescriptorSetLayout, nullptr);
+        }
 
-        void AddModel(Model *ModelPtr) {
+        void AddModel(Model* ModelPtr)
+        {
             std::shared_ptr<Model> SharedModel(ModelPtr);
             AddModel(SharedModel);
         }
 
-        template<typename... Args>
-        void AddModel(const std::string &ModelName, Args &&... Args_) {
+        template <typename... Args>
+        void AddModel(const std::string& ModelName, Args&&... Args_)
+        {
             auto SharedModel = std::make_shared<Model>(Args_...);
             SharedModel->SetModelName(ModelName);
             AddModel(SharedModel);
         }
 
-        template<typename... Args>
-        void AddModel(Args &&... Args_) {
+        template <typename... Args>
+        void AddModel(Args&&... Args_)
+        {
             auto SharedModel = std::make_shared<Model>(Args_...);
             AddModel(SharedModel);
         }
 
-        void AddModel(std::shared_ptr<Model>& SharedModel) {
+        void AddModel(std::shared_ptr<Model>& SharedModel)
+        {
             SharedModel->SetInstanceID(s_instanceIDCounter++);
             // NOTE: Set Global Texture Offset for each ModelDesc
             SharedModel->SetModelDescTextureOffset(static_cast<int>(m_sceneModelTextures.size()));
@@ -47,37 +56,60 @@ namespace HWPT {
             m_modelDescs.emplace_back(SharedModel->GetModelDesc());
         }
 
-        void FinalizeScene() {
+        void FinalizeScene()
+        {
             CreateAccel();
             CreateModelDescBuffer();
         }
 
         void CreateAccel();
 
-        auto GetAccelBuilder() -> std::shared_ptr<ASBuilder> & {
+        auto GetAccelBuilder() -> std::shared_ptr<ASBuilder>&
+        {
             return m_accelBuilder;
         }
 
-        [[nodiscard]] auto GetSceneModelTextures() const -> const std::vector<std::shared_ptr<Texture2D>>& {
+        [[nodiscard]] auto
+        GetSceneModelTextures() const -> const std::vector<std::shared_ptr<Texture2D>>&
+        {
             return m_sceneModelTextures;
         }
 
         void CreateModelDescBuffer();
 
-        auto GetModelDescBuffer() -> std::shared_ptr<ArbitraryBuffer> & {
+        auto GetModelDescBuffer() -> std::shared_ptr<ArbitraryBuffer>&
+        {
             return m_sceneModelDescBuffer;
         }
 
-        void CreateModelTextures(const std::vector<std::string> &TexturePaths);
+        void CreateModelTextures(const std::vector<std::string>& TexturePaths);
+
+        void CreateModelDescDescriptorSet(uint BindingSpace = 1);
+
+        void BindModelDescDescriptorSets(uint BindingSpace = 1);
+
+        [[nodiscard]] auto GetModelDescDescriptorSetLayout() const -> VkDescriptorSetLayout
+        {
+            return m_modelDescDescriptorSetLayout;
+        }
+
+        [[nodiscard]] auto GetModelDescDescriptorSet(uint ImageIndex) const -> VkDescriptorSet
+        {
+            Check(ImageIndex < MAX_FRAMES_IN_FLIGHT);
+            return m_modelDescDescriptorSets[ImageIndex];
+        }
 
     private:
         std::shared_ptr<ASBuilder> m_accelBuilder;
         std::vector<std::shared_ptr<Model>> m_models;
         std::vector<ModelDesc> m_modelDescs;
         std::shared_ptr<ArbitraryBuffer> m_sceneModelDescBuffer = nullptr;
-        static inline uint s_instanceIDCounter = 0;  // TODO: dispatch instance index to models
+        static inline uint s_instanceIDCounter = 0; // TODO: dispatch instance index to models
         std::vector<std::shared_ptr<Texture2D>> m_sceneModelTextures;
+
+        VkDescriptorSetLayout m_modelDescDescriptorSetLayout = VK_NULL_HANDLE;
+        std::vector<VkDescriptorSet> m_modelDescDescriptorSets;
     };
-}  // namespace HWPT
+} // namespace HWPT
 
 #endif //HARDWAREPATHTRACER_SCENE_H

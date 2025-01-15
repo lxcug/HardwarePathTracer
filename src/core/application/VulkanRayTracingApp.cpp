@@ -169,14 +169,18 @@ namespace HWPT
                                      1, SrcInput, DstInput);
 
         // TODO: Add RayTracing Code Here
+        std::array<VkDescriptorSet, 2> BindingDescriptorSets = {
+            m_RTDescriptorSets[m_imageIndex],
+            m_RTScene->GetModelDescDescriptorSet(m_imageIndex)
+        };
         vkCmdBindPipeline(CommandBuffer,
                           VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
                           m_RTPipeline);
         vkCmdBindDescriptorSets(CommandBuffer,
                                 VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
                                 m_RTPipelineLayout,
-                                0, 1,
-                                &m_RTDescriptorSets[m_imageIndex],
+                                0, BindingDescriptorSets.size(),
+                                BindingDescriptorSets.data(),
                                 0, nullptr);
         auto RayTraceFunc = reinterpret_cast<PFN_vkCmdTraceRaysKHR>(vkGetDeviceProcAddr(m_device,
             "vkCmdTraceRaysKHR"));
@@ -483,29 +487,15 @@ namespace HWPT
         InImageBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
         InImageBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
-        VkDescriptorSetLayoutBinding ModelInfoBinding{};
-        ModelInfoBinding.binding = 4;
-        ModelInfoBinding.descriptorCount = 1;
-        ModelInfoBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        ModelInfoBinding.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-
-        VkDescriptorSetLayoutBinding TexturesBinding{};
-        TexturesBinding.binding = 5;
-        TexturesBinding.descriptorCount = m_RTScene->GetSceneModelTextures().size();
-        TexturesBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        TexturesBinding.stageFlags =
-            VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
-
         VkDescriptorSetLayoutBinding GBufferBinding{};
-        GBufferBinding.binding = 6;
+        GBufferBinding.binding = 4;
         GBufferBinding.descriptorCount = 4;
         GBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         GBufferBinding.stageFlags =
             VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
-        std::array<VkDescriptorSetLayoutBinding, 7> Bindings = {
-            ViewUniformBufferBinding, TLASBinding, OutImageBinding, InImageBinding,
-            ModelInfoBinding, TexturesBinding, GBufferBinding
+        std::array<VkDescriptorSetLayoutBinding, 5> Bindings = {
+            ViewUniformBufferBinding, TLASBinding, OutImageBinding, InImageBinding, GBufferBinding
         };
 
         VkDescriptorSetLayoutCreateInfo CreateInfo{};
@@ -526,11 +516,14 @@ namespace HWPT
 
         m_RTDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
         VK_CHECK(vkAllocateDescriptorSets(m_device, &AllocateInfo, m_RTDescriptorSets.data()));
+
+        // Create Model Desc DescriptorSets
+        m_RTScene->CreateModelDescDescriptorSet();
     }
 
     void VulkanRayTracingApp::BindRTDescriptorSets()
     {
-        std::array<VkWriteDescriptorSet, 7> DescriptorWrites{};
+        std::array<VkWriteDescriptorSet, 5> DescriptorWrites{};
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
             VkDescriptorBufferInfo BufferInfo{};
@@ -582,37 +575,6 @@ namespace HWPT
             DescriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
             DescriptorWrites[3].pImageInfo = &InImageInfo;
 
-            VkDescriptorBufferInfo ModelDescBufferInfo{};
-            ModelDescBufferInfo.buffer = m_RTScene->GetModelDescBuffer()->GetHandle();
-            ModelDescBufferInfo.offset = 0;
-            ModelDescBufferInfo.range = VK_WHOLE_SIZE;
-            DescriptorWrites[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescriptorWrites[4].dstSet = m_RTDescriptorSets[i];
-            DescriptorWrites[4].dstBinding = 4;
-            DescriptorWrites[4].dstArrayElement = 0;
-            DescriptorWrites[4].descriptorCount = 1;
-            DescriptorWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            DescriptorWrites[4].pBufferInfo = &ModelDescBufferInfo;
-
-            auto SceneModelTextures = m_RTScene->GetSceneModelTextures();
-            std::vector<VkDescriptorImageInfo> TexturesInfos;
-            TexturesInfos.reserve(SceneModelTextures.size());
-            for (int index = 0; index < SceneModelTextures.size(); index++)
-            {
-                VkDescriptorImageInfo TextureInfo{};
-                TextureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                TextureInfo.imageView = SceneModelTextures[index]->CreateSRV();
-                TextureInfo.sampler = Sampler::GetDefaultSample().GetHandle();
-                TexturesInfos.emplace_back(TextureInfo);
-            }
-            DescriptorWrites[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescriptorWrites[5].dstSet = m_RTDescriptorSets[i];
-            DescriptorWrites[5].dstBinding = 5;
-            DescriptorWrites[5].dstArrayElement = 0;
-            DescriptorWrites[5].descriptorCount = SceneModelTextures.size();
-            DescriptorWrites[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            DescriptorWrites[5].pImageInfo = TexturesInfos.data();
-
             std::vector<VkDescriptorImageInfo> GBufferInfos(4);
             for (int index = 0; index < GBufferInfos.size(); index++)
             {
@@ -623,18 +585,21 @@ namespace HWPT
             GBufferInfos[1].imageView = m_gBuffer->GetGBufferNormal(i)->CreateSRV();
             GBufferInfos[2].imageView = m_gBuffer->GetGBufferPos(i)->CreateSRV();
             GBufferInfos[3].imageView = m_gBuffer->GetGBufferDepth(i)->CreateSRV();
-            DescriptorWrites[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescriptorWrites[6].dstSet = m_RTDescriptorSets[i];
-            DescriptorWrites[6].dstBinding = 6;
-            DescriptorWrites[6].dstArrayElement = 0;
-            DescriptorWrites[6].descriptorCount = GBufferInfos.size();
-            DescriptorWrites[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            DescriptorWrites[6].pImageInfo = GBufferInfos.data();
+            DescriptorWrites[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            DescriptorWrites[4].dstSet = m_RTDescriptorSets[i];
+            DescriptorWrites[4].dstBinding = 4;
+            DescriptorWrites[4].dstArrayElement = 0;
+            DescriptorWrites[4].descriptorCount = GBufferInfos.size();
+            DescriptorWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            DescriptorWrites[4].pImageInfo = GBufferInfos.data();
 
             vkUpdateDescriptorSets(m_device, DescriptorWrites.size(), DescriptorWrites.data(),
                                    0,
                                    nullptr);
         }
+
+        // Update ModelDesc DescriptorSets
+        m_RTScene->BindModelDescDescriptorSets();
     }
 
     void VulkanRayTracingApp::CreateRTPipelineLayout()
@@ -644,8 +609,12 @@ namespace HWPT
 
         VkPipelineLayoutCreateInfo CreateInfo{};
         CreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        CreateInfo.setLayoutCount = 1;
-        CreateInfo.pSetLayouts = &m_RTDescriptorSetLayout;
+        std::array<VkDescriptorSetLayout, 2> Layouts = {
+            m_RTDescriptorSetLayout,
+            m_RTScene->GetModelDescDescriptorSetLayout()
+        };
+        CreateInfo.setLayoutCount = Layouts.size();
+        CreateInfo.pSetLayouts = Layouts.data();
 
         VK_CHECK(vkCreatePipelineLayout(m_device, &CreateInfo, nullptr, &m_RTPipelineLayout));
     }

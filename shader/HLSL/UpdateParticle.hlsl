@@ -1,6 +1,6 @@
 #pragma Compute UpdateParticles
 
-#include "ViewUniformBuffer.hlsl"
+#include "../../src/host_device_shared/ViewUniformBuffer.h"
 #include "ParticleCommon.hlsl"
 
 StructuredBuffer<Particle> ParticlesIn : register(t1);

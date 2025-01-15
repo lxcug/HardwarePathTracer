@@ -1,7 +1,7 @@
 #pragma shader_stage(raygeneration)
 
 #include "RayTracingCommon.hlsl"
-#include "../ViewUniformBuffer.hlsl"
+#include "../../../src/host_device_shared/ViewUniformBuffer.h"
 
 #define NUM_AO_RAYS 4
 
