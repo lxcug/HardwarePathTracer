@@ -26,8 +26,8 @@ void main()
     RayDesc ray;
     ray.Origin = origin.xyz;
     ray.Direction = dir.xyz;
-    ray.TMin = 1e-3f;
-    ray.TMax = 1e10f;
+    ray.TMin = render_options.RayMinBias;
+    ray.TMax = 1e3f;
 
     RayPayload payload;
     uint flags = RAY_FLAG_FORCE_OPAQUE;
