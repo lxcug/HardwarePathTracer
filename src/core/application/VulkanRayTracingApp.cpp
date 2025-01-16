@@ -45,8 +45,8 @@ namespace HWPT {
 
         InitRayTracing();
 
-//        m_camera->SetCameraPosition(glm::vec3(-600, 510, 40));
-//        m_camera->SetCameraRotation(-0.13, -1.41);
+        m_camera->SetCameraPosition(glm::vec3(-600, 510, 40));
+        m_camera->SetCameraRotation(-0.13, -1.41);
 //        m_camera->SetCameraRotation(-glm::radians(10.f), glm::radians(10.f));
     }
 
@@ -113,11 +113,6 @@ namespace HWPT {
         if (m_frameBufferResized) {
             OnWindowResize();
             m_frameBufferResized = false;
-        }
-        if (m_shouldRecreateViewportImages) {
-            ResizeViewportImages();
-            m_gBuffer->OnResize(m_viewportSize);
-            m_shouldRecreateViewportImages = false;
         }
 
         // Wait for image available
@@ -349,9 +344,12 @@ namespace HWPT {
             m_viewportOffset.x = ViewportPos.x;
             m_viewportOffset.y = ViewportPos.y;
             if (ViewportSize.x != m_viewportSize.x || ViewportSize.y != m_viewportSize.y) {
-                m_viewportSize.x = max(ViewportSize.x, 1.f);
-                m_viewportSize.y = max(ViewportSize.y, 1.f);
-                m_shouldRecreateViewportImages = true;
+                m_viewportSize.x = ViewportSize.x;
+                m_viewportSize.y = ViewportSize.y;
+                m_deferredOperations.emplace_back([this](){
+                    ResizeViewportImages();
+                    m_gBuffer->OnResize(m_viewportSize);
+                });
             }
 
             if (IsWindowHovered) {
@@ -534,9 +532,14 @@ namespace HWPT {
             auto CameraPos = m_camera->GetCameraPos();
             ImGui::Text("Camera Position (%.2f, %.2f, %.2f)", CameraPos.x, CameraPos.y,
                         CameraPos.z);
-            ImGui::Text("Pitch %.2f:  Yaw %.2f", m_camera->GetPitch(), m_camera->GetYaw()
-
-            );
+            auto PerspCamera = std::dynamic_pointer_cast<PerspectiveCamera>(m_camera);
+            if (ImGui::SliderFloat("FOV", &PerspCamera->GetFOV(), 5.f, 120.f, "%.0f")) {
+                m_deferredOperations.emplace_back([this, PerspCamera]() {
+                    ResetFrameNum();
+                    PerspCamera->UpdateProjMatrix();
+                });
+            }
+            ImGui::Text("Pitch %.2f:  Yaw %.2f", m_camera->GetPitch(), m_camera->GetYaw());
             ImGui::SliderFloat("Move Speed", &m_camera->GetCameraMoveSpeed(), .01f, 100.f, "%.1f");
             ImGui::SliderFloat("Rotate Speed", &m_camera->GetCameraRotateSpeed(), .01f, 5.f,
                                "%.1f");
@@ -858,16 +861,18 @@ namespace HWPT {
     void VulkanRayTracingApp::InitScene() {
         m_RTScene = new Scene();
 
+        // TODO: Choose a default sky texture
         m_RTScene->CreateSkyTexture("../../asset/env/wildflower_field_4k.hdr");
-//        m_RTScene->AddModel("../../asset/sponza/sponza.obj");
-        m_RTScene->AddModel("../../asset/house_with_tree/house_with_tree.obj");
+        m_RTScene->AddModel("../../asset/sponza/sponza.obj");
+//        m_RTScene->AddModel("../../asset/house_with_tree/house_with_tree.obj");
+//        m_RTScene->AddModel("../../asset/cornell_box/cornell_box.obj");
         m_RTScene->AddLight(
-                glm::normalize(glm::vec3(1.f, -1.f, -1.f)),
+                glm::normalize(glm::vec3(.0f, -1.f, -.1f)),
                 LightType::Directional,
                 glm::vec3(.5f, .5f, .5f),
                 0.f,
                 glm::vec3(1.f, 1.f, 1.f),
-                3.1415926f,
+                2.f * 3.1415926f,
                 0.f,
                 0.f,
                 0.f

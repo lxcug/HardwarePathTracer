@@ -128,8 +128,7 @@ namespace HWPT
             return m_rotateSpeedMultiplier;
         }
 
-        auto GetCameraScrollSpeed() -> float&
-        {
+        auto GetCameraScrollSpeed() -> float& {
             return m_scrollSpeedMultiplier;
         }
 
@@ -173,6 +172,10 @@ namespace HWPT
         }
 
         void UpdateProjMatrix();
+
+        auto GetFOV() -> float& {
+            return m_fov;
+        }
 
     protected:
         float m_fov = 45.f;

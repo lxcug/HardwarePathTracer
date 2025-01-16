@@ -64,3 +64,5 @@ HardwarePathTracer using Vulkan RayTracing API
 > * Add sky light and change sky light at runtime
 >
 > ![](imgs/SkyLight.png)
+>
+> ![](imgs/SponzaWithSkyLight.png)
