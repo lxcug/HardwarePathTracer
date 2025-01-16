@@ -83,6 +83,7 @@ namespace HWPT
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+//        glfwWindowHint(GLFW_DECORATED, GL_FALSE);
 
         m_window = glfwCreateWindow(
             static_cast<int>(m_windowWidth), static_cast<int>(m_windowHeight),

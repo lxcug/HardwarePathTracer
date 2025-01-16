@@ -793,11 +793,23 @@ namespace HWPT {
         m_RTScene = new Scene();
         m_vikingRoom->SetModelName("VikingRoom");
         m_RTScene->AddModel(m_vikingRoom);
+
         m_RTScene->AddLight(
                 glm::normalize(glm::vec3(1.f, -1.f, -1.f)),
                 LightType::Directional,
                 glm::vec3(.5f, .5f, .5f),
                 0.f,
+                glm::vec3(1.f, 1.f, 1.f),
+                5.f,
+                0.f,
+                0.f,
+                0.f
+        );
+        m_RTScene->AddLight(
+                glm::vec3(0.f, 0.f, 0.f),
+                LightType::Point,
+                glm::vec3(1.f, .2f, -1.f),
+                3.f,  // Radius
                 glm::vec3(1.f, 1.f, 1.f),
                 3.1415926f,
                 0.f,
