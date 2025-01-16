@@ -43,11 +43,9 @@ float3 PathTracingKernel(in RayPayload payload, inout uint seed) {
             ray.Origin = payload.pos;
             ray.Direction = UniformSampleHemisphere(rnd2(seed), payload.normal);  // implies pdf = cos / PI
             ray.TMin = render_options.RayMinBias;
-            ray.TMax = 1e3f;  // TODO: TMax as PushConstant
+            ray.TMax = render_options.MaxTraceDistance;  // TODO: TMax as PushConstant
             TraceRay(TLAS, RAY_FLAG_NONE, 0xff, 0, 0, 0, ray, payload);
         }
-
-
     }
 
     return radiance;

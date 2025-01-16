@@ -27,7 +27,7 @@ void main()
     ray.Origin = origin.xyz;
     ray.Direction = dir.xyz;
     ray.TMin = render_options.RayMinBias;
-    ray.TMax = 1e3f;
+    ray.TMax = render_options.MaxTraceDistance;
 
     RayPayload payload;
     uint flags = RAY_FLAG_FORCE_OPAQUE;
