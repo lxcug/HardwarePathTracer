@@ -1290,7 +1290,8 @@ namespace HWPT
     void VulkanBackendApp::CreateModels()
     {
         // m_vikingRoom = new Model("../../asset/viking_room_new/viking_room_new.obj");
-        m_vikingRoom = new Model("../../asset/house_with_tree/house_with_tree.obj");
+//        m_vikingRoom = new Model("../../asset/house_with_tree/house_with_tree.obj");
+        m_vikingRoom = new Model("../../asset/cornell_box/cornell_box.obj");
     }
 
     void VulkanBackendApp::InitImGui()

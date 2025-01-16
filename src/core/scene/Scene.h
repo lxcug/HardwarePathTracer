@@ -11,43 +11,36 @@
 #include "host_device_shared/Light.h"
 
 
-namespace HWPT
-{
+namespace HWPT {
     class ASBuilder;
 
-    class Scene
-    {
+    class Scene {
     public:
         Scene() = default;
 
-        ~Scene()
-        {
+        ~Scene() {
             vkDestroyDescriptorSetLayout(GetVKDevice(), m_modelDescDescriptorSetLayout, nullptr);
         }
 
-        void AddModel(Model* ModelPtr)
-        {
+        void AddModel(Model *ModelPtr) {
             std::shared_ptr<Model> SharedModel(ModelPtr);
             AddModel(SharedModel);
         }
 
-        template <typename... Args>
-        void AddModel(const std::string& ModelName, Args&&... Args_)
-        {
+        template<typename... Args>
+        void AddModel(const std::string &ModelName, Args &&... Args_) {
             auto SharedModel = std::make_shared<Model>(Args_...);
             SharedModel->SetModelName(ModelName);
             AddModel(SharedModel);
         }
 
-        template <typename... Args>
-        void AddModel(Args&&... Args_)
-        {
+        template<typename... Args>
+        void AddModel(Args &&... Args_) {
             auto SharedModel = std::make_shared<Model>(Args_...);
             AddModel(SharedModel);
         }
 
-        void AddModel(std::shared_ptr<Model>& SharedModel)
-        {
+        void AddModel(std::shared_ptr<Model> &SharedModel) {
             SharedModel->SetInstanceID(s_instanceIDCounter++);
             // NOTE: Set Global Texture Offset for each ModelDesc
             SharedModel->SetModelDescTextureOffset(static_cast<int>(m_sceneModelTextures.size()));
@@ -57,65 +50,53 @@ namespace HWPT
             m_modelDescs.emplace_back(SharedModel->GetModelDesc());
         }
 
-        template <typename... Args>
-        void AddLight(Args&&... Args_)
-        {
+        template<typename... Args>
+        void AddLight(Args &&... Args_) {
             m_sceneLights.emplace_back(Light{Args_...});
         }
 
-        void FinalizeScene()
-        {
-            CreateAccel();
-            CreateModelDescBuffer();
-            CreateSceneLightsBuffer();
-        }
+        void FinalizeScene();
 
         void CreateAccel();
 
-        auto GetAccelBuilder() -> std::shared_ptr<ASBuilder>&
-        {
+        auto GetAccelBuilder() -> std::shared_ptr<ASBuilder> & {
             return m_accelBuilder;
         }
 
         [[nodiscard]] auto
-        GetSceneModelTextures() const -> const std::vector<std::shared_ptr<Texture2D>>&
-        {
+        GetSceneModelTextures() const -> const std::vector<std::shared_ptr<Texture2D>> & {
             return m_sceneModelTextures;
         }
 
         void CreateModelDescBuffer();
 
-        auto GetModelDescBuffer() -> std::shared_ptr<ArbitraryBuffer>&
-        {
+        auto GetModelDescBuffer() -> std::shared_ptr<ArbitraryBuffer> & {
             return m_sceneModelDescBuffer;
         }
 
-        void CreateModelTextures(const std::vector<std::string>& TexturePaths);
+        void CreateModelTextures(const std::vector<std::string> &TexturePaths);
 
         void CreateModelDescDescriptorSet();
 
         void BindModelDescDescriptorSets() const;
 
-        [[nodiscard]] auto GetModelDescDescriptorSetLayout() const -> VkDescriptorSetLayout
-        {
+        [[nodiscard]] auto GetModelDescDescriptorSetLayout() const -> VkDescriptorSetLayout {
             return m_modelDescDescriptorSetLayout;
         }
 
-        [[nodiscard]] auto GetModelDescDescriptorSet(uint ImageIndex) const -> VkDescriptorSet
-        {
+        [[nodiscard]] auto GetModelDescDescriptorSet(uint ImageIndex) const -> VkDescriptorSet {
             Check(ImageIndex < MAX_FRAMES_IN_FLIGHT);
             return m_modelDescDescriptorSets[ImageIndex];
         }
 
         void CreateSceneLightsBuffer();
 
-        [[nodiscard]] auto GetSceneLightsBuffer() const -> const std::shared_ptr<ArbitraryBuffer>&
-        {
+        [[nodiscard]] auto
+        GetSceneLightsBuffer() const -> const std::shared_ptr<ArbitraryBuffer> & {
             return m_sceneLightsBuffer;
         }
 
-        [[nodiscard]] auto GetSceneLights() const -> const std::vector<Light>&
-        {
+        [[nodiscard]] auto GetSceneLights() const -> const std::vector<Light> & {
             return m_sceneLights;
         }
 
@@ -136,9 +117,10 @@ namespace HWPT
     private:
         Light m_dummyLight;
         ModelDesc m_dummyDesc;
-        std::shared_ptr<ArbitraryBuffer> m_sceneModelDescDummyBuffer; // Used when m_models.empty()
-        std::shared_ptr<ArbitraryBuffer> m_sceneLightsDummyBuffer;
+        // Used when m_models.empty()
+        std::shared_ptr<ArbitraryBuffer> m_sceneModelDescDummyBuffer;
         // Used when m_sceneLights.empty()
+        std::shared_ptr<ArbitraryBuffer> m_sceneLightsDummyBuffer;
     };
 } // namespace HWPT
 

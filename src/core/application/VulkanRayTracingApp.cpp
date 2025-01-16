@@ -805,17 +805,17 @@ namespace HWPT {
                 0.f,
                 0.f
         );
-        m_RTScene->AddLight(
-                glm::vec3(0.f, 0.f, 0.f),
-                LightType::Point,
-                glm::vec3(1.f, .2f, -1.f),
-                3.f,  // Radius
-                glm::vec3(1.f, 1.f, 1.f),
-                3.1415926f,
-                0.f,
-                0.f,
-                0.f
-        );
+//        m_RTScene->AddLight(
+//                glm::vec3(0.f, 0.f, 0.f),
+//                LightType::Point,
+//                glm::vec3(1.5f, 1.5f, -1.f),
+//                2.f,  // Radius
+//                glm::vec3(1.f, 1.f, 1.f),
+//                3.1415926f,
+//                0.f,
+//                0.f,
+//                0.f
+//        );
         m_RTScene->FinalizeScene();
     }
 
