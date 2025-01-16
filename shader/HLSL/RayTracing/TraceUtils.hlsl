@@ -61,7 +61,7 @@ float TraceShadowRay(in float3 origin, in Light light) {
     ray.TMin = render_options.RayMinBias;
     if (light.Type == LightType::Directional) {
         ray.Direction = -normalize(light.Direction);
-        ray.TMax = 1e3f;
+        ray.TMax = render_options.MaxTraceDistance;
     } else {
         float3 ToLight = light.Position - origin;
         ray.Direction = normalize(ToLight);
@@ -79,7 +79,7 @@ float TraceShadowRay(in float3 origin, in Light light, out float3 ray_direction)
     ray.TMin = render_options.RayMinBias;
     if (light.Type == LightType::Directional) {
         ray.Direction = -normalize(light.Direction);
-        ray.TMax = 1e3f;
+        ray.TMax = render_options.MaxTraceDistance;
     } else {
         float3 ToLight = light.Position - origin;
         ray.Direction = normalize(ToLight);

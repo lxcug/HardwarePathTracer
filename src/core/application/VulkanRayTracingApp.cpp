@@ -45,8 +45,8 @@ namespace HWPT {
 
         InitRayTracing();
 
-        m_camera->SetPosition(glm::vec3(2.f, 1.f, 2.5f));
-        m_camera->SetRotation(-glm::radians(15.f), glm::radians(30.f));
+        m_camera->SetPosition(glm::vec3(2.f, 2.f, 18.f));
+        m_camera->SetRotation(-glm::radians(10.f), glm::radians(10.f));
     }
 
     void VulkanRayTracingApp::CleanUp() {
@@ -360,7 +360,7 @@ namespace HWPT {
 
         static bool ShouldReAccumulate = false;
         ShouldReAccumulate = false;
-        static bool ShowGBuffer = true;
+        static bool ShowGBuffer = false;
         {
             if (ShowGBuffer) {
                 ImGui::Begin("GBuffer");
@@ -469,9 +469,9 @@ namespace HWPT {
             ImGui::Text("Pitch %.2f:  Yaw %.2f", m_camera->GetPitch(), m_camera->GetYaw()
 
             );
-            ImGui::SliderFloat("Move Speed", &m_camera->GetCameraMoveSpeed(), .05f, 2.f, "%.1f");
+            ImGui::SliderFloat("Move Speed", &m_camera->GetCameraMoveSpeed(), .05f, 50.f, "%.1f");
             ImGui::SliderFloat("Rotate Speed", &m_camera->GetCameraRotateSpeed(), .05f, 2.f, "%.1f");
-            ImGui::SliderFloat("Scroll Speed", &m_camera->GetCameraScrollSpeed(), .05f, 2.f, "%.1f");
+            ImGui::SliderFloat("Scroll Speed", &m_camera->GetCameraScrollSpeed(), .05f, 50.f, "%.1f");
 
             ImGui::NewLine();
 
@@ -795,12 +795,12 @@ namespace HWPT {
         m_RTScene->AddModel(m_vikingRoom);
 
         m_RTScene->AddLight(
-                glm::normalize(glm::vec3(1.f, -1.f, -1.f)),
+                glm::normalize(glm::vec3(.5f, -1.f, -.1f)),
                 LightType::Directional,
                 glm::vec3(.5f, .5f, .5f),
                 0.f,
                 glm::vec3(1.f, 1.f, 1.f),
-                5.f,
+                2 * 3.1415926f,
                 0.f,
                 0.f,
                 0.f
@@ -808,10 +808,10 @@ namespace HWPT {
 //        m_RTScene->AddLight(
 //                glm::vec3(0.f, 0.f, 0.f),
 //                LightType::Point,
-//                glm::vec3(1.5f, 1.5f, -1.f),
-//                2.f,  // Radius
+//                glm::vec3(1.f, 2.f, 2.f),
+//                10.f,  // Radius
 //                glm::vec3(1.f, 1.f, 1.f),
-//                3.1415926f,
+//                2.f,  // Intensity
 //                0.f,
 //                0.f,
 //                0.f

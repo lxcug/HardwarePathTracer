@@ -19,6 +19,7 @@ BEGIN_HWPT_NAMESPACE
         uint NumLights;
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, Bounce, 4);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, RayMinBias, 1e-3f);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, MaxTraceDistance, 1e4f);
     };
 
 #if IS_COMPILING_SHADER
