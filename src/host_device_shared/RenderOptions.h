@@ -11,8 +11,8 @@ BEGIN_HWPT_NAMESPACE
     struct RenderOptions
     {
         // TODO: Pack Bool into Int/UInt
-        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, Accumulation, 1);
-        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableAO, 1);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableAccumulation, 1);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableAO, 0);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, ShouldReAccumulate, 1);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, NumAORays, 4);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, AORayLength, 1.f);

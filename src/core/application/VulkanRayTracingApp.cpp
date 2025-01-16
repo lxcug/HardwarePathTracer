@@ -39,7 +39,6 @@ namespace HWPT {
         CreateDescriptorPool();
 
         CreateViewUniformBuffers();
-        CreateModels();
 
         CreateSyncObjects();
 
@@ -405,6 +404,21 @@ namespace HWPT {
             ImGui::Text("FPS: %d", m_fpsCalculator->GetFPS());
             ImGui::Text("Accumulated Frames: %d", m_frameNum);
             ImGui::Text("Render Resolution (%.0f, %.0f)", m_viewportSize.x, m_viewportSize.y);
+            static bool FullScreen = false;
+            static int WindowWidth, WindowHeight, WindowPosX, WindowPosY;
+            if (ImGui::Checkbox("Full Screen", &FullScreen)) {
+                glfwSetWindowAttrib(m_window, GLFW_DECORATED, !FullScreen);
+                if (FullScreen) {
+                    glfwGetWindowSize(m_window, &WindowWidth, &WindowHeight);
+                    glfwGetWindowPos(m_window, &WindowPosX, &WindowPosY);
+                    const GLFWvidmode *Mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
+                    glfwSetWindowPos(m_window, 0, 0);
+                    glfwSetWindowSize(m_window, Mode->width, Mode->height);
+                } else {
+                    glfwSetWindowPos(m_window, WindowPosX, WindowPosY);
+                    glfwSetWindowSize(m_window, WindowWidth, WindowHeight);
+                }
+            }
 
             ImGui::NewLine();
             ImGui::Separator();
@@ -421,7 +435,8 @@ namespace HWPT {
             ImGui::Separator();
             ImGui::NewLine();
             ImGui::Text("Path Tracing Options");
-            ShouldReAccumulate |= ImGui::InputFloat("Min Ray Bias", &m_renderOptions.RayMinBias, 1e-3f);
+            ShouldReAccumulate |= ImGui::InputFloat("Min Ray Bias", &m_renderOptions.RayMinBias,
+                                                    1e-3f);
             ShouldReAccumulate |= ImGui::InputInt("Bounce", &m_renderOptions.Bounce, 1.f);
 
             if (ShouldReAccumulate) {
@@ -437,8 +452,7 @@ namespace HWPT {
 //            {
 //                glfwSetWindowAttrib(m_window, GLFW_DECORATED, !BorderlessWindow);
 //            }
-//            static bool FullScreen = false;
-//            static int WindowWidth, WindowHeight, WindowPosX, WindowPosY;
+
 //            if (!FullScreen)
 //            {
 //                glfwGetWindowSize(m_window, &WindowWidth, &WindowHeight);
@@ -471,9 +485,11 @@ namespace HWPT {
             ImGui::Text("Pitch %.2f:  Yaw %.2f", m_camera->GetPitch(), m_camera->GetYaw()
 
             );
-            ImGui::SliderFloat("Move Speed", &m_camera->GetCameraMoveSpeed(), .05f, 50.f, "%.1f");
-            ImGui::SliderFloat("Rotate Speed", &m_camera->GetCameraRotateSpeed(), .05f, 2.f, "%.1f");
-            ImGui::SliderFloat("Scroll Speed", &m_camera->GetCameraScrollSpeed(), .05f, 50.f, "%.1f");
+            ImGui::SliderFloat("Move Speed", &m_camera->GetCameraMoveSpeed(), .01f, 50.f, "%.1f");
+            ImGui::SliderFloat("Rotate Speed", &m_camera->GetCameraRotateSpeed(), .01f, 2.f,
+                               "%.1f");
+            ImGui::SliderFloat("Scroll Speed", &m_camera->GetCameraScrollSpeed(), .01f, 50.f,
+                               "%.1f");
 
             ImGui::NewLine();
 
@@ -793,9 +809,8 @@ namespace HWPT {
 
     void VulkanRayTracingApp::CreateAccelerationStructure() {
         m_RTScene = new Scene();
-        m_vikingRoom->SetModelName("VikingRoom");
-        m_RTScene->AddModel(m_vikingRoom);
 
+        m_RTScene->AddModel("../../asset/sponza/sponza.obj");
         m_RTScene->AddLight(
                 glm::normalize(glm::vec3(.5f, -1.f, -.1f)),
                 LightType::Directional,
@@ -818,6 +833,7 @@ namespace HWPT {
 //                0.f,
 //                0.f
 //        );
+
         m_RTScene->FinalizeScene();
     }
 
