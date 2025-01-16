@@ -45,8 +45,9 @@ namespace HWPT {
 
         InitRayTracing();
 
-        m_camera->SetPosition(glm::vec3(2.f, 2.f, 18.f));
-        m_camera->SetRotation(-glm::radians(10.f), glm::radians(10.f));
+        m_camera->SetPosition(glm::vec3(-600, 510, 40));
+        m_camera->SetRotation(-0.13, -1.41);
+//        m_camera->SetRotation(-glm::radians(10.f), glm::radians(10.f));
     }
 
     void VulkanRayTracingApp::CleanUp() {
@@ -403,6 +404,7 @@ namespace HWPT {
             ImGuiInfrastructure::Begin("Settings");
             ImGui::Text("FPS: %d", m_fpsCalculator->GetFPS());
             ImGui::Text("Accumulated Frames: %d", m_frameNum);
+            ImGui::Text("Render Resolution (%.0f, %.0f)", m_viewportSize.x, m_viewportSize.y);
 
             ImGui::NewLine();
             ImGui::Separator();
@@ -800,7 +802,7 @@ namespace HWPT {
                 glm::vec3(.5f, .5f, .5f),
                 0.f,
                 glm::vec3(1.f, 1.f, 1.f),
-                2 * 3.1415926f,
+                2.5f * 3.1415926f,
                 0.f,
                 0.f,
                 0.f
