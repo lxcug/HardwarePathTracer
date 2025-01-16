@@ -37,3 +37,4 @@ HardwarePathTracer using Vulkan RayTracing API
 > * Length Based AO and Render Options Control
 > * Simple Path Tracing Algorithm
 >   ![](imgs/PathTracing.png)
+>   ![](imgs/CornellBox.png)
