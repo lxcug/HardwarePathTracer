@@ -233,8 +233,6 @@ namespace HWPT
 
         void CreateViewUniformBuffers();
 
-        void CreateModels();
-
         virtual void OnWindowResize();
 
     protected:
@@ -305,7 +303,6 @@ namespace HWPT
         ImGuiInfrastructure* m_imguiInfrastructure = nullptr;
         glm::vec2 m_viewportSize = glm::vec2(0.f, 0.f);
 
-        Model* m_vikingRoom = nullptr;
         uint m_msaaSamples = 8;
 
         MSAABuffer* m_msaaBuffers = nullptr;
@@ -319,7 +316,7 @@ namespace HWPT
     public:
         std::shared_ptr<CameraBase> m_camera;
 
-        Debugger* m_debugger = nullptr;
+        Debugger* m_debugger = nullptr;  // TODO
     };
 } // namespace HWPT
 

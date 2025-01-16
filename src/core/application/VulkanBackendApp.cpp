@@ -120,7 +120,6 @@ namespace HWPT
         CreateDescriptorPool();
 
         CreateViewUniformBuffers();
-        CreateModels();
 
         CreateGraphicsDescriptorSetLayout();
         CreateGraphicsPipeline();
@@ -153,7 +152,7 @@ namespace HWPT
     {
         Sampler::ReleaseSamplers();
         delete m_msaaBuffers;
-        delete m_vikingRoom;
+//        delete m_vikingRoom;
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
         {
             delete m_MVPUniformBuffers[i];
@@ -779,9 +778,8 @@ namespace HWPT
 
         VkPipelineVertexInputStateCreateInfo VertexInputInfo{};
         VertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        auto bindingDescription = m_vikingRoom->GetVertexBufferLayout()->GetBindingDescription();
-        auto attributeDescription = m_vikingRoom->GetVertexBufferLayout()->
-                                                  GetAttributeDescriptions();
+        auto bindingDescription = VertexBuffer::DefaultVertexLayout().GetBindingDescription();
+        auto attributeDescription = VertexBuffer::DefaultVertexLayout().GetAttributeDescriptions();
         VertexInputInfo.vertexBindingDescriptionCount = 1;
         VertexInputInfo.pVertexBindingDescriptions = &bindingDescription;
         VertexInputInfo.vertexAttributeDescriptionCount = attributeDescription.size();
@@ -1161,8 +1159,9 @@ namespace HWPT
 
             VkDescriptorImageInfo ImageInfo{};
             ImageInfo.imageLayout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
-            ImageInfo.imageView = m_vikingRoom->GetTexture()->CreateSRV();
-            ImageInfo.sampler = Sampler::GetDefaultSample()->GetHandle();
+            // NOTE: Deprecated Graphics Pipeline
+//            ImageInfo.imageView = m_vikingRoom->GetTexture()->CreateSRV();
+//            ImageInfo.sampler = Sampler::GetDefaultSample()->GetHandle();
             DescriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             DescriptorWrites[1].dstSet = m_graphicsDescriptorSets[i];
             DescriptorWrites[1].dstBinding = 1;
@@ -1256,7 +1255,8 @@ namespace HWPT
         Scissor.extent = m_swapChain.Extent;
         vkCmdSetScissorWithCount(CommandBuffer, 1, &Scissor);
 
-        m_vikingRoom->DrawIndexed(CommandBuffer);
+        // NOTE: Deprecated Graphics Pipeline
+//        m_vikingRoom->DrawIndexed(CommandBuffer);
 
         vkCmdBindPipeline(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                           m_particleGraphicsPipeline);
@@ -1285,14 +1285,6 @@ namespace HWPT
         delete m_msaaBuffers;
         CreateMSAABuffers();
         CreateFrameBuffers();
-    }
-
-    void VulkanBackendApp::CreateModels()
-    {
-        // m_vikingRoom = new Model("../../asset/viking_room_new/viking_room_new.obj");
-//        m_vikingRoom = new Model("../../asset/house_with_tree/house_with_tree.obj");
-//        m_vikingRoom = new Model("../../asset/cornell_box/cornell_box.obj");
-        m_vikingRoom = new Model("../../asset/sponza/sponza.obj");
     }
 
     void VulkanBackendApp::InitImGui()

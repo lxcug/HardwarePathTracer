@@ -44,6 +44,16 @@ namespace HWPT {
             return m_vertexCount;
         }
 
+        static auto DefaultVertexLayout() -> VertexBufferLayout {
+            static VertexBufferLayout DefaultLayout = {
+                    {VertexAttributeDataType::Float3, "Pos"},
+                    {VertexAttributeDataType::Float3, "Normal"},
+                    {VertexAttributeDataType::Float3, "Color"},
+                    {VertexAttributeDataType::Float2, "TexCoord"}
+            };
+            return DefaultLayout;
+        }
+
     private:
         VkBuffer m_vertexBuffer = VK_NULL_HANDLE;
         VkDeviceMemory m_vertexBufferMemory = VK_NULL_HANDLE;
