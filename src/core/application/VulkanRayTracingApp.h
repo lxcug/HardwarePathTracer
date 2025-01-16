@@ -46,7 +46,7 @@ namespace HWPT
 
         void CreateRTPipeline();
 
-        void CreateAccelerationStructure();
+        void InitScene();
 
         void CreateViewportImages();
 
@@ -91,6 +91,10 @@ namespace HWPT
         std::vector<VkDescriptorSet> m_viewportImageDescriptorSets;
         GBuffer* m_gBuffer = nullptr;
         RenderOptions m_renderOptions;
+
+        Texture2D* m_skyTexture = nullptr;
+
+        std::vector<std::function<void()>> m_deferredOperations;
     };
 } // namespace HWPT
 

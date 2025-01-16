@@ -11,7 +11,7 @@ d 1.000000
 illum 2
 map_Kd Texture/Bark___0.jpg
 
-newmtl Oak_Leav.jpg
+newmtl Bark___0.jpg.001
 Ns 224.999985
 Ka 1.000000 1.000000 1.000000
 Ks 0.500000 0.500000 0.500000
@@ -19,10 +19,10 @@ Ke 0.000000 0.000000 0.000000
 Ni 1.450000
 d 1.000000
 illum 2
-map_Kd Texture/Oak_Leav.jpg
+map_Kd Texture/Bark___0.jpg
 
 newmtl 材质
-Ns 250.000000
+Ns 0.000000
 Ka 1.000000 1.000000 1.000000
 Kd 0.132374 0.731467 0.801826
 Ks 0.500000 0.500000 0.500000

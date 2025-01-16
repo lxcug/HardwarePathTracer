@@ -33,27 +33,34 @@ HardwarePathTracer using Vulkan RayTracing API
 > 2025.1.16 
 >
 > * Access Lights In Shaders
->
 > * Better Random In Shaders
->
 > * Length Based AO and Render Options Control
->
 > * Simple Path Tracing Algorithm
->   ![](imgs/PathTracing.png)
->   
->   
->   
->   ![](imgs/CornellBox.png)
+>
+> ![](imgs/PathTracing.png)
+>
+> 
+>
+> ![](imgs/CornellBox.png)
+>
 >   <center>
 >       <b>
 >           Cornell Box
 >       </b>
 >   </center>
->   
->   ![](imgs/Sponza.png)
->   
+>
+> ![](imgs/Sponza.png)
+>
 >   <center>
 >       <b>
 >           Sponza
 >       </b>
 >   </center>
+
+
+
+> 2025.1.17
+>
+> * Add sky light and change sky light at runtime
+>
+> ![](imgs/SkyLight.png)

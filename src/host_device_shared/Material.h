@@ -44,6 +44,8 @@ StructuredBuffer<ModelDesc> ModelInfo : register(t0, space1);
 Texture2D<float4> MaterialTextures[] : register(t1, space1);
 SamplerState Samplers[] : register(s1, space1);
 StructuredBuffer<Light> Lights : register(t2, space1);
+Texture2D<float4> SkyTexture : register(t3, space1);
+SamplerState SkyTextureSampler : register(s3, space1);
 
 Material GetMaterial(uint InstanceID, uint PrimitiveIndex) {
     uint64_t MaterialBufferAddress = ModelInfo[InstanceID].MaterialBufferAddress;

@@ -13,22 +13,6 @@ find_package(tinyobjloader CONFIG REQUIRED)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/vendor)
 
-add_executable(
-        CompileHLSL
-        src/core/shader_compiler/CompileScript.cpp
-        src/core/shader_compiler/CompilerHLSL.cpp
-        src/host_device_shared/BaseDefinitions.h
-)
-
-target_link_libraries(
-        CompileHLSL
-        PRIVATE Vulkan::Vulkan
-        PRIVATE glfw
-        PRIVATE glm::glm
-        PRIVATE imgui
-        PRIVATE tinyobjloader::tinyobjloader
-)
-
 add_executable(HardwarePathTracer src/core/PTMain.cpp
         src/core/application/Application.cpp
         src/core/application/Application.h
@@ -114,5 +98,21 @@ target_link_libraries(
         PRIVATE glm::glm
         PRIVATE imgui
         PRIVATE tinyobjloader::tinyobjloader
-#        PRIVATE glog
+        ImGuiFileDialog
+)
+
+add_executable(
+        CompileHLSL
+        src/core/shader_compiler/CompileScript.cpp
+        src/core/shader_compiler/CompilerHLSL.cpp
+        src/host_device_shared/BaseDefinitions.h
+)
+
+target_link_libraries(
+        CompileHLSL
+        PRIVATE Vulkan::Vulkan
+        PRIVATE glfw
+        PRIVATE glm::glm
+        PRIVATE imgui
+        PRIVATE tinyobjloader::tinyobjloader
 )

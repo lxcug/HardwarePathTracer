@@ -81,8 +81,15 @@ namespace HWPT {
         SceneLightsBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR |
                                         VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
-        std::array<VkDescriptorSetLayoutBinding, 3> Bindings = {
-                ModelInfoBinding, TexturesBinding, SceneLightsBinding
+        VkDescriptorSetLayoutBinding SkyTextureBinding{};
+        SkyTextureBinding.binding = 3;
+        SkyTextureBinding.descriptorCount = 1;
+        SkyTextureBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        SkyTextureBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+                                       VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+
+        std::array<VkDescriptorSetLayoutBinding, 4> Bindings = {
+                ModelInfoBinding, TexturesBinding, SceneLightsBinding, SkyTextureBinding
         };
 
         VkDescriptorSetLayoutCreateInfo CreateInfo{};
@@ -108,8 +115,8 @@ namespace HWPT {
                 ));
     }
 
-    void Scene::BindModelDescDescriptorSets() const {
-        std::array<VkWriteDescriptorSet, 3> DescriptorWrites{};
+    void Scene::UpdateModelDescDescriptorSets() const {
+        std::array<VkWriteDescriptorSet, 4> DescriptorWrites{};
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkDescriptorBufferInfo ModelDescBufferInfo{};
             ModelDescBufferInfo.buffer = m_models.empty()
@@ -157,9 +164,20 @@ namespace HWPT {
             DescriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
             DescriptorWrites[2].pBufferInfo = &SceneLightsBufferInfo;
 
+            VkDescriptorImageInfo SkyTextureInfo{};
+            SkyTextureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            SkyTextureInfo.imageView = m_skyTexture->CreateSRV();
+            SkyTextureInfo.sampler = Sampler::GetDefaultSample()->GetHandle();
+            DescriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            DescriptorWrites[3].dstSet = m_modelDescDescriptorSets[i];
+            DescriptorWrites[3].dstBinding = 3;
+            DescriptorWrites[3].dstArrayElement = 0;
+            DescriptorWrites[3].descriptorCount = 1;
+            DescriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            DescriptorWrites[3].pImageInfo = &SkyTextureInfo;
+
             vkUpdateDescriptorSets(GetVKDevice(), DescriptorWrites.size(), DescriptorWrites.data(),
-                                   0,
-                                   nullptr);
+                                   0, nullptr);
         }
     }
 

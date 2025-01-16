@@ -36,6 +36,9 @@ void main()
     float3 radiance = float3(0.f, 0.f, 0.f);
     if (payload.is_hit) {
         radiance = PathTracingKernel(payload, seed);
+    } else {
+        float2 uv = uint_vector_to_hdri_uv(-dir);
+        radiance = SkyTexture.SampleLevel(SkyTextureSampler, uv, 0).rgb;
     }
 
     // Distance Based RT AO
@@ -79,7 +82,7 @@ void main()
             OutImage[index] = float4(new_color, 1.0);
         }
     } else {
-        OutImage[index] = float4(0.f, 0.f, 0.f, 0.f);
+        OutImage[index] = float4(radiance, 1.f);
 
         GBuffer[0][index] = float4(0.f, 0.f, 0.f, 0.f);
         GBuffer[1][index] = float4(0.f, 0.f, 0.f, 0.f);

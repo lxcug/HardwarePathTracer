@@ -78,7 +78,7 @@ namespace HWPT {
 
         void CreateModelDescDescriptorSet();
 
-        void BindModelDescDescriptorSets() const;
+        void UpdateModelDescDescriptorSets() const;
 
         [[nodiscard]] auto GetModelDescDescriptorSetLayout() const -> VkDescriptorSetLayout {
             return m_modelDescDescriptorSetLayout;
@@ -100,6 +100,10 @@ namespace HWPT {
             return m_sceneLights;
         }
 
+        void CreateSkyTexture(const std::filesystem::path& Path) {
+            m_skyTexture = std::make_shared<Texture2D>(Path);
+        }
+
     private:
         std::shared_ptr<ASBuilder> m_accelBuilder;
         std::vector<std::shared_ptr<Model>> m_models;
@@ -113,6 +117,8 @@ namespace HWPT {
 
         std::vector<Light> m_sceneLights;
         std::shared_ptr<ArbitraryBuffer> m_sceneLightsBuffer;
+
+        std::shared_ptr<Texture2D> m_skyTexture;
 
     private:
         Light m_dummyLight;
