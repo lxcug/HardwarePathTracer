@@ -72,3 +72,43 @@ float TraceShadowRay(in float3 origin, in Light light) {
     TraceRay(TLAS, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xff, 0, 0, 0, ray, payload);
     return !payload.is_hit;
 }
+
+float TraceShadowRay(in float3 origin, in Light light, out float3 ray_direction) {
+    RayDesc ray;
+    ray.Origin = origin;
+    ray.TMin = render_options.RayMinBias;
+    if (light.Type == LightType::Directional) {
+        ray.Direction = -normalize(light.Direction);
+        ray.TMax = 1e3f;
+    } else {
+        float3 ToLight = light.Position - origin;
+        ray.Direction = normalize(ToLight);
+        ray.TMax = length(ToLight);
+    }
+
+    ray_direction = ray.Direction;
+
+    RayPayload payload;
+    TraceRay(TLAS, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xff, 0, 0, 0, ray, payload);
+    return !payload.is_hit;
+}
+
+void TraceLight(in float3 origin, in float3 normal, in Light light, out float3 radiance) {
+    float distance_attenuation = 1.f;
+    float3 ray_direction;
+    if (light.Type == LightType::Point || light.Type == LightType::Spot) {
+        float3 to_light = light.Position - origin;
+        float dis2 = dot(to_light, to_light);
+        float radius2 = light.Radius * light.Radius;
+        if (dis2 > radius2) {
+            radiance = float3(0.f, 0.f, 0.f);
+            return;
+        }
+        distance_attenuation = 1.f - min(dis2 / radius2, 1.f);
+    }
+
+    float vis = TraceShadowRay(origin, light, ray_direction);
+
+    radiance = vis * light.Intensity * light.Color * dot(normal, ray_direction) * distance_attenuation;
+}
+
