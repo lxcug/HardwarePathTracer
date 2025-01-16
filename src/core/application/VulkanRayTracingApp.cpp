@@ -359,6 +359,7 @@ namespace HWPT {
         }
 
         static bool ShouldReAccumulate = false;
+        ShouldReAccumulate = false;
         static bool ShowGBuffer = true;
         {
             if (ShowGBuffer) {
@@ -411,7 +412,6 @@ namespace HWPT {
             ShouldReAccumulate |= ImGui::Checkbox("Enable AO",
                                                   reinterpret_cast<bool *>(&m_renderOptions.EnableAO));
             ShouldReAccumulate |= ImGui::InputInt("Num AO Rays", &m_renderOptions.NumAORays, 1.f);
-
             ShouldReAccumulate |= ImGui::InputFloat("AO Ray Length", &m_renderOptions.AORayLength,
                                                     .5f, 1.f, "%.1f");
 
@@ -419,9 +419,8 @@ namespace HWPT {
             ImGui::Separator();
             ImGui::NewLine();
             ImGui::Text("Path Tracing Options");
-            ShouldReAccumulate |= ImGui::SliderFloat("Min Ray Bias", &m_renderOptions.RayMinBias,
-                                                     1e-4, 1e-2, "%.4f");
-            ShouldReAccumulate |= ImGui::SliderInt("Bounce", &m_renderOptions.Bounce, 0, 10);
+            ShouldReAccumulate |= ImGui::InputFloat("Min Ray Bias", &m_renderOptions.RayMinBias, 1e-3f);
+            ShouldReAccumulate |= ImGui::InputInt("Bounce", &m_renderOptions.Bounce, 1.f);
 
             if (ShouldReAccumulate) {
                 ResetFrameNum();
@@ -467,32 +466,12 @@ namespace HWPT {
             auto CameraPos = m_camera->GetCameraPos();
             ImGui::Text("Camera Position (%.2f, %.2f, %.2f)", CameraPos.x, CameraPos.y,
                         CameraPos.z);
-            ImGui::Text("Pitch %.2f:  Yaw %.2f", m_camera->
-
-                    GetPitch(), m_camera
-
-                                ->
-
-                                        GetYaw()
+            ImGui::Text("Pitch %.2f:  Yaw %.2f", m_camera->GetPitch(), m_camera->GetYaw()
 
             );
-            ImGui::SliderFloat("Move Speed", &m_camera->
-
-                                       GetCameraMoveSpeed(),
-
-                               .05f, 2.f, "%.1f");
-            ImGui::SliderFloat("Rotate Speed", &m_camera->
-
-                                       GetCameraRotateSpeed(),
-
-                               .05f, 2.f,
-                               "%.1f");
-            ImGui::SliderFloat("Scroll Speed", &m_camera->
-
-                                       GetCameraScrollSpeed(),
-
-                               .05f, 2.f,
-                               "%.1f");
+            ImGui::SliderFloat("Move Speed", &m_camera->GetCameraMoveSpeed(), .05f, 2.f, "%.1f");
+            ImGui::SliderFloat("Rotate Speed", &m_camera->GetCameraRotateSpeed(), .05f, 2.f, "%.1f");
+            ImGui::SliderFloat("Scroll Speed", &m_camera->GetCameraScrollSpeed(), .05f, 2.f, "%.1f");
 
             ImGui::NewLine();
 
