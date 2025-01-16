@@ -87,13 +87,13 @@ namespace HWPT
 
         glm::vec2 m_viewportSize = glm::vec2(1.f, 1.f);
         glm::vec2 m_viewportOffset = glm::vec2(0.f, 0.f);
-        bool m_shouldRecreateViewportImages = false;
         std::vector<VkDescriptorSet> m_viewportImageDescriptorSets;
         GBuffer* m_gBuffer = nullptr;
         RenderOptions m_renderOptions;
 
         Texture2D* m_skyTexture = nullptr;
 
+        // NOTE: Store Last Frame Operations and Execute before RenderPipeline Begins
         std::vector<std::function<void()>> m_deferredOperations;
     };
 } // namespace HWPT
