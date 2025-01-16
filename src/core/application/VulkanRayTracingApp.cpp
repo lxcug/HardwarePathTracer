@@ -10,6 +10,7 @@
 #include "core/shader/ShaderBase.h"
 #include "core/shader_compiler/CompilerHLSL.h"
 #include "core/Utils.h"
+#include "ImGuiFileDialog.h"
 
 
 namespace HWPT {
@@ -44,9 +45,9 @@ namespace HWPT {
 
         InitRayTracing();
 
-        m_camera->SetPosition(glm::vec3(-600, 510, 40));
-        m_camera->SetRotation(-0.13, -1.41);
-//        m_camera->SetRotation(-glm::radians(10.f), glm::radians(10.f));
+//        m_camera->SetCameraPosition(glm::vec3(-600, 510, 40));
+//        m_camera->SetCameraRotation(-0.13, -1.41);
+//        m_camera->SetCameraRotation(-glm::radians(10.f), glm::radians(10.f));
     }
 
     void VulkanRayTracingApp::CleanUp() {
@@ -85,6 +86,11 @@ namespace HWPT {
     }
 
     void VulkanRayTracingApp::DrawFrame() {
+        for (auto &Operation: m_deferredOperations) {
+            Operation();
+        }
+        m_deferredOperations.clear();
+
         // Update ViewUniformBuffer
         ViewUniformBuffer ViewUniformBuffer_{};
         ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();
@@ -323,7 +329,7 @@ namespace HWPT {
         CreateViewportImages();
         CreateGBuffer();
 
-        CreateAccelerationStructure();
+        InitScene();
         CreateRTDescriptorSets();
         BindRTDescriptorSets();
         CreateRTPipelineLayout();
@@ -435,12 +441,58 @@ namespace HWPT {
             ImGui::Separator();
             ImGui::NewLine();
             ImGui::Text("Path Tracing Options");
+            ShouldReAccumulate |= ImGui::Checkbox("Enable Accumulation",
+                                                  reinterpret_cast<bool *>(&m_renderOptions.EnableAccumulation));
             ShouldReAccumulate |= ImGui::InputFloat("Min Ray Bias", &m_renderOptions.RayMinBias,
                                                     1e-3f);
             ShouldReAccumulate |= ImGui::InputInt("Bounce", &m_renderOptions.Bounce, 1.f);
+            ShouldReAccumulate |= ImGui::Checkbox("Enable SkyLight",
+                                                  reinterpret_cast<bool *>(&m_renderOptions.AccumulateSkyLight));
+
+            // TODO: Choose Obj
+//            if (ImGui::Button("Open Obj")) {
+//                IGFD::FileDialogConfig config;
+//                config.path = "../../asset";
+//                ImGuiFileDialog::Instance()->OpenDialog("ChooseObj", "Choose File",
+//                                                        ".obj", config);
+//            }
+            if (ImGui::Button("Open Sky Texture")) {
+                IGFD::FileDialogConfig config;
+                config.path = "../../asset/env";
+                ImGuiFileDialog::Instance()->OpenDialog("ChooseSkyTexture", "Choose File",
+                                                        ".hdr, .jpg, .png", config);
+            }
+//            if (ImGuiFileDialog::Instance()->Display("ChooseObj")) { // => will show a dialog
+//                if (ImGuiFileDialog::Instance()->IsOk()) { // action if OK
+//                    std::string FilePathName = ImGuiFileDialog::Instance()->GetFilePathName();
+//                    std::string FilePath = ImGuiFileDialog::Instance()->GetCurrentPath();
+//                    vkDeviceWaitIdle(m_device);
+//                    m_deferredOperations.emplace_back([this, FilePathName]() {
+//
+//                        m_RTScene->UpdateModelDescDescriptorSets();
+//                        ResetFrameNum();
+//                    });
+//                }
+//                ImGuiFileDialog::Instance()->Close();
+//            }
+            if (ImGuiFileDialog::Instance()->Display("ChooseSkyTexture")) { // => will show a dialog
+                if (ImGuiFileDialog::Instance()->IsOk()) { // action if OK
+                    std::string FilePathName = ImGuiFileDialog::Instance()->GetFilePathName();
+                    std::string FilePath = ImGuiFileDialog::Instance()->GetCurrentPath();
+                    vkDeviceWaitIdle(m_device);
+                    m_deferredOperations.emplace_back([this, FilePathName]() {
+                        ResetFrameNum();
+                        m_RTScene->CreateSkyTexture(FilePathName);
+                        m_RTScene->UpdateModelDescDescriptorSets();
+                    });
+                }
+                ImGuiFileDialog::Instance()->Close();
+            }
 
             if (ShouldReAccumulate) {
-                ResetFrameNum();
+                m_deferredOperations.emplace_back([this]() {
+                    ResetFrameNum();
+                });
             }
 
 //            ImGui::NewLine();
@@ -485,24 +537,20 @@ namespace HWPT {
             ImGui::Text("Pitch %.2f:  Yaw %.2f", m_camera->GetPitch(), m_camera->GetYaw()
 
             );
-            ImGui::SliderFloat("Move Speed", &m_camera->GetCameraMoveSpeed(), .01f, 50.f, "%.1f");
-            ImGui::SliderFloat("Rotate Speed", &m_camera->GetCameraRotateSpeed(), .01f, 2.f,
+            ImGui::SliderFloat("Move Speed", &m_camera->GetCameraMoveSpeed(), .01f, 100.f, "%.1f");
+            ImGui::SliderFloat("Rotate Speed", &m_camera->GetCameraRotateSpeed(), .01f, 5.f,
                                "%.1f");
-            ImGui::SliderFloat("Scroll Speed", &m_camera->GetCameraScrollSpeed(), .01f, 50.f,
+            ImGui::SliderFloat("Scroll Speed", &m_camera->GetCameraScrollSpeed(), .01f, 100.f,
                                "%.1f");
 
             ImGui::NewLine();
-
             ImGui::Separator();
-
             ImGui::NewLine();
 
             ImGui::Text("Model Info");
 
             ImGui::NewLine();
-
             ImGui::Separator();
-
             ImGui::NewLine();
 
             ImGui::Text("Light Info");
@@ -647,7 +695,7 @@ namespace HWPT {
         }
 
         // Update ModelDesc DescriptorSets
-        m_RTScene->BindModelDescDescriptorSets();
+        m_RTScene->UpdateModelDescDescriptorSets();
     }
 
     void VulkanRayTracingApp::CreateRTPipelineLayout() {
@@ -807,17 +855,19 @@ namespace HWPT {
         vkUnmapMemory(m_device, m_RTSBTBuffer->GetMemoryHandle());
     }
 
-    void VulkanRayTracingApp::CreateAccelerationStructure() {
+    void VulkanRayTracingApp::InitScene() {
         m_RTScene = new Scene();
 
-        m_RTScene->AddModel("../../asset/sponza/sponza.obj");
+        m_RTScene->CreateSkyTexture("../../asset/env/wildflower_field_4k.hdr");
+//        m_RTScene->AddModel("../../asset/sponza/sponza.obj");
+        m_RTScene->AddModel("../../asset/house_with_tree/house_with_tree.obj");
         m_RTScene->AddLight(
-                glm::normalize(glm::vec3(.5f, -1.f, -.1f)),
+                glm::normalize(glm::vec3(1.f, -1.f, -1.f)),
                 LightType::Directional,
                 glm::vec3(.5f, .5f, .5f),
                 0.f,
                 glm::vec3(1.f, 1.f, 1.f),
-                2.5f * 3.1415926f,
+                3.1415926f,
                 0.f,
                 0.f,
                 0.f

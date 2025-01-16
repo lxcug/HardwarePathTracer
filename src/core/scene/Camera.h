@@ -38,7 +38,7 @@ namespace HWPT
         // Return if camera is moving
         virtual void Tick(float DeltaTime);
 
-        void SetPosition(const glm::vec3& Pos)
+        void SetCameraPosition(const glm::vec3& Pos)
         {
             m_cameraPos = Pos;
             UpdateViewMatrix();
@@ -46,7 +46,7 @@ namespace HWPT
 
         void OnMouseScroll(float XOffset, float YOffset);
 
-        void SetRotation(float Pitch, float Yaw)
+        void SetCameraRotation(float Pitch, float Yaw)
         {
             m_pitch = Pitch;
             m_yaw = Yaw;
@@ -143,7 +143,7 @@ namespace HWPT
         float m_moveSpeedMultiplier = 1.f, m_rotateSpeedMultiplier = 1.f;
         float m_scrollSpeedMultiplier = 1.f;
         static inline float s_moveSpeed = 5.f;
-        static inline float s_rotateSpeed = 1.5f;
+        static inline float s_rotateSpeed = .5f;
         glm::vec2 m_lastMousePos;
         bool m_isFirstTouch = true;
         bool m_isMoving = false;

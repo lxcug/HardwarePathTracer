@@ -313,7 +313,6 @@ namespace HWPT
         void CreateParticleStorageBuffers();
         std::shared_ptr<VertexBufferLayout> m_particleVertexBufferLayout;
 
-    public:
         std::shared_ptr<CameraBase> m_camera;
 
         Debugger* m_debugger = nullptr;  // TODO

@@ -5,12 +5,14 @@ float3 PathTracingKernel(in RayPayload payload, inout uint seed) {
 
     float3 radiance = float3(0.f, 0.f, 0.f);
     float3 path_throughput = float3(1.f, 1.f, 1.f);
+
+    RayDesc ray;
     for (int bounce = 0; bounce < render_options.Bounce; bounce++) {
         bool is_camera_ray = bounce == 0;
         bool is_last_bounce = bounce == render_options.Bounce - 1;
 
-        if (!payload.is_hit) {
-            // TODO: Accumulate SkyLight
+        if (render_options.AccumulateSkyLight && !payload.is_hit) {
+            radiance += sample_sky_texture(ray.Direction);
             break;
         }
 
@@ -38,8 +40,6 @@ float3 PathTracingKernel(in RayPayload payload, inout uint seed) {
                 path_throughput = next_path_throughput;
             }
 
-
-            RayDesc ray;
             ray.Origin = payload.pos;
             ray.Direction = UniformSampleHemisphere(rnd2(seed), payload.normal);  // implies pdf = cos / PI
             ray.TMin = render_options.RayMinBias;
