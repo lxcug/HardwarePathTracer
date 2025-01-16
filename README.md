@@ -35,4 +35,5 @@ HardwarePathTracer using Vulkan RayTracing API
 > * Access Lights In Shaders
 > * Better Random In Shaders
 > * Length Based AO and Render Options Control
->   ![](imgs/LengthBasedAO.png)
+> * Simple Path Tracing Algorithm
+>   ![](imgs/PathTracing.png)

@@ -3,16 +3,9 @@
 #include "RayTracingCommon.hlsl"
 #include "../../../src/host_device_shared/ViewUniformBuffer.h"
 #include "../../../src/host_device_shared/RenderOptions.h"
-
-
-float TraceAORay(in RayDesc ray) {
-    RayPayload payload;
-    TraceRay(TLAS, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xff, 0, 0, 0, ray, payload);
-    if (!payload.is_hit) {
-        return render_options.AORayLength;
-    }
-    return payload.hit_t;
-}
+#include "BRDF.hlsl"
+#include "TraceUtils.hlsl"
+#include "PathTracing.hlsl"
 
 
 [shader("raygeneration")]
@@ -40,6 +33,11 @@ void main()
     uint flags = RAY_FLAG_FORCE_OPAQUE;
     TraceRay(TLAS, flags, 0xff, 0, 0, 0, ray, payload);
 
+    float3 radiance = float3(0.f, 0.f, 0.f);
+    if (payload.is_hit) {
+        radiance = PathTracingKernel(payload, seed);
+    }
+
     // Distance Based RT AO
     float ao = 0.f;
     if (render_options.EnableAO) {
@@ -49,14 +47,10 @@ void main()
             float3 tangent, bitangent;
             GetCoordBasis(payload.normal, tangent, bitangent);
             for (int i = 0; i < render_options.NumAORays; i++) {
-                RayDesc ao_ray;
-                ao_ray.Origin = hit_pos;
-                float3 dir_local = uniform_sample_hemisphere(rnd(seed), rnd(seed));
-                ao_ray.Direction = dir_local.x * tangent + dir_local.y * bitangent + dir_local.z * payload.normal;
-                ao_ray.TMin = 1e-3;
-                ao_ray.TMax = render_options.AORayLength;
+                float3 dir_local = UniformSampleHemisphere(rnd(seed), rnd(seed));
+                float3 dir_world = dir_local.x * tangent + dir_local.y * bitangent + dir_local.z * payload.normal;
 
-                ao += TraceAORay(ao_ray);
+                ao += TraceAORay(hit_pos, dir_world, rnd2(seed));
             }
             ao /= (render_options.NumAORays * render_options.AORayLength);
         }
@@ -74,9 +68,10 @@ void main()
         float depth = ClipPos.z / ClipPos.w;
         GBuffer[3][index] = float4(depth, depth, depth, 1.f);
 
-        float3 color = payload.albedo * ao;
+        float3 color = radiance * ao;
 
-        if (view_uniform_buffer.FrameNum <= 2 || render_options.ShouldReAccumulate) {
+        // TODO: Accumulate for the first several frames cause artifacts, to fix
+        if (view_uniform_buffer.FrameNum <= 5 || render_options.ShouldReAccumulate || !render_options.Accumulation) {
             OutImage[index] = float4(color, 1.0);
         } else {
             float3 old_color = InImage[index].rgb;

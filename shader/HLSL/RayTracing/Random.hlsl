@@ -32,3 +32,7 @@ float rnd(inout uint seed)
 {
     return (float(lcg(seed)) / float(0x01000000));
 }
+
+float2 rnd2(inout uint seed) {
+    return float2(rnd(seed), rnd(seed));
+}
