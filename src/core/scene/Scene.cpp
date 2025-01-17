@@ -8,6 +8,12 @@
 
 
 namespace HWPT {
+    Scene::~Scene() {
+        vkDestroyDescriptorSetLayout(GetVKDevice(), m_modelDescDescriptorSetLayout, nullptr);
+        vkFreeDescriptorSets(GetVKDevice(), VulkanBackendApp::GetApplication()->GetDescriptorPool(),
+                             m_modelDescDescriptorSets.size(), m_modelDescDescriptorSets.data());
+    }
+
     void Scene::CreateAccel() {
         m_accelBuilder = std::make_shared<ASBuilder>();
 
@@ -214,5 +220,18 @@ namespace HWPT {
             RHI::TransitionTextureLayout(m_sceneModelTextures[0]->GetHandle(), 1, SrcInput,
                                          DstInput);
         }
+    }
+
+    void Scene::OnRecreate() {
+        vkDestroyDescriptorSetLayout(GetVKDevice(), m_modelDescDescriptorSetLayout, nullptr);
+        vkFreeDescriptorSets(GetVKDevice(), VulkanBackendApp::GetApplication()->GetDescriptorPool(),
+                             m_modelDescDescriptorSets.size(), m_modelDescDescriptorSets.data());
+        m_accelBuilder.reset();
+        m_models.clear();
+        m_modelDescs.clear();
+        m_sceneModelDescBuffer.reset();
+        m_sceneModelTextures.clear();
+        s_instanceIDCounter = 0;
+        HWPT::ASBuilder::OnRebuildAccel();
     }
 } // namespace HWPT

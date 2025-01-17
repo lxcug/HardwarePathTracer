@@ -18,9 +18,7 @@ namespace HWPT {
     public:
         Scene() = default;
 
-        ~Scene() {
-            vkDestroyDescriptorSetLayout(GetVKDevice(), m_modelDescDescriptorSetLayout, nullptr);
-        }
+        ~Scene();
 
         void AddModel(Model *ModelPtr) {
             std::shared_ptr<Model> SharedModel(ModelPtr);
@@ -78,6 +76,8 @@ namespace HWPT {
 
         void CreateModelDescDescriptorSet();
 
+        void OnRecreate();
+
         void UpdateModelDescDescriptorSets() const;
 
         [[nodiscard]] auto GetModelDescDescriptorSetLayout() const -> VkDescriptorSetLayout {
@@ -96,13 +96,15 @@ namespace HWPT {
             return m_sceneLightsBuffer;
         }
 
-        [[nodiscard]] auto GetSceneLights() const -> const std::vector<Light> & {
+        auto GetSceneLights() -> std::vector<Light> & {
             return m_sceneLights;
         }
 
-        void CreateSkyTexture(const std::filesystem::path& Path) {
+        void CreateSkyTexture(const std::filesystem::path &Path) {
             m_skyTexture = std::make_shared<Texture2D>(Path);
         }
+
+        void ReloadObj(const std::filesystem::path &ObjPath);
 
     private:
         std::shared_ptr<ASBuilder> m_accelBuilder;

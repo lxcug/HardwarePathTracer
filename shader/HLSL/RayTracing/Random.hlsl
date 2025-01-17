@@ -36,3 +36,7 @@ float rnd(inout uint seed)
 float2 rnd2(inout uint seed) {
     return float2(rnd(seed), rnd(seed));
 }
+
+float4 rnd4(inout uint seed) {
+    return float4(rnd2(seed), rnd2(seed));
+}

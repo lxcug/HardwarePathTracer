@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Random.hlsl"
 #include "Payload.hlsl"
 #include "../../../src/host_device_shared/Vertex.h"

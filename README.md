@@ -66,3 +66,13 @@ HardwarePathTracer using Vulkan RayTracing API
 > ![](imgs/SkyLight.png)
 >
 > ![](imgs/SponzaWithSkyLight.png)
+
+
+
+> 2025.1.18
+>
+> * UI control for camera and lights
+> * PathTracing Developing
+> * Open obj and compile shaders at runtime 
+>
+> ![](imgs/New UI and Runtime Operations.png)

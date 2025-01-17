@@ -14,12 +14,10 @@
 #include "host_device_shared/RenderOptions.h"
 
 
-namespace HWPT
-{
-    class VulkanRayTracingApp : public VulkanBackendApp
-    {
+namespace HWPT {
+    class VulkanRayTracingApp : public VulkanBackendApp {
     public:
-        explicit VulkanRayTracingApp(const std::string& Title = "Ray Tracing Application");
+        explicit VulkanRayTracingApp(const std::string &Title = "Ray Tracing Application");
 
         void InitVulkan() override;
 
@@ -38,13 +36,15 @@ namespace HWPT
 
         void CreateRTDescriptorSets();
 
-        void BindRTDescriptorSets();
+        void UpdateRTDescriptorSets();
 
         void CreateRTPipelineLayout();
 
         void CreateRTSBT();
 
         void CreateRTPipeline();
+
+        void ReloadScene(const std::filesystem::path &Path);
 
         void InitScene();
 
@@ -54,13 +54,14 @@ namespace HWPT
 
         void CreateGBuffer();
 
+        void ReCompileShaders();
+
         VkDescriptorSetLayout m_RTDescriptorSetLayout = VK_NULL_HANDLE;
         std::vector<VkDescriptorSet> m_RTDescriptorSets;
         VkPipelineLayout m_RTPipelineLayout = VK_NULL_HANDLE;
         VkPipeline m_RTPipeline = VK_NULL_HANDLE;
 
-        enum StageIndices : uint8_t
-        {
+        enum StageIndices : uint8_t {
             RayGen,
             Miss,
             ClosestHit,
@@ -70,28 +71,27 @@ namespace HWPT
         };
 
         std::vector<VkRayTracingShaderGroupCreateInfoKHR> m_RTShaderGroups;
-
-        ArbitraryBuffer* m_RTSBTBuffer = nullptr;
+        ArbitraryBuffer *m_RTSBTBuffer = nullptr;
         VkStridedDeviceAddressRegionKHR m_rayGenRegion{};
         VkStridedDeviceAddressRegionKHR m_missRegion{};
         VkStridedDeviceAddressRegionKHR m_hitRegion{};
         VkStridedDeviceAddressRegionKHR m_callRegion{};
         VkPhysicalDeviceRayTracingPipelinePropertiesKHR m_RTProps{
-            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR
+                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR
         };
 
-        Scene* m_RTScene = nullptr;
+        Scene *m_RTScene = nullptr;
 
-        std::vector<Texture2D*> m_viewportImages;
-        Texture2D* m_lastFrameViewportImage = nullptr;
+        std::vector<Texture2D *> m_viewportImages;
+        Texture2D *m_lastFrameViewportImage = nullptr;
 
         glm::vec2 m_viewportSize = glm::vec2(1.f, 1.f);
         glm::vec2 m_viewportOffset = glm::vec2(0.f, 0.f);
         std::vector<VkDescriptorSet> m_viewportImageDescriptorSets;
-        GBuffer* m_gBuffer = nullptr;
+        GBuffer *m_gBuffer = nullptr;
         RenderOptions m_renderOptions;
 
-        Texture2D* m_skyTexture = nullptr;
+        Texture2D *m_skyTexture = nullptr;
 
         // NOTE: Store Last Frame Operations and Execute before RenderPipeline Begins
         std::vector<std::function<void()>> m_deferredOperations;

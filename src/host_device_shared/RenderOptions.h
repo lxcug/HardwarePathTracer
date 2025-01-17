@@ -20,7 +20,8 @@ BEGIN_HWPT_NAMESPACE
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, Bounce, 4);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, RayMinBias, 1e-3f);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, MaxTraceDistance, 1e4f);
-        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, AccumulateSkyLight, 1);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableSkyLight, 1);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableEmissive, 1);
     };
 
 #if IS_COMPILING_SHADER

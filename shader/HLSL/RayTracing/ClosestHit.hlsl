@@ -34,6 +34,8 @@ void main(inout RayPayload payload, in HitAttribute attrib)
     payload.pos = hit_pos;
     payload.albedo = albedo;
     payload.normal = hit_normal;
+    payload.emissive = material.Emissive;
+    payload.opacity = material.Opacity;
     payload.is_hit = true;
     payload.hit_t = RayTCurrent();
     payload.instance_id = InstanceID();
