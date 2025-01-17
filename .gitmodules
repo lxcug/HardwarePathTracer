@@ -1,0 +1,22 @@
+[submodule "vendor/glfw"]
+	path = vendor/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "vendor/glm"]
+	path = vendor/glm
+	url = https://github.com/g-truc/glm.git
+[submodule "vendor/imgui"]
+	path = vendor/imgui
+	url = https://github.com/ocornut/imgui.git
+	branch = docking
+[submodule "vendor/ImGuiFileDialog"]
+	path = vendor/ImGuiFileDialog
+	url = https://github.com/lxcug/ImGuiFileDialog.git
+[submodule "stb"]
+	path = stb
+	url = https://github.com/nothings/stb.git
+[submodule "vendor/tinyobjloader"]
+	path = vendor/tinyobjloader
+	url = https://github.com/tinyobjloader/tinyobjloader.git
+[submodule "vendor/stb"]
+	path = vendor/stb
+	url = https://github.com/nothings/stb.git

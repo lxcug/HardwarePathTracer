@@ -1,6 +1,6 @@
 # Shadowy
 
-## Intro
+## Introduction
 
 A path tracing renderer using vulkan.
 
