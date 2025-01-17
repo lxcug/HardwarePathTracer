@@ -23,7 +23,7 @@ namespace Shadowy {
         static auto ExecCmd(const std::string& cmd) -> std::string;
 
     private:
-        inline static std::filesystem::path s_dxcPath = "../../vendor/dxc_2024_07_31";
+        inline static std::filesystem::path s_dxcPath = "../../vendor/dxc";
         inline static std::filesystem::path s_hlslDirectory = "../../shader/HLSL";
     };
 }  // namespace Shadowy
