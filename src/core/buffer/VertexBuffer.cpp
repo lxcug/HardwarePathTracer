@@ -7,7 +7,7 @@
 #include "core/RHI.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     VertexBuffer::VertexBuffer(VkDeviceSize Size, const void *Data) {
         auto [StagingBuffer, StagingBufferMemory] = RHI::CreateStagingBuffer(Size);
 
@@ -52,4 +52,4 @@ namespace HWPT {
 
         m_layout = new VertexBufferLayout(Attributes);
     }
-}  // namespace HWPT
+}  // namespace Shadowy

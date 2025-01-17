@@ -7,7 +7,7 @@
 #include "core/RHI.h"
 
 
-namespace HWPT {
+namespace Shadowy {
 
     ImGuiInfrastructure::ImGuiInfrastructure(uint NumFrames) : m_numFrames(NumFrames) {
         m_frameBuffers.resize(NumFrames);
@@ -223,4 +223,4 @@ namespace HWPT {
         glfwMakeContextCurrent(App->GetWindow());
     }
 
-}  // namespace HWPT
+}  // namespace Shadowy

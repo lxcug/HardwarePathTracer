@@ -6,7 +6,7 @@
 #include "core/application/VulkanBackendApp.h"
 
 
-namespace HWPT::RHI {
+namespace Shadowy::RHI {
 
     auto FindMemoryType(uint TypeFilter, VkMemoryPropertyFlags Properties) -> uint {
         VkPhysicalDeviceMemoryProperties memoryProperties;
@@ -400,4 +400,4 @@ namespace HWPT::RHI {
         return vkGetBufferDeviceAddress(GetVKDevice(), &DeviceAddressInfo);
     }
 
-}  // namespace HWPT::RHI
+}  // namespace Shadowy::RHI

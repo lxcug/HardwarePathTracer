@@ -8,7 +8,7 @@
 #include <vector>
 
 
-namespace HWPT::Utils {
+namespace Shadowy::Utils {
 
     auto FindQueueFamilies(VkPhysicalDevice PhysicalDevice) -> QueueFamilyIndices {
         QueueFamilyIndices Indices;
@@ -59,4 +59,4 @@ namespace HWPT::Utils {
     auto Align(uint Size, uint Alignment) -> uint {
         return (Size + Alignment - 1) & ~(Alignment - 1);
     }
-}  // namespace HWPT::Utils
+}  // namespace Shadowy::Utils

@@ -8,7 +8,7 @@
 #include "core/application/VulkanBackendApp.h"
 
 
-namespace HWPT
+namespace Shadowy
 {
     void GBuffer::Init()
     {
@@ -87,4 +87,4 @@ namespace HWPT
             delete m_depth[i];
         }
     }
-} // namespace HWPT
+} // namespace Shadowy

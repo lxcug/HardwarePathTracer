@@ -9,7 +9,7 @@
 #include "core/input/KeyCode.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     enum class CameraType {
         Orthographic = 0x0,
         Perspective,
@@ -154,7 +154,7 @@ namespace HWPT {
     protected:
         float m_fov = 45.f;
     };
-} // namespace HWPT
+} // namespace Shadowy
 
 
 #endif //HARDWAREPATHTRACER_CAMERA_H

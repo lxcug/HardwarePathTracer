@@ -7,7 +7,7 @@
 #include "core/application/VulkanBackendApp.h"
 
 
-namespace HWPT {
+namespace Shadowy {
 
     IndexBuffer::IndexBuffer(uint IndexCount, const void *Data) : m_indexCount(IndexCount) {
         VkDeviceSize Size = IndexCount * sizeof(uint);
@@ -44,4 +44,4 @@ namespace HWPT {
 
     IndexBuffer::IndexBuffer(uint IndexCount, const uint *Data)
             : IndexBuffer(IndexCount, static_cast<const void *>(Data)) {}
-}  // namespace HWPT
+}  // namespace Shadowy

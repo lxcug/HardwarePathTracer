@@ -8,7 +8,7 @@
 #include "core/Core.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     class ArbitraryBuffer {
     public:
         ArbitraryBuffer(VkDeviceSize Size, VkBufferUsageFlags Usage, VkMemoryPropertyFlags MemProps);
@@ -30,6 +30,6 @@ namespace HWPT {
         VkDeviceMemory m_bufferMemory = VK_NULL_HANDLE;
         VkDeviceAddress m_deviceAddress = 0;
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_ARBITRARYBUFFER_H

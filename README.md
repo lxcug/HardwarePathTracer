@@ -1,6 +1,40 @@
-# HardwarePathTracer
+# Shadowy
 
-HardwarePathTracer using Vulkan RayTracing API
+## Intro
+
+A path tracing renderer using vulkan.
+
+## Get Started
+
+1. Install Vulkan >= 1.2 and make sure vulkan/Bin is in included in the path
+2. Build with CMake, CMakeGUI or Other IDEs
+3. Run Shadowy.exe
+
+## Usage
+
+### Camera Contorl
+
+WASD to move, press Ctrl to move at a slower speed (0.1x).
+Hold the left mouse button to rotate the camera.
+You can also change the camera position/FOV in the UI panel.
+
+### Run Shader Compile
+
+Press the "Compile Ray Tracing Shaders" button or use the shortcut `CTRL + ALT + .`.
+
+### Run Time Load Obj/Sky Texture
+
+Press "Load Obj" or "Load Sky Texture" to open the file dialog.
+
+### Light Control
+
+Control the scene lights in the UI panel.
+
+## Features
+
+* RayTracing AO
+
+* Path Tracing Diffuse Material
 
 ## Dev Log
 
@@ -75,4 +109,4 @@ HardwarePathTracer using Vulkan RayTracing API
 > * PathTracing Developing
 > * Open obj and compile shaders at runtime 
 >
-> ![](imgs/New UI and Runtime Operations.png)
+> ![](imgs/NewUIAndRuntimeOperations.png)

@@ -7,7 +7,7 @@
 #include "core/application/VulkanBackendApp.h"
 
 
-namespace HWPT {
+namespace Shadowy {
 
     UniformBuffer::UniformBuffer(VkDeviceSize Size, const void *Data): m_size(Size) {
         RHI::CreateBuffer(Size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -28,4 +28,4 @@ namespace HWPT {
         memcpy(m_mappedData, Data, m_size);
     }
 
-}  // namespace HWPT
+}  // namespace Shadowy

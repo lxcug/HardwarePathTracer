@@ -6,7 +6,7 @@
 #include "core/RHI.h"
 
 
-namespace HWPT {
+namespace Shadowy {
 
     ArbitraryBuffer::ArbitraryBuffer(VkDeviceSize Size, VkBufferUsageFlags Usage,
                                      VkMemoryPropertyFlags MemProps = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
@@ -37,4 +37,4 @@ namespace HWPT {
         vkDestroyBuffer(GetVKDevice(), m_buffer, nullptr);
     }
 
-}  // namespace HWPT
+}  // namespace Shadowy

@@ -8,7 +8,7 @@
 #include "core/Utils.h"
 
 
-namespace HWPT {
+namespace Shadowy {
 
     void ASBuilder::Init() {
         m_commandPool = new CommandPool(PoolType::Graphics | PoolType::Transient);
@@ -429,4 +429,4 @@ namespace HWPT {
         return GetASDeviceAddressFunc(GetVKDevice(), &AddressInfo);
     }
 
-}  // namespace HWPT
+}  // namespace Shadowy

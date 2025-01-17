@@ -7,7 +7,7 @@
 #include "core/application/VulkanBackendApp.h"
 
 
-namespace HWPT
+namespace Shadowy
 {
     void CameraBase::UpdateViewMatrix()
     {
@@ -112,4 +112,4 @@ namespace HWPT
         m_projMatrix = glm::perspectiveRH_ZO(glm::radians(m_fov), m_aspectRatio, m_near, m_far);
         m_projMatrix[1][1] *= -1; // NOTE: Flip Y Axis for Vulkan
     }
-} // namespace HWPT
+} // namespace Shadowy

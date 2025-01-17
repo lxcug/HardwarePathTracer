@@ -9,7 +9,7 @@
 #include <vector>
 
 
-namespace HWPT {
+namespace Shadowy {
     enum class VertexAttributeDataType : uint8_t {
         None = 0,
         Float, Float2, Float3, Float4,
@@ -43,6 +43,6 @@ namespace HWPT {
         uint Stride = 0;
     };
 
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_VERTEXBUFFERLAYOUT_H

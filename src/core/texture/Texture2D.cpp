@@ -10,7 +10,7 @@
 #include "stb_image.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     // TextureUsage is ShaderResourceView when giving a TexturePath
     Texture2D::Texture2D(const std::filesystem::path &TexturePath, uint MSAASamples,
                          bool GenerateMips)
@@ -153,4 +153,4 @@ namespace HWPT {
         uint MaxResolution = std::max(Width, Height);
         return static_cast<uint>(std::floor(std::log2(MaxResolution))) + 1;
     }
-} // namespace HWPT
+} // namespace Shadowy

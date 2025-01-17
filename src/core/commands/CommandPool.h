@@ -9,7 +9,7 @@
 #include <optional>
 
 
-namespace HWPT {
+namespace Shadowy {
 
     enum PoolType {
         Graphics = 0x1,
@@ -100,6 +100,6 @@ namespace HWPT {
         QueueFamilyIndices m_queueFamilyIndices;
     };
 
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_COMMANDPOOL_H

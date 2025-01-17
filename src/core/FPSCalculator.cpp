@@ -6,7 +6,7 @@
 #include <iostream>
 
 
-namespace HWPT {
+namespace Shadowy {
 
     FPSCalculator::FPSCalculator(float RecordInterval): m_recordInterval(RecordInterval) {}
 

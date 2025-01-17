@@ -5,7 +5,7 @@
 #include "VertexBufferLayout.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     auto GetVertexAttributeDataTypeSize(VertexAttributeDataType DataType) -> uint {
         switch (DataType) {
             case VertexAttributeDataType::Float: [[fallthrough]];
@@ -98,4 +98,4 @@ namespace HWPT {
 
         return AttributeDescriptions;
     }
-}  // namespace HWPT
+}  // namespace Shadowy

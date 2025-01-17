@@ -30,7 +30,7 @@ void main()
 
     if (payload.is_hit()) {
         // TODO: Accumulate for the first several frames cause artifacts, to fix
-        if (view_uniform_buffer.FrameNum <= 5 || render_options.ShouldReAccumulate || !render_options.EnableAccumulation) {
+        if (view_uniform_buffer.FrameNum <= 5) {
             OutImage[index] = float4(color, 1.0);
         } else {
             float3 old_radiance = InImage[index].rgb;

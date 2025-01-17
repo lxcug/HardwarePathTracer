@@ -5,7 +5,7 @@
 
 
 auto main(int argc, char* argv[]) -> int {
-    auto* App = new HWPT::VulkanRayTracingApp();
+    auto* App = new Shadowy::VulkanRayTracingApp();
     App->Init();
     App->Run();
 

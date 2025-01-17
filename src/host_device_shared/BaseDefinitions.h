@@ -43,8 +43,8 @@ using uint = uint32_t;
 
 
 #if IS_COMPILING_CPP
-#define BEGIN_HWPT_NAMESPACE namespace HWPT {
-#define END_HWPT_NAME_SPACE }  // namespace HWPT
+#define BEGIN_HWPT_NAMESPACE namespace Shadowy {
+#define END_HWPT_NAME_SPACE }  // namespace Shadowy
 #else
 #define BEGIN_HWPT_NAMESPACE
 #define END_HWPT_NAME_SPACE

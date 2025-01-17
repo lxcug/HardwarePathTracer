@@ -8,7 +8,7 @@
 #include "core/Core.h"
 
 
-namespace HWPT
+namespace Shadowy
 {
     class Debugger
     {
@@ -39,6 +39,6 @@ namespace HWPT
         PFN_vkCmdDebugMarkerEndEXT m_endMarkerFunc{};
         PFN_vkCmdDebugMarkerInsertEXT m_insertMakerFunc{};
     };
-} // namespace HWPT
+} // namespace Shadowy
 
 #endif //DEBUGGER_H

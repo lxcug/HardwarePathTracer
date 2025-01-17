@@ -9,12 +9,12 @@
 #include "texture/Texture2D.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     // TODO: Merge into swapchain
     struct LastFrameTextures {
         Texture2D LastFrameSceneColor;
     };
 
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_SWAPCHAIN_H

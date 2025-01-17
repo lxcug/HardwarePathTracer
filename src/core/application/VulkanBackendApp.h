@@ -29,7 +29,7 @@
 #include <host_device_shared/ViewUniformBuffer.h>
 
 
-namespace HWPT
+namespace Shadowy
 {
     struct SwapChainSupportDetails
     {
@@ -317,6 +317,6 @@ namespace HWPT
 
         Debugger* m_debugger = nullptr;  // TODO
     };
-} // namespace HWPT
+} // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_VULKANBACKENDAPP_H

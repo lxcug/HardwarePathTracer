@@ -5,7 +5,7 @@
 #include "CompilerHLSL.h"
 
 
-namespace HWPT
+namespace Shadowy
 {
     void HLSLCompiler::CompileShader(const std::string& ShaderFile, const std::string& Entry,
                                      ShaderType Type, const std::string& OutFile)
@@ -123,4 +123,4 @@ namespace HWPT
 
         return output;
     }
-} // namespace HWPT
+} // namespace Shadowy

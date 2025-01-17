@@ -13,7 +13,7 @@
 #include "core/Input/Input.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     VulkanRayTracingApp::VulkanRayTracingApp(const std::string &Title) : VulkanBackendApp(Title) {
         DeviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
         DeviceExtensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
@@ -89,6 +89,9 @@ namespace HWPT {
     }
 
     void VulkanRayTracingApp::DrawFrame() {
+        if (!m_renderOptions.EnableAccumulation || m_camera->IsMoving()) {
+            ResetFrameNum();
+        }
         for (auto &Operation: m_deferredOperations) {
             Operation();
         }
@@ -173,7 +176,6 @@ namespace HWPT {
                                 0, BindingDescriptorSets.size(),
                                 BindingDescriptorSets.data(),
                                 0, nullptr);
-        m_renderOptions.ShouldReAccumulate = m_camera->IsMoving();
         m_renderOptions.NumLights = m_RTScene->GetSceneLights().size();
         vkCmdPushConstants(CommandBuffer, m_RTPipelineLayout,
                            VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
@@ -981,4 +983,4 @@ namespace HWPT {
         CreateRTSBT();
     }
 
-} // namespace HWPT
+} // namespace Shadowy

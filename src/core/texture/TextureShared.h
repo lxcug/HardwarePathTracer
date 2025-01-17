@@ -9,7 +9,7 @@
 #include "stb_image.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     enum class TextureFormat : uint8_t {
         None = 0x0,
         RGB,
@@ -39,6 +39,6 @@ namespace HWPT {
         DSV,  // TODO: Depth Stencil View
         CBV  // TODO: Const Buffer View
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_TEXTURESHARED_H

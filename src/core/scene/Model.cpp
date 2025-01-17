@@ -12,7 +12,7 @@
 #include "core/Utils.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     Model::Model(const std::filesystem::path &ModelPath,
                  const std::filesystem::path &TexturePath, bool GenerateMips)
             : m_generateMips(GenerateMips) {
@@ -241,4 +241,4 @@ namespace HWPT {
 
         return Instance;
     }
-} // namespace HWPT
+} // namespace Shadowy

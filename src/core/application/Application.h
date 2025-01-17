@@ -8,7 +8,7 @@
 #include "core/Core.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     class ApplicationBase {
     public:
         virtual void Run() = 0;
@@ -20,7 +20,7 @@ namespace HWPT {
     private:
         virtual void Init() = 0;
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 
 #endif //HARDWAREPATHTRACER_APPLICATION_H

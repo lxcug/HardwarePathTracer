@@ -10,7 +10,7 @@
 #include "core/RHI.h"
 
 
-namespace HWPT
+namespace Shadowy
 {
     class GBuffer
     {
@@ -106,6 +106,6 @@ namespace HWPT
         std::vector<VkDescriptorSet> m_posDescriptorSets;
         std::vector<VkDescriptorSet> m_depthDescriptorSets;
     };
-} // namespace HWPT
+} // namespace Shadowy
 
 #endif //GBUFFER_H

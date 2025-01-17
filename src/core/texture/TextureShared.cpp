@@ -5,7 +5,7 @@
 #include "TextureShared.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     auto GetTextureFormat(int Channels) -> TextureFormat {
         switch (Channels) {
             case 3:
@@ -63,4 +63,4 @@ namespace HWPT {
                 return VK_SAMPLE_COUNT_1_BIT;
         }
     }
-}  // namespace HWPT
+}  // namespace Shadowy
