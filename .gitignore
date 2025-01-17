@@ -5,6 +5,7 @@
 *.slo
 *.lo
 *.o
+*.obj
 
 # Precompiled Headers
 *.gch
@@ -32,3 +33,7 @@
 
 .idea
 cmake-build*
+
+!asset
+!vendor/dxc/bin
+!vendor/dxc/lib
