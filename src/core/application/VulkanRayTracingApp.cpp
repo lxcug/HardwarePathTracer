@@ -362,7 +362,7 @@ namespace Shadowy {
                 m_camera->Tick(m_fpsCalculator->GetDeltaTime());
             }
 
-            ImGui::Image(m_viewportImageDescriptorSets[m_imageIndex],
+            ImGui::Image(reinterpret_cast<ImTextureID>(m_viewportImageDescriptorSets[m_imageIndex]),
                          {m_viewportSize.x, m_viewportSize.y});
 
             ImGuiInfrastructure::End();
@@ -395,15 +395,19 @@ namespace Shadowy {
                         ImageRegion.x / 2.05f, ImageRegion.y / 2.05f
                 };
 
-                ImGui::Image(m_gBuffer->GetGBufferAlbedoDescriptorSet(m_imageIndex),
+                ImGui::Image(reinterpret_cast<ImTextureID>(m_gBuffer->GetGBufferAlbedoDescriptorSet(
+                                     m_imageIndex)),
                              SizePerGBufferImage);
                 ImGui::SameLine();
-                ImGui::Image(m_gBuffer->GetGBufferNormalDescriptorSet(m_imageIndex),
+                ImGui::Image(reinterpret_cast<ImTextureID>(m_gBuffer->GetGBufferNormalDescriptorSet(
+                                     m_imageIndex)),
                              SizePerGBufferImage);
-                ImGui::Image(m_gBuffer->GetGBufferPosDescriptorSet(m_imageIndex),
+                ImGui::Image(reinterpret_cast<ImTextureID>(m_gBuffer->GetGBufferPosDescriptorSet(
+                                     m_imageIndex)),
                              SizePerGBufferImage);
                 ImGui::SameLine();
-                ImGui::Image(m_gBuffer->GetGBufferDepthDescriptorSet(m_imageIndex),
+                ImGui::Image(reinterpret_cast<ImTextureID>(m_gBuffer->GetGBufferDepthDescriptorSet(
+                                     m_imageIndex)),
                              SizePerGBufferImage);
 
                 ImGui::End();
