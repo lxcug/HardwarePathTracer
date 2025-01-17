@@ -3,14 +3,14 @@
 //
 
 #include "VulkanRayTracingApp.h"
-
 #include <imgui_internal.h>
-
 #include "core/RHI.h"
 #include "core/shader/ShaderBase.h"
 #include "core/shader_compiler/CompilerHLSL.h"
 #include "core/Utils.h"
 #include "ImGuiFileDialog.h"
+#include "UILayer.h"
+#include "core/Input/Input.h"
 
 
 namespace HWPT {
@@ -45,8 +45,9 @@ namespace HWPT {
 
         InitRayTracing();
 
-        m_camera->SetCameraPosition(glm::vec3(-600, 510, 40));
-        m_camera->SetCameraRotation(-0.13, -1.41);
+        m_camera->SetCameraPosition(glm::vec3(0, 0, 17));
+//        m_camera->SetCameraPosition(glm::vec3(-600, 510, 40));
+//        m_camera->SetCameraRotation(-0.13, -1.41);
 //        m_camera->SetCameraRotation(-glm::radians(10.f), glm::radians(10.f));
     }
 
@@ -70,6 +71,8 @@ namespace HWPT {
             vkDestroyFence(m_device, m_graphicsInFlightFences[i], nullptr);
         }
 
+        vkFreeDescriptorSets(m_device, m_descriptorPool,
+                             m_RTDescriptorSets.size(), m_RTDescriptorSets.data());
         vkDestroyDescriptorSetLayout(m_device, m_RTDescriptorSetLayout, nullptr);
         vkDestroyPipelineLayout(m_device, m_RTPipelineLayout, nullptr);
         vkDestroyPipeline(m_device, m_RTPipeline, nullptr);
@@ -326,7 +329,7 @@ namespace HWPT {
 
         InitScene();
         CreateRTDescriptorSets();
-        BindRTDescriptorSets();
+        UpdateRTDescriptorSets();
         CreateRTPipelineLayout();
         CreateRTPipeline();
         CreateRTSBT();
@@ -334,6 +337,7 @@ namespace HWPT {
 
     void VulkanRayTracingApp::DrawImGuiFrame() {
         {
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0, 0});
             ImGuiInfrastructure::Begin("Viewport");
             ImVec2 ViewportSize = ImGui::GetContentRegionAvail();
             ImVec2 ViewportPos = ImGui::GetWindowPos();
@@ -346,7 +350,7 @@ namespace HWPT {
             if (ViewportSize.x != m_viewportSize.x || ViewportSize.y != m_viewportSize.y) {
                 m_viewportSize.x = ViewportSize.x;
                 m_viewportSize.y = ViewportSize.y;
-                m_deferredOperations.emplace_back([this](){
+                m_deferredOperations.emplace_back([this]() {
                     ResizeViewportImages();
                     m_gBuffer->OnResize(m_viewportSize);
                 });
@@ -360,6 +364,7 @@ namespace HWPT {
                          {m_viewportSize.x, m_viewportSize.y});
 
             ImGuiInfrastructure::End();
+            ImGui::PopStyleVar();
         }
 
         static bool ShouldReAccumulate = false;
@@ -424,6 +429,16 @@ namespace HWPT {
                 }
             }
 
+            if (ImGui::Button("Compile Ray Tracing Shaders") ||
+                Input::IsKeyPressed(KeyCode::LeftControl) &&
+                Input::IsKeyPressed(KeyCode::LeftAlt) && Input::IsKeyPressed(KeyCode::Period)) {
+                m_deferredOperations.emplace_back([this]() {
+                    ResetFrameNum();
+                    vkDeviceWaitIdle(m_device);
+                    ReCompileShaders();
+                });
+            }
+
             ImGui::NewLine();
             ImGui::Separator();
             ImGui::NewLine();
@@ -441,38 +456,40 @@ namespace HWPT {
             ImGui::Text("Path Tracing Options");
             ShouldReAccumulate |= ImGui::Checkbox("Enable Accumulation",
                                                   reinterpret_cast<bool *>(&m_renderOptions.EnableAccumulation));
+            ShouldReAccumulate |= ImGui::Checkbox("Enable Emissive",
+                                                  reinterpret_cast<bool *>(&m_renderOptions.EnableEmissive));
             ShouldReAccumulate |= ImGui::InputFloat("Min Ray Bias", &m_renderOptions.RayMinBias,
                                                     1e-3f);
             ShouldReAccumulate |= ImGui::InputInt("Bounce", &m_renderOptions.Bounce, 1.f);
             ShouldReAccumulate |= ImGui::Checkbox("Enable SkyLight",
-                                                  reinterpret_cast<bool *>(&m_renderOptions.AccumulateSkyLight));
+                                                  reinterpret_cast<bool *>(&m_renderOptions.EnableSkyLight));
 
             // TODO: Choose Obj
-//            if (ImGui::Button("Open Obj")) {
-//                IGFD::FileDialogConfig config;
-//                config.path = "../../asset";
-//                ImGuiFileDialog::Instance()->OpenDialog("ChooseObj", "Choose File",
-//                                                        ".obj", config);
-//            }
-            if (ImGui::Button("Open Sky Texture")) {
-                IGFD::FileDialogConfig config;
-                config.path = "../../asset/env";
-                ImGuiFileDialog::Instance()->OpenDialog("ChooseSkyTexture", "Choose File",
-                                                        ".hdr, .jpg, .png", config);
+            if (ImGui::Button("Open Obj")) {
+                IGFD::FileDialogConfig Config;
+                Config.path = "../../asset";
+                Config.flags = ImGuiFileDialogFlags_Modal;
+                ImGuiFileDialog::Instance()->OpenDialog("ChooseObj", "Choose File",
+                                                        ".obj", Config);
             }
-//            if (ImGuiFileDialog::Instance()->Display("ChooseObj")) { // => will show a dialog
-//                if (ImGuiFileDialog::Instance()->IsOk()) { // action if OK
-//                    std::string FilePathName = ImGuiFileDialog::Instance()->GetFilePathName();
-//                    std::string FilePath = ImGuiFileDialog::Instance()->GetCurrentPath();
-//                    vkDeviceWaitIdle(m_device);
-//                    m_deferredOperations.emplace_back([this, FilePathName]() {
-//
-//                        m_RTScene->UpdateModelDescDescriptorSets();
-//                        ResetFrameNum();
-//                    });
-//                }
-//                ImGuiFileDialog::Instance()->Close();
-//            }
+            if (ImGui::Button("Open Sky Texture")) {
+                IGFD::FileDialogConfig Config;
+                Config.path = "../../asset/env";
+                ImGuiFileDialog::Instance()->OpenDialog("ChooseSkyTexture", "Choose File",
+                                                        ".hdr, .jpg, .png", Config);
+            }
+            if (ImGuiFileDialog::Instance()->Display("ChooseObj")) { // => will show a dialog
+                if (ImGuiFileDialog::Instance()->IsOk()) { // action if OK
+                    std::string FilePathName = ImGuiFileDialog::Instance()->GetFilePathName();
+                    std::string FilePath = ImGuiFileDialog::Instance()->GetCurrentPath();
+                    m_deferredOperations.emplace_back([this, FilePathName]() {
+                        vkDeviceWaitIdle(m_device);
+                        ResetFrameNum();
+                        ReloadScene(std::filesystem::path(FilePathName));
+                    });
+                }
+                ImGuiFileDialog::Instance()->Close();
+            }
             if (ImGuiFileDialog::Instance()->Display("ChooseSkyTexture")) { // => will show a dialog
                 if (ImGuiFileDialog::Instance()->IsOk()) { // action if OK
                     std::string FilePathName = ImGuiFileDialog::Instance()->GetFilePathName();
@@ -486,79 +503,57 @@ namespace HWPT {
                 }
                 ImGuiFileDialog::Instance()->Close();
             }
-
-            if (ShouldReAccumulate) {
-                m_deferredOperations.emplace_back([this]() {
-                    ResetFrameNum();
-                });
-            }
-
-//            ImGui::NewLine();
-//            ImGui::Separator();
-//            ImGui::NewLine();
-//            ImGui::Text("Window Options");
-//            static bool BorderlessWindow = false;
-//            if (ImGui::Checkbox("Borderless Window", &BorderlessWindow))
-//            {
-//                glfwSetWindowAttrib(m_window, GLFW_DECORATED, !BorderlessWindow);
-//            }
-
-//            if (!FullScreen)
-//            {
-//                glfwGetWindowSize(m_window, &WindowWidth, &WindowHeight);
-//                glfwGetWindowPos(m_window, &WindowPosX, &WindowPosY);
-//            }
-//            if (ImGui::Checkbox("Full Screen", &FullScreen))
-//            {
-//                if (FullScreen)
-//                {
-//                    const GLFWvidmode* Mode = glfwGetVideoMode(glfwGetPrimaryMonitor());
-//                    glfwSetWindowPos(m_window, 0, 0);
-//                    glfwSetWindowSize(m_window, Mode->width, Mode->height);
-//                }
-//                else
-//                {
-//                    glfwSetWindowPos(m_window, WindowPosX, WindowPosY);
-//                    glfwSetWindowSize(m_window, WindowWidth, WindowHeight);
-//                }
-//            }
-
             ImGuiInfrastructure::End();
         }
 
         {
             ImGuiInfrastructure::Begin("Scene Info");
             ImGui::Text("Camera Info");
-            auto CameraPos = m_camera->GetCameraPos();
-            ImGui::Text("Camera Position (%.2f, %.2f, %.2f)", CameraPos.x, CameraPos.y,
-                        CameraPos.z);
+
+            UILayer::DrawFloat3Control("Position", m_camera->GetCameraPos(), 0.f,
+                                       &ShouldReAccumulate);
+
+            static bool FOVChanged = false;
+            FOVChanged = false;
             auto PerspCamera = std::dynamic_pointer_cast<PerspectiveCamera>(m_camera);
-            if (ImGui::SliderFloat("FOV", &PerspCamera->GetFOV(), 5.f, 120.f, "%.0f")) {
+            UILayer::DrawSlideFloatControl("FOV", PerspCamera->GetFOV(), 45.f, &FOVChanged, 150.f,
+                                           5.f, 120.f, "%.1f");
+            if (FOVChanged) {
                 m_deferredOperations.emplace_back([this, PerspCamera]() {
                     ResetFrameNum();
                     PerspCamera->UpdateProjMatrix();
                 });
             }
-            ImGui::Text("Pitch %.2f:  Yaw %.2f", m_camera->GetPitch(), m_camera->GetYaw());
-            ImGui::SliderFloat("Move Speed", &m_camera->GetCameraMoveSpeed(), .01f, 100.f, "%.1f");
-            ImGui::SliderFloat("Rotate Speed", &m_camera->GetCameraRotateSpeed(), .01f, 5.f,
-                               "%.1f");
-            ImGui::SliderFloat("Scroll Speed", &m_camera->GetCameraScrollSpeed(), .01f, 100.f,
-                               "%.1f");
 
-            ImGui::NewLine();
-            ImGui::Separator();
-            ImGui::NewLine();
-
-            ImGui::Text("Model Info");
+            UILayer::DrawSlideFloatControl("Move Speed", m_camera->GetCameraMoveSpeed(), 1.f,
+                                           nullptr,
+                                           150.f, 1e-2f, 100.f, "%.2f");
+            UILayer::DrawSlideFloatControl("Rotate Speed", m_camera->GetCameraRotateSpeed(), 1.f,
+                                           nullptr,
+                                           150.f, 1e-2f, 5.f, "%.2f");
 
             ImGui::NewLine();
             ImGui::Separator();
             ImGui::NewLine();
 
             ImGui::Text("Light Info");
+            bool ShouldUpdateLight = false;
+            UILayer::DrawLights(m_RTScene->GetSceneLights(), &ShouldUpdateLight);
+            if (ShouldUpdateLight) {
+                m_deferredOperations.emplace_back([this]() {
+                    ResetFrameNum();
+                    m_RTScene->CreateSceneLightsBuffer();
+                    m_RTScene->UpdateModelDescDescriptorSets();
+                });
+            }
 
             ImGuiInfrastructure::End();
+        }
+
+        if (ShouldReAccumulate) {
+            m_deferredOperations.emplace_back([this]() {
+                ResetFrameNum();
+            });
         }
     }
 
@@ -623,7 +618,7 @@ namespace HWPT {
         m_RTScene->CreateModelDescDescriptorSet();
     }
 
-    void VulkanRayTracingApp::BindRTDescriptorSets() {
+    void VulkanRayTracingApp::UpdateRTDescriptorSets() {
         std::array<VkWriteDescriptorSet, 5> DescriptorWrites{};
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkDescriptorBufferInfo BufferInfo{};
@@ -877,17 +872,17 @@ namespace HWPT {
                 0.f,
                 0.f
         );
-//        m_RTScene->AddLight(
-//                glm::vec3(0.f, 0.f, 0.f),
-//                LightType::Point,
-//                glm::vec3(1.f, 2.f, 2.f),
-//                10.f,  // Radius
-//                glm::vec3(1.f, 1.f, 1.f),
-//                2.f,  // Intensity
-//                0.f,
-//                0.f,
-//                0.f
-//        );
+        m_RTScene->AddLight(
+                glm::vec3(0.f, 0.f, 0.f),
+                LightType::Point,
+                glm::vec3(1.f, 2.f, 2.f),
+                5.f,  // Radius
+                glm::vec3(1.f, 1.f, 1.f),
+                2.f,  // Intensity
+                0.f,
+                0.f,
+                0.f
+        );
 
         m_RTScene->FinalizeScene();
     }
@@ -943,7 +938,7 @@ namespace HWPT {
         delete m_lastFrameViewportImage;
         CreateViewportImages();
         m_gBuffer->OnResize(m_viewportSize.x, m_viewportSize.y);
-        BindRTDescriptorSets();
+        UpdateRTDescriptorSets();
         ResetFrameNum();
 
         m_camera->OnWindowResize(m_viewportSize.x, m_viewportSize.y);
@@ -955,8 +950,35 @@ namespace HWPT {
 
     void VulkanRayTracingApp::OnWindowResize() {
         VulkanBackendApp::OnWindowResize();
-        BindRTDescriptorSets();
+        UpdateRTDescriptorSets();
         ResetFrameNum();
+    }
+
+    void VulkanRayTracingApp::ReloadScene(const std::filesystem::path &Path) {
+        // Release Resources
+        vkDestroyPipelineLayout(m_device, m_RTPipelineLayout, nullptr);
+        vkDestroyDescriptorSetLayout(m_device, m_RTDescriptorSetLayout, nullptr);
+        vkFreeDescriptorSets(m_device, m_descriptorPool, m_RTDescriptorSets.size(),
+                             m_RTDescriptorSets.data());
+        vkDestroyPipeline(m_device, m_RTPipeline, nullptr);
+        delete m_RTSBTBuffer;
+
+        m_RTScene->OnRecreate();
+        m_RTScene->AddModel(Path);
+        m_RTScene->FinalizeScene();
+
+        CreateRTDescriptorSets();
+        UpdateRTDescriptorSets();
+        CreateRTPipelineLayout();
+        CreateRTPipeline();
+        CreateRTSBT();
+    }
+
+    void VulkanRayTracingApp::ReCompileShaders() {
+        delete m_RTSBTBuffer;
+        vkDestroyPipeline(m_device, m_RTPipeline, nullptr);
+        CreateRTPipeline();
+        CreateRTSBT();
     }
 
 } // namespace HWPT

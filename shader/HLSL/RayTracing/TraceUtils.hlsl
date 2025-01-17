@@ -1,114 +1,81 @@
-float3 UniformSampleHemisphere(in float rnd1, in float rnd2) {
-    float3 dir = float3(cos(2 * PI * rnd1) * sqrt(1 - rnd2), sin(2 * PI * rnd1) * sqrt(1 - rnd2), sqrt(rnd2));
-    return dir;
-}
+#pragma once
 
-float3 UniformSampleHemisphere(in float2 rnd) {
-    return UniformSampleHemisphere(rnd.x, rnd.y);
-}
-
-void GetCoordBasis(in float3 normal, out float3 tangent, out float3 bitangent) {
-    float3 z  = normal;
-    const float yz = -z.y * z.z;
-    bitangent = normalize(((abs(z.z) > 0.99999f) ? float3(-z.x * z.y, 1.0f - z.y * z.y, yz) : float3(-z.x * z.z, yz, 1.0f - z.z * z.z)));
-
-    tangent = cross(bitangent, z);
-}
-
-float3 UniformSampleHemisphere(in float rnd1, in float rnd2, in float3 normal) {
-    float3 local_dir = UniformSampleHemisphere(rnd1, rnd2);
-    float3 tangent, bitangent;
-
-    GetCoordBasis(normal, tangent, bitangent);
-    return local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * normal;
-}
-
-float3 UniformSampleHemisphere(in float2 rnd, in float3 normal) {
-    float3 local_dir = UniformSampleHemisphere(rnd);
-    float3 tangent, bitangent;
-
-    GetCoordBasis(normal, tangent, bitangent);
-    return local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * normal;
-}
+#include "Payload.hlsl"
+#include "../../../src/host_device_shared/Light.h"
 
 
-/*
- * Distance Based AO
- * Return a float in [0, 1], 0 represents occlusion, 1 represents dis-occlusion
- */
-float TraceAORay(in float3 origin, in float3 direction, float2 rnd) {
-    RayDesc ray;
-    ray.Origin = origin;
-    ray.Direction = direction;
-    ray.TMin = render_options.RayMinBias;
-    ray.TMax = render_options.AORayLength;
-
+float TraceVisibilityRay(in RayDesc ray) {
     RayPayload payload;
     TraceRay(TLAS, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xff, 0, 0, 0, ray, payload);
-    if (!payload.is_hit) {
-        return render_options.AORayLength;
-    }
-    return payload.hit_t;
-}
 
-
-/*
- * Return 1 for dis-occlusion, 0 for occlusion
- */
-float TraceShadowRay(in float3 origin, in Light light) {
-    RayDesc ray;
-    ray.Origin = origin;
-    ray.TMin = render_options.RayMinBias;
-    if (light.Type == LightType::Directional) {
-        ray.Direction = -normalize(light.Direction);
-        ray.TMax = render_options.MaxTraceDistance;
-    } else {
-        float3 ToLight = light.Position - origin;
-        ray.Direction = normalize(ToLight);
-        ray.TMax = length(ToLight);
-    }
-
-    RayPayload payload;
-    TraceRay(TLAS, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xff, 0, 0, 0, ray, payload);
     return !payload.is_hit;
 }
 
-float TraceShadowRay(in float3 origin, in Light light, out float3 ray_direction) {
-    RayDesc ray;
-    ray.Origin = origin;
-    ray.TMin = render_options.RayMinBias;
-    if (light.Type == LightType::Directional) {
-        ray.Direction = -normalize(light.Direction);
-        ray.TMax = render_options.MaxTraceDistance;
-    } else {
-        float3 ToLight = light.Position - origin;
-        ray.Direction = normalize(ToLight);
-        ray.TMax = length(ToLight);
+struct LightHitSample {
+    float3 radiance;
+    float pdf;
+    float3 direction;
+    float hit_t;
+
+    bool is_hit() {
+        return hit_t > 0.f;
     }
+    bool is_miss() {
+        return hit_t <= 0.f;
+    }
+};
 
-    ray_direction = ray.Direction;
+LightHitSample TraceDirectionalLight(in RayDesc ray, in Light light) {
+    LightHitSample light_sample;
+    light_sample.radiance = light.Intensity * light.Color;
+//     light_sample.pdf = TODO
+    light_sample.direction = -normalize(light.Direction);
+    light_sample.hit_t = render_options.MaxTraceDistance;
 
-    RayPayload payload;
-    TraceRay(TLAS, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xff, 0, 0, 0, ray, payload);
-    return !payload.is_hit;
+    return light_sample;
 }
 
-void TraceLight(in float3 origin, in float3 normal, in Light light, out float3 radiance) {
-    float distance_attenuation = 1.f;
-    float3 ray_direction;
-    if (light.Type == LightType::Point || light.Type == LightType::Spot) {
-        float3 to_light = light.Position - origin;
-        float dis2 = dot(to_light, to_light);
-        float radius2 = light.Radius * light.Radius;
-        if (dis2 > radius2) {
-            radiance = float3(0.f, 0.f, 0.f);
-            return;
-        }
-        distance_attenuation = 1.f - min(dis2 / radius2, 1.f);
-    }
+LightHitSample TracePointLight(in RayDesc ray, in Light light) {
+    float radius2 = light.Radius * light.Radius;
+//     float3 oc = ray.Origin - light.Position;
+//     float b = dot(oc, ray.Direction);
+//     float h = radius2 - dot(oc - b * ray.Direction, oc - b * ray.Direction);
 
-    float vis = TraceShadowRay(origin, light, ray_direction);
+    float3 to_light = light.Position - ray.Origin;
 
-    radiance = vis * light.Intensity * light.Color * dot(normal, ray_direction) * distance_attenuation;
+    float dis2 = dot(to_light, to_light);
+    float3 radiance = float3(0.f, 0.f, 0.f);
+
+    float distance_attenuation = 1.f - min(dis2 / radius2, 1.f);
+    radiance = light.Intensity * light.Color * distance_attenuation;
+
+
+//     if (h > 0) {
+//         float t = -b - sqrt(h);
+//         if (t > ray.TMin && t < ray.TMax) {  // TODO: Check this
+
+//         }
+//     }
+
+    LightHitSample hit_sample;
+    hit_sample.radiance = radiance;
+    hit_sample.direction = normalize(to_light);
+    hit_sample.hit_t = length(to_light);
+
+    return hit_sample;
 }
+
+LightHitSample TraceLight(in RayDesc ray, in Light light) {
+    switch (light.Type) {
+        case LightType::Directional:
+            return TraceDirectionalLight(ray, light);
+        case LightType::Point:
+            return TracePointLight(ray, light);
+        default:
+            return (LightHitSample)0;
+    }
+}
+
+
+
 

@@ -1,3 +1,5 @@
+#pragma once
+
 struct RayPayload
 {
     float3 pos;
@@ -9,8 +11,14 @@ struct RayPayload
     float3 albedo;
     uint triangle_index;
 
+    float3 emissive;
     bool is_hit;
-    bool is_front_face;
+
+    float opacity;
+
+    bool is_miss() {
+        return !is_hit;
+    }
 };
 
 struct HitAttribute
