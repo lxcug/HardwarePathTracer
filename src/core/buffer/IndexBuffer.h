@@ -8,7 +8,7 @@
 #include "core/Core.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     class IndexBuffer {
     public:
         IndexBuffer(uint IndexCount, const void *Data);
@@ -32,6 +32,6 @@ namespace HWPT {
         VkDeviceMemory m_indexBufferMemory = VK_NULL_HANDLE;
         uint m_indexCount = 0;
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_INDEXBUFFER_H

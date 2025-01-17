@@ -48,8 +48,8 @@ END_HWPT_NAME_SPACE
 #if IS_COMPILING_CPP
 #include <glm/gtx/hash.hpp>
 template<>
-struct std::hash<HWPT::Vertex> {
-    auto operator()(HWPT::Vertex const &_Vertex) const noexcept -> size_t {
+struct std::hash<Shadowy::Vertex> {
+    auto operator()(Shadowy::Vertex const &_Vertex) const noexcept -> size_t {
         return ((hash<glm::vec3>()(_Vertex.Pos) ^
                 (hash<glm::vec3>()(_Vertex.Normal) << 1)) >> 1) ^
             (hash<glm::vec2>()(_Vertex.TexCoord) << 1);

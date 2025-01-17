@@ -9,11 +9,11 @@
 #include <type_traits>
 
 
-namespace HWPT {
+namespace Shadowy {
     struct QueueFamilyIndices;
-}  // namespace HWPT
+}  // namespace Shadowy
 
-namespace HWPT::Utils {
+namespace Shadowy::Utils {
 
     template<typename EnumClassType>
     auto HasFlag(EnumClassType Enum, EnumClassType Flag) -> bool {
@@ -29,6 +29,6 @@ namespace HWPT::Utils {
     auto GLMToVulkanMatrix(const glm::mat4& Mat) -> VkTransformMatrixKHR;
 
     auto Align(uint Size, uint Alignment) -> uint;
-}  // namespace HWPT::Utils
+}  // namespace Shadowy::Utils
 
 #endif //HARDWAREPATHTRACER_UTILS_H

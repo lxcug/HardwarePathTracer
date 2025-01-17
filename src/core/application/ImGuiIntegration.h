@@ -12,7 +12,7 @@
 #include "imgui_impl_vulkan.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     class ImGuiInfrastructure {
     public:
         ImGuiInfrastructure(uint NumFrames);  // NOLINT
@@ -51,6 +51,6 @@ namespace HWPT {
         inline static uint MaxNumTextures = 20;
         inline static float m_imguiUIAlpha = 1.f;
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_IMGUIINTEGRATION_H

@@ -6,7 +6,7 @@
 #define HARDWAREPATHTRACER_MOUSECODE_H
 
 
-namespace HWPT {
+namespace Shadowy {
     enum class MouseCode {
         Button0 = 0,
         Button1 = 1,
@@ -21,6 +21,6 @@ namespace HWPT {
         ButtonRight = Button1,
         ButtonMiddle = Button2
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_MOUSECODE_H

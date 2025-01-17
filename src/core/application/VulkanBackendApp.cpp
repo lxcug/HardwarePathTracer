@@ -13,7 +13,7 @@
 #include "core/Utils.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     auto GetVKDevice() -> VkDevice {
         return VulkanBackendApp::GetApplication()->GetVkDevice();
     }
@@ -74,7 +74,6 @@ namespace HWPT {
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-//        glfwWindowHint(GLFW_DECORATED, GL_FALSE);
 
         m_window = glfwCreateWindow(
                 static_cast<int>(m_windowWidth), static_cast<int>(m_windowHeight),
@@ -691,14 +690,14 @@ namespace HWPT {
     }
 
     void VulkanBackendApp::CreateGraphicsPipeline() {
-        HLSLCompiler::CompileShader("Mesh.hlsl", "VSMain", HWPT::ShaderType::Vertex, "Vert");
-        HLSLCompiler::CompileShader("Mesh.hlsl", "PSMain", HWPT::ShaderType::Fragment, "Frag");
-        HLSLCompiler::CompileShader("Particle.hlsl", "VSMain", HWPT::ShaderType::Vertex,
+        HLSLCompiler::CompileShader("Mesh.hlsl", "VSMain", Shadowy::ShaderType::Vertex, "Vert");
+        HLSLCompiler::CompileShader("Mesh.hlsl", "PSMain", Shadowy::ShaderType::Fragment, "Frag");
+        HLSLCompiler::CompileShader("Particle.hlsl", "VSMain", Shadowy::ShaderType::Vertex,
                                     "ParticleVert");
-        HLSLCompiler::CompileShader("Particle.hlsl", "PSMain", HWPT::ShaderType::Fragment,
+        HLSLCompiler::CompileShader("Particle.hlsl", "PSMain", Shadowy::ShaderType::Fragment,
                                     "ParticleFrag");
         HLSLCompiler::CompileShader("UpdateParticle.hlsl", "UpdateParticles",
-                                    HWPT::ShaderType::Compute, "UpdateParticle");
+                                    Shadowy::ShaderType::Compute, "UpdateParticle");
 
         ShaderBase VertexShader(ShaderType::Vertex, "../../shader/HLSL/Vert.spv", "VSMain");
         ShaderBase FragmentShader(ShaderType::Fragment, "../../shader/HLSL/Frag.spv", "PSMain");
@@ -1451,4 +1450,4 @@ namespace HWPT {
                                        &SwapChainImageViews[Index]));
         }
     }
-} // namespace HWPT
+} // namespace Shadowy

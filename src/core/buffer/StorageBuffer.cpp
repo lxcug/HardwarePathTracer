@@ -7,7 +7,7 @@
 #include "core/application/VulkanBackendApp.h"
 
 
-namespace HWPT {
+namespace Shadowy {
 
     StorageBuffer::StorageBuffer(VkDeviceSize Size, void *Data) {
         auto [StagingBuffer, StagingBufferMemory] = RHI::CreateStagingBuffer(Size);
@@ -30,4 +30,4 @@ namespace HWPT {
         vkDestroyBuffer(GetVKDevice(), m_storageBuffer, nullptr);
     }
 
-}  // namespace HWPT
+}  // namespace Shadowy

@@ -6,7 +6,7 @@
 #define HARDWAREPATHTRACER_KEYCODE_H
 
 
-namespace HWPT {
+namespace Shadowy {
     enum class KeyCode {
         Space = 32,
         Apostrophe = 39, /* ' */
@@ -139,6 +139,6 @@ namespace HWPT {
         RightSuper = 347,
         Menu = 348
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_KEYCODE_H

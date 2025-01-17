@@ -6,7 +6,7 @@
 #include "core/application/VulkanBackendApp.h"
 
 
-namespace HWPT
+namespace Shadowy
 {
     void Debugger::Init()
     {
@@ -55,4 +55,4 @@ namespace HWPT
         std::memcpy(MarkerInfo.color, glm::value_ptr(MarkerColor), sizeof(float) * 4);
         m_insertMakerFunc(CommandBuffer, &MarkerInfo);
     }
-} // namespace HWPT
+} // namespace Shadowy

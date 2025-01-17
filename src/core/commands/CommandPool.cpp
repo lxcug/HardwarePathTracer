@@ -8,7 +8,7 @@
 #include "core/Utils.h"
 
 
-namespace HWPT {
+namespace Shadowy {
 
     void CommandPool::Init() {
         Check(Utils::HasFlag(m_poolType, PoolType::Graphics) ||
@@ -115,5 +115,5 @@ namespace HWPT {
         return m_computePool != VK_NULL_HANDLE && Utils::HasFlag(m_poolType, PoolType::Compute);
     }
 
-}  // namespace HWPT
+}  // namespace Shadowy
 

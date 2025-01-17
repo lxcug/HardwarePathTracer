@@ -8,11 +8,11 @@
 #include "ShaderBase.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     class ComputeShader : public ShaderBase {
     public:
 
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_COMPUTESHADER_H

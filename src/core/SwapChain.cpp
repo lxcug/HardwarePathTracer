@@ -5,6 +5,6 @@
 #include "SwapChain.h"
 
 
-namespace HWPT {
+namespace Shadowy {
 
-}  // namespace HWPT
+}  // namespace Shadowy

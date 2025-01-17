@@ -14,10 +14,10 @@
 #include "host_device_shared/RenderOptions.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     class VulkanRayTracingApp : public VulkanBackendApp {
     public:
-        explicit VulkanRayTracingApp(const std::string &Title = "Ray Tracing Application");
+        explicit VulkanRayTracingApp(const std::string &Title = "Shadowy");
 
         void InitVulkan() override;
 
@@ -96,6 +96,6 @@ namespace HWPT {
         // NOTE: Store Last Frame Operations and Execute before RenderPipeline Begins
         std::vector<std::function<void()>> m_deferredOperations;
     };
-} // namespace HWPT
+} // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_VULKANRAYTRACINGAPP_H

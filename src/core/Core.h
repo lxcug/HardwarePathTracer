@@ -25,11 +25,11 @@
 #define MAX_FRAMES_IN_FLIGHT (2)
 
 // NOTE: Should be implemented in Application
-namespace HWPT {
+namespace Shadowy {
     auto GetVKDevice() -> VkDevice;
 
     auto GetVKPhysicalDevice() -> VkPhysicalDevice;
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #if BUILD_DEVELOP
 #define BUILD_SHIPPING 0

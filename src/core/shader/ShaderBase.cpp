@@ -6,7 +6,7 @@
 #include "core/application/VulkanBackendApp.h"
 
 
-namespace HWPT {
+namespace Shadowy {
 
 
     ShaderBase::ShaderBase(ShaderType ShaderType, const std::filesystem::path &ShaderPath,
@@ -48,4 +48,4 @@ namespace HWPT {
 
         return Buffer;
     }
-}  // namespace HWPT
+}  // namespace Shadowy

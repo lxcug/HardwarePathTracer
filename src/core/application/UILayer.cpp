@@ -7,7 +7,7 @@
 #include "imgui_internal.h"
 
 
-namespace HWPT {
+namespace Shadowy {
 
     void UILayer::DrawFloat3Control(const std::string &Label, glm::vec3 &Value, float ResetValue,
                                     bool *ValueChangeSignal, float ColumnWidth,

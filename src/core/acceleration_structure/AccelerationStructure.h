@@ -20,7 +20,7 @@
 #endif
 
 
-namespace HWPT {
+namespace Shadowy {
     // Collect from Mesh as BLASBuildInput
     struct BLASBuildInput {
         std::vector<VkAccelerationStructureGeometryKHR> ASGeometries;
@@ -146,6 +146,6 @@ namespace HWPT {
         static inline VkQueryPool m_queryPool = VK_NULL_HANDLE;
 #endif
     };
-} // namespace HWPT
+} // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_ACCELERATIONSTRUCTURE_H

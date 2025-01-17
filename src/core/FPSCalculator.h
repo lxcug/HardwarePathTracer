@@ -9,7 +9,7 @@
 #include <chrono>
 
 
-namespace HWPT {
+namespace Shadowy {
     class FPSCalculator {
     public:
         FPSCalculator(float RecordInterval = 1.f);  // NOLINT
@@ -33,6 +33,6 @@ namespace HWPT {
         double m_deltaTime = 0.;
         uint m_fps = 0;
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_FPSCALCULATOR_H

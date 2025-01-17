@@ -8,7 +8,7 @@
 #include "core/Core.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     class StorageBuffer {
     public:
         StorageBuffer(VkDeviceSize Size, void* Data);
@@ -23,6 +23,6 @@ namespace HWPT {
         VkBuffer m_storageBuffer = VK_NULL_HANDLE;
         VkDeviceMemory m_storageBufferMemory = VK_NULL_HANDLE;
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_STORAGEBUFFER_H

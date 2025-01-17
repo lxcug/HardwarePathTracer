@@ -7,7 +7,7 @@
 #include "core/application/VulkanBackendApp.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     Scene::~Scene() {
         vkDestroyDescriptorSetLayout(GetVKDevice(), m_modelDescDescriptorSetLayout, nullptr);
         vkFreeDescriptorSets(GetVKDevice(), VulkanBackendApp::GetApplication()->GetDescriptorPool(),
@@ -232,6 +232,6 @@ namespace HWPT {
         m_sceneModelDescBuffer.reset();
         m_sceneModelTextures.clear();
         s_instanceIDCounter = 0;
-        HWPT::ASBuilder::OnRebuildAccel();
+        Shadowy::ASBuilder::OnRebuildAccel();
     }
-} // namespace HWPT
+} // namespace Shadowy

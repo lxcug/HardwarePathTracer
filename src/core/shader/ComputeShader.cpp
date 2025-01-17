@@ -6,6 +6,6 @@
 #include "core/application/VulkanBackendApp.h"
 
 
-namespace HWPT {
+namespace Shadowy {
 
-}  // namespace HWPT
+}  // namespace Shadowy

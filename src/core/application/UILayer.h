@@ -11,7 +11,7 @@
 #include <vector>
 
 
-namespace HWPT {
+namespace Shadowy {
     class UILayer {
     public:
         static void
@@ -36,6 +36,6 @@ namespace HWPT {
 
         static void DrawLights(std::vector<Light> &Lights, bool *ValueChangedSignal = nullptr);
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_UILAYER_H

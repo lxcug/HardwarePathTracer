@@ -8,7 +8,7 @@
 #include "core/Core.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     class UniformBuffer {
     public:
         UniformBuffer(VkDeviceSize Size, const void *Data);
@@ -27,6 +27,6 @@ namespace HWPT {
         void* m_mappedData = nullptr;
         VkDeviceSize m_size = 0;
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_UNIFORMBUFFER_H

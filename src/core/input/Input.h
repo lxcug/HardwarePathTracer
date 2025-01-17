@@ -11,7 +11,7 @@
 #include "glm/glm.hpp"
 
 
-namespace HWPT {
+namespace Shadowy {
     class Input {
     public:
         static auto IsKeyPressed(KeyCode Code) -> bool;
@@ -20,6 +20,6 @@ namespace HWPT {
 
         static auto GetMousePosition() -> glm::vec2;
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_INPUT_H

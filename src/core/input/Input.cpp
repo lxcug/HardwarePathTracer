@@ -6,7 +6,7 @@
 #include "core/application/VulkanBackendApp.h"
 
 
-namespace HWPT
+namespace Shadowy
 {
     auto Input::IsKeyPressed(KeyCode Code) -> bool
     {
@@ -27,4 +27,4 @@ namespace HWPT
         glfwGetCursorPos(Window, &xPos, &yPos);
         return {static_cast<float>(xPos), static_cast<float>(yPos)};
     }
-} // namespace HWPT
+} // namespace Shadowy

@@ -10,7 +10,7 @@
 #include "core/Commands/CommandPool.h"
 
 // NOTE: Only Support Vulkan, Actually is a Util Funcs Header Now
-namespace HWPT::RHI {
+namespace Shadowy::RHI {
     auto FindMemoryType(uint TypeFilter, VkMemoryPropertyFlags Properties) -> uint;
 
     auto
@@ -66,6 +66,6 @@ namespace HWPT::RHI {
     void GenerateMips(VkImage Image, uint Width, uint Height, uint NumMips, VkFormat Format);
 
     auto GetBufferDeviceAddress(VkBuffer Buffer) -> VkDeviceSize;
-}  // namespace HWPT::RHI
+}  // namespace Shadowy::RHI
 
 #endif //HARDWAREPATHTRACER_RHI_H

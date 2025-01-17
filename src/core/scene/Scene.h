@@ -11,7 +11,7 @@
 #include "host_device_shared/Light.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     class ASBuilder;
 
     class Scene {
@@ -130,6 +130,6 @@ namespace HWPT {
         // Used when m_sceneLights.empty()
         std::shared_ptr<ArbitraryBuffer> m_sceneLightsDummyBuffer;
     };
-} // namespace HWPT
+} // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_SCENE_H

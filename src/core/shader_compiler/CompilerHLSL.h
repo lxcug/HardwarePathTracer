@@ -13,7 +13,7 @@
 #include "Windows.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     class HLSLCompiler {
     public:
 
@@ -26,7 +26,7 @@ namespace HWPT {
         inline static std::filesystem::path s_dxcPath = "../../vendor/dxc_2024_07_31";
         inline static std::filesystem::path s_hlslDirectory = "../../shader/HLSL";
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 
 #endif //HARDWAREPATHTRACER_COMPILERHLSL_H

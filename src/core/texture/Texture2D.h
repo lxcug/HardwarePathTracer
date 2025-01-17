@@ -11,7 +11,7 @@
 
 
 // TODO: Reconstruct this...
-namespace HWPT {
+namespace Shadowy {
     // TODO
 //    class Texture2DDesc {
 //    public:
@@ -51,6 +51,6 @@ namespace HWPT {
         uint m_msaaSamples = 1;
         TextureUsage m_textureUsage = TextureUsage::None;
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_TEXTURE2D_H

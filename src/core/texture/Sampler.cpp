@@ -5,7 +5,7 @@
 #include "Sampler.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     Sampler::Sampler() {
         CreateSampler();
     }
@@ -37,4 +37,4 @@ namespace HWPT {
         VK_CHECK(vkCreateSampler(GetVKDevice(), &CreateInfo, nullptr, &m_sampler));
     }
 
-}  // namespace HWPT
+}  // namespace Shadowy

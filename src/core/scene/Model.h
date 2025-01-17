@@ -15,7 +15,7 @@
 #include "host_device_shared/Material.h"
 
 
-namespace HWPT {
+namespace Shadowy {
 
     class Model {
     public:
@@ -118,6 +118,6 @@ namespace HWPT {
         ModelDesc m_modelDesc;
     };
 
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_MODEL_H

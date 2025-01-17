@@ -12,7 +12,7 @@
 #include <fstream>
 
 
-namespace HWPT {
+namespace Shadowy {
     enum class ShaderType : uint8_t {
         None = 0x0,
         Vertex,
@@ -54,6 +54,6 @@ namespace HWPT {
 
 
     static auto LoadShaderFile(const std::filesystem::path& ShaderPath) -> std::vector<char>;
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_SHADERBASE_H

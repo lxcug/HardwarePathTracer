@@ -8,7 +8,7 @@
 #include "core/Core.h"
 
 
-namespace HWPT {
+namespace Shadowy {
     class Sampler {
     public:
         Sampler();
@@ -35,6 +35,6 @@ namespace HWPT {
     private:
         VkSampler m_sampler = VK_NULL_HANDLE;
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_SAMPLER_H

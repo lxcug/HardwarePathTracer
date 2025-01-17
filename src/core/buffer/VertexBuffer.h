@@ -9,14 +9,11 @@
 #include "vulkan/vulkan.h"
 #include <glm/glm.hpp>
 #include <array>
-
-#define GLM_ENABLE_EXPERIMENTAL
-
 #include "VertexBufferLayout.h"
 #include "host_device_shared/Vertex.h"
 
 
-namespace HWPT {
+namespace Shadowy {
 
     class VertexBuffer {
     public:
@@ -60,6 +57,6 @@ namespace HWPT {
         VertexBufferLayout *m_layout = nullptr;
         uint m_vertexCount = 0;
     };
-}  // namespace HWPT
+}  // namespace Shadowy
 
 #endif //HARDWAREPATHTRACER_VERTEXBUFFER_H
