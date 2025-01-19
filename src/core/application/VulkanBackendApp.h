@@ -88,7 +88,7 @@ namespace Shadowy
 
         void ResetFrameNum()
         {
-            m_frameNum = 0;
+            m_accumulatedFrameNum = 0;
         }
 
         [[nodiscard]] auto GetVkInstance() const -> VkInstance
@@ -288,6 +288,7 @@ namespace Shadowy
 
         uint m_currentFrame = 0;
         uint m_imageIndex = 0;
+        uint m_accumulatedFrameNum = 0;
         uint m_frameNum = 0;
 
         inline static VulkanBackendApp* s_application = nullptr;

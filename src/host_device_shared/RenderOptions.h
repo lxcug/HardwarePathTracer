@@ -8,14 +8,14 @@
 #include "BaseDefinitions.h"
 
 BEGIN_HWPT_NAMESPACE
-    struct RenderOptions
+    struct PathTracingOptions
     {
         // TODO: Pack Bool into Int/UInt
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableAccumulation, 1);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableAO, 0);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, NumAORays, 4);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, AORayLength, 1.f);
-        uint NumLights;
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, NumLights, 0);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, Bounce, 4);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, RayMinBias, 1e-3f);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, MaxTraceDistance, 1e4f);
@@ -23,9 +23,11 @@ BEGIN_HWPT_NAMESPACE
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableEmissive, 1);
     };
 
-#if IS_COMPILING_SHADER
-[[vk::push_constant]] RenderOptions render_options;
-#endif
+    struct ToneMappingOptions {
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableGammaCorrection, 1);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableToneMapping, 1);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, AdaptedLuminance, 1.f);
+    };
 
 END_HWPT_NAME_SPACE
 

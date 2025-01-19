@@ -101,7 +101,8 @@ namespace Shadowy {
         }
 
         void CreateSkyTexture(const std::filesystem::path &Path) {
-            m_skyTexture = std::make_shared<Texture2D>(Path);
+            // NOTE: SRGB
+            m_skyTexture = std::make_shared<Texture2D>(Path, 1, false, true);
         }
 
         void ReloadObj(const std::filesystem::path &ObjPath);

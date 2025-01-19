@@ -51,7 +51,7 @@ namespace Shadowy {
     void Scene::CreateModelTextures(const std::vector<std::string> &TexturePaths) {
         auto CommandBuffer = RHI::BeginIntermediateCommandBuffer();
         for (auto &TexturePath: TexturePaths) {
-            auto SharedTexture = std::make_shared<Texture2D>(TexturePath, 1, false);
+            auto SharedTexture = std::make_shared<Texture2D>(TexturePath, 1, true);
             RHI::TextureTransitionInput SrcInput{}, DstInput{};
             SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
             SrcInput.AccessMask = 0;
@@ -208,7 +208,7 @@ namespace Shadowy {
         CreateSceneLightsBuffer();
         if (m_sceneModelTextures.empty()) {
             m_sceneModelTextures.emplace_back(
-                    std::make_shared<Texture2D>(1, 1, TextureFormat::RGBA,
+                    std::make_shared<Texture2D>(1, 1, TextureFormat::RGBA_UNORM,
                                                 TextureUsage::SRV));
             RHI::TextureTransitionInput SrcInput{}, DstInput{};
             SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;

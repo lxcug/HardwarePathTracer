@@ -6,12 +6,14 @@
 
 
 namespace Shadowy {
-    auto GetTextureFormat(int Channels) -> TextureFormat {
+    auto GetTextureFormat(int Channels, bool IsSRGB) -> TextureFormat {
         switch (Channels) {
             case 3:
-//                return TextureFormat::RGB;
             case 4:
-                return TextureFormat::RGBA;
+                if (IsSRGB) {
+                    return TextureFormat::SRGBA;
+                }
+                return TextureFormat::RGBA_UNORM;
             default:
                 Check(false);
                 return TextureFormat::None;
@@ -21,8 +23,14 @@ namespace Shadowy {
     auto GetVKFormat(TextureFormat Format) -> VkFormat {
         switch (Format) {
             case TextureFormat::RGB:
-            case TextureFormat::RGBA:
-                return VK_FORMAT_R8G8B8A8_UNORM;  // SRGB or UNORM
+            case TextureFormat::RGBA_UNORM:
+                return VK_FORMAT_R8G8B8A8_UNORM;
+            case TextureFormat::SRGBA:
+                return VK_FORMAT_R8G8B8A8_SRGB;
+            case TextureFormat::RGBA_SNORM:
+                return VK_FORMAT_R8G8B8A8_SNORM;
+            case TextureFormat::RGBA_SFLOAT:
+                return VK_FORMAT_R32G32B32A32_SFLOAT;
             case TextureFormat::Depth32:
                 return VK_FORMAT_D32_SFLOAT;
             case TextureFormat::Depth32Stencil8:

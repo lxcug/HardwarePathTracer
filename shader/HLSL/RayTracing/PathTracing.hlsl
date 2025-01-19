@@ -116,7 +116,7 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
         ao_ray.TMax = render_options.AORayLength;
         ao = 0.f;
         for (int ray_idx = 0; ray_idx < render_options.NumAORays; ray_idx++) {
-            ao_ray.Direction = UniformSampleHemisphere(rnd2(seed));
+            ao_ray.Direction = UniformSampleHemisphere(rnd2(seed), first_normal);
             ao += TraceVisibilityRay(ao_ray);
         }
         ao /= render_options.NumAORays;

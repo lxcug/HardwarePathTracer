@@ -50,7 +50,7 @@ namespace Shadowy::Utils {
         return FindQueueFamilies(GetVKPhysicalDevice());
     }
 
-    auto GLMToVulkanMatrix(const glm::mat4& Mat) -> VkTransformMatrixKHR {
+    auto GLMToVulkanMatrix(const glm::mat4 &Mat) -> VkTransformMatrixKHR {
         VkTransformMatrixKHR RetMat;
         memcpy(&RetMat, glm::value_ptr(glm::transpose(Mat)), sizeof(VkTransformMatrixKHR));
         return RetMat;
@@ -58,5 +58,14 @@ namespace Shadowy::Utils {
 
     auto Align(uint Size, uint Alignment) -> uint {
         return (Size + Alignment - 1) & ~(Alignment - 1);
+    }
+
+    auto GetThreadGroupCount(const glm::vec3 &DispatchSize,
+                             const glm::vec3 &ThreadGroupSize) -> glm::uvec3 {
+        return {
+                (DispatchSize.x + ThreadGroupSize.x - 1) / ThreadGroupSize.x,
+                (DispatchSize.y + ThreadGroupSize.y - 1) / ThreadGroupSize.y,
+                (DispatchSize.z + ThreadGroupSize.z - 1) / ThreadGroupSize.z
+        };
     }
 }  // namespace Shadowy::Utils

@@ -33,14 +33,14 @@ namespace Shadowy
         for (int i = 0; i < m_frameCount; i++)
         {
             m_albedo[i] = new Texture2D(m_size.x, m_size.y,
-                                        TextureFormat::RGBA, TextureUsage::UAV);
+                                        TextureFormat::RGBA_UNORM, TextureUsage::UAV);
             m_normal[i] = new Texture2D(m_size.x, m_size.y,
-                                        TextureFormat::RGBA,
+                                        TextureFormat::RGBA_UNORM,
                                         TextureUsage::UAV);
             m_pos[i] = new Texture2D(m_size.x, m_size.y,
-                                     TextureFormat::RGBA, TextureUsage::UAV);
+                                     TextureFormat::RGBA_UNORM, TextureUsage::UAV);
             m_depth[i] = new Texture2D(m_size.x, m_size.y,
-                                       TextureFormat::RGBA, TextureUsage::UAV);
+                                       TextureFormat::RGBA_UNORM, TextureUsage::UAV);
 
             RHI::TransitionTextureLayout(CommandBuffer, m_albedo[i]->GetHandle(), 1, SrcInput,
                                          DstInput);
