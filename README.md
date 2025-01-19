@@ -36,6 +36,8 @@ Control the scene lights in the UI panel.
 
 * Path Tracing Diffuse Material
 
+* PostProcess: ToneMapping
+
 ## Dev Log
 
 > 2025.1.10:
@@ -110,3 +112,12 @@ Control the scene lights in the UI panel.
 > * Open obj and compile shaders at runtime 
 >
 > ![](imgs/NewUIAndRuntimeOperations.png)
+
+
+
+> 2025.1.20
+>
+> * Separate RenderOptions for each pass as push constants
+>
+> * Uncharted and ACES Tone Mapping(fixed sky texture isn't init with SRGB Format)
+>   ![](imgs/w_o_ToneMapping.png)

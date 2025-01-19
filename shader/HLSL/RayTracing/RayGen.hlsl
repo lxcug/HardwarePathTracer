@@ -30,11 +30,11 @@ void main()
 
     if (payload.is_hit()) {
         // TODO: Accumulate for the first several frames cause artifacts, to fix
-        if (view_uniform_buffer.FrameNum <= 5) {
+        if (view_uniform_buffer.AccumulatedFrameNum <= 5) {
             OutImage[index] = float4(color, 1.0);
         } else {
             float3 old_radiance = InImage[index].rgb;
-            float3 new_radiance = lerp(old_radiance, color, 1.f / view_uniform_buffer.FrameNum);
+            float3 new_radiance = lerp(old_radiance, color, 1.f / view_uniform_buffer.AccumulatedFrameNum);
             OutImage[index] = float4(new_radiance, 1.0);
         }
     } else {
@@ -98,11 +98,11 @@ void main()
 //         float3 color = radiance * ao;
 //
 //         // TODO: Accumulate for the first several frames cause artifacts, to fix
-//         if (view_uniform_buffer.FrameNum <= 5 || render_options.ShouldReAccumulate || !render_options.EnableAccumulation) {
+//         if (view_uniform_buffer.AccumulatedFrameNum <= 5 || render_options.ShouldReAccumulate || !render_options.EnableAccumulation) {
 //             OutImage[index] = float4(color, 1.0);
 //         } else {
 //             float3 old_color = InImage[index].rgb;
-//             float3 new_color = lerp(old_color, color, 1.f / view_uniform_buffer.FrameNum);
+//             float3 new_color = lerp(old_color, color, 1.f / view_uniform_buffer.AccumulatedFrameNum);
 //             OutImage[index] = float4(new_color, 1.0);
 //         }
 //     } else {

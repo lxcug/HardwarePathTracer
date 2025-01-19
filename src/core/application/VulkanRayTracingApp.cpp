@@ -6,7 +6,7 @@
 #include <imgui_internal.h>
 #include "core/RHI.h"
 #include "core/shader/ShaderBase.h"
-#include "core/shader_compiler/CompilerHLSL.h"
+#include "core/shader_compiler/HLSLCompiler.h"
 #include "core/Utils.h"
 #include "ImGuiFileDialog.h"
 #include "UILayer.h"
@@ -45,6 +45,8 @@ namespace Shadowy {
 
         InitRayTracing();
 
+        CreatePostProcessPasses();
+
         m_camera->SetCameraPosition(glm::vec3(0, 0, 17));
 //        m_camera->SetCameraPosition(glm::vec3(-600, 510, 40));
 //        m_camera->SetCameraRotation(-0.13, -1.41);
@@ -56,6 +58,7 @@ namespace Shadowy {
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             delete m_viewportImages[i];
         }
+        delete m_toneMappingPass;
         delete m_gBuffer;
         delete m_lastFrameViewportImage;
         delete m_RTScene;
@@ -89,7 +92,7 @@ namespace Shadowy {
     }
 
     void VulkanRayTracingApp::DrawFrame() {
-        if (!m_renderOptions.EnableAccumulation || m_camera->IsMoving()) {
+        if (!m_PathTracingOptions.EnableAccumulation || m_camera->IsMoving()) {
             ResetFrameNum();
         }
         for (auto &Operation: m_deferredOperations) {
@@ -102,10 +105,10 @@ namespace Shadowy {
         ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();
         ViewUniformBuffer_.ProjTrans = m_camera->GetProjMatrix();
         ViewUniformBuffer_.CameraPos = m_camera->GetCameraPos();
-        ViewUniformBuffer_.DebugColor = glm::vec3(.5f, .9f, .6f);
         ViewUniformBuffer_.DeltaTime = m_fpsCalculator
                                        ? static_cast<float>(m_fpsCalculator->GetDeltaTime())
                                        : 0.f;
+        ViewUniformBuffer_.AccumulatedFrameNum = m_accumulatedFrameNum;
         ViewUniformBuffer_.FrameNum = m_frameNum;
         ViewUniformBuffer_.InvView = glm::transpose(m_camera->GetViewMatrix());
         ViewUniformBuffer_.InvProj = glm::inverse(m_camera->GetProjMatrix());
@@ -131,8 +134,7 @@ namespace Shadowy {
             throw std::runtime_error("Failed to acquire swap chain images");
         }
 
-        auto CommandBuffer = m_graphicsCommandBuffers[m_currentFrame];
-        auto CurrentFrameSceneColor = m_swapChain.SwapChainImages[m_imageIndex];
+        auto CommandBuffer = m_computeCommandBuffers[m_currentFrame];
         auto CurrentFrameViewportImage = m_viewportImages[m_imageIndex];
         vkResetCommandBuffer(CommandBuffer, 0);
         VkCommandBufferBeginInfo BeginInfo{};
@@ -176,20 +178,20 @@ namespace Shadowy {
                                 0, BindingDescriptorSets.size(),
                                 BindingDescriptorSets.data(),
                                 0, nullptr);
-        m_renderOptions.NumLights = m_RTScene->GetSceneLights().size();
+        m_PathTracingOptions.NumLights = m_RTScene->GetSceneLights().size();
         vkCmdPushConstants(CommandBuffer, m_RTPipelineLayout,
                            VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
                            VK_SHADER_STAGE_MISS_BIT_KHR,
-                           0, sizeof(RenderOptions), &m_renderOptions);
+                           0, sizeof(PathTracingOptions), &m_PathTracingOptions);
         auto RayTraceFunc = reinterpret_cast<PFN_vkCmdTraceRaysKHR>(vkGetDeviceProcAddr(m_device,
                                                                                         "vkCmdTraceRaysKHR"));
         RayTraceFunc(CommandBuffer, &m_rayGenRegion, &m_missRegion, &m_hitRegion,
                      &m_callRegion, m_viewportSize.x, m_viewportSize.y, 1);
 
         /*
-         * Transition Current ColorAttach to VK_IMAGE_LAYOUT_VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
-         * Transition m_lastFrameSceneColor to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL for CopyImage
-         */
+ * Transition Current ColorAttach to VK_IMAGE_LAYOUT_VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+ * Transition m_lastFrameSceneColor to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL for CopyImage
+ */
         // RHI::TextureTransitionInput SrcInput{}, DstInput{};
         SrcInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
         SrcInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
@@ -231,13 +233,43 @@ namespace Shadowy {
                 1, &ImageCopy
         );
 
-        /*
-         * Transition Current ColorAttach to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR for ColorAttach and Present
-         * Transition m_lastFrameSceneColor to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-         */
+        // NOTE: Must Do Tone Mapping after Copy To LastFrameViewportImage, since ToneMapped color shouldn't be accumulate
         SrcInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
         SrcInput.AccessMask = VK_ACCESS_TRANSFER_READ_BIT;
         SrcInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        DstInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
+        DstInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        DstInput.PipelineStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameViewportImage->GetHandle(), 1,
+                                     SrcInput, DstInput);
+
+        // Sync RT and ToneMapping Pass
+        VkImageMemoryBarrier Barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        Barrier.image = CurrentFrameViewportImage->GetHandle();
+        Barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+        Barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        Barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        Barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        Barrier.subresourceRange.baseMipLevel = 0;
+        Barrier.subresourceRange.levelCount = 1;
+        Barrier.subresourceRange.baseArrayLayer = 0;
+        Barrier.subresourceRange.layerCount = 1;
+        vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
+                             1, &Barrier);
+        m_toneMappingPass->Dispatch(CommandBuffer, m_imageIndex, m_viewportSize.x,
+                                    m_viewportSize.y);
+
+        /*
+         * Transition Current ColorAttach to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR/VK_IMAGE_LAYOUT_GENERAL(if ToneMapping) for ColorAttach and Present
+         * Transition m_lastFrameSceneColor to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+         */
+        SrcInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
+        SrcInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        SrcInput.PipelineStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
         DstInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         DstInput.AccessMask = VK_ACCESS_SHADER_READ_BIT;
         DstInput.PipelineStage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
@@ -417,7 +449,7 @@ namespace Shadowy {
         {
             ImGuiInfrastructure::Begin("Settings");
             ImGui::Text("FPS: %d", m_fpsCalculator->GetFPS());
-            ImGui::Text("Accumulated Frames: %d", m_frameNum);
+            ImGui::Text("Accumulated Frames: %d", m_accumulatedFrameNum);
             ImGui::Text("Render Resolution (%.0f, %.0f)", m_viewportSize.x, m_viewportSize.y);
             static bool FullScreen = false;
             static int WindowWidth, WindowHeight, WindowPosX, WindowPosY;
@@ -451,24 +483,33 @@ namespace Shadowy {
             ImGui::Text("Render Options");
             ImGui::Checkbox("Show GBuffer", &ShowGBuffer);
             ShouldReAccumulate |= ImGui::Checkbox("Enable AO",
-                                                  reinterpret_cast<bool *>(&m_renderOptions.EnableAO));
-            ShouldReAccumulate |= ImGui::InputInt("Num AO Rays", &m_renderOptions.NumAORays, 1.f);
-            ShouldReAccumulate |= ImGui::InputFloat("AO Ray Length", &m_renderOptions.AORayLength,
+                                                  reinterpret_cast<bool *>(&m_PathTracingOptions.EnableAO));
+            ShouldReAccumulate |= ImGui::InputInt("Num AO Rays", &m_PathTracingOptions.NumAORays,
+                                                  1.f);
+            ShouldReAccumulate |= ImGui::InputFloat("AO Ray Length",
+                                                    &m_PathTracingOptions.AORayLength,
                                                     .5f, 1.f, "%.1f");
+            ShouldReAccumulate |= ImGui::Checkbox("Enable Gamma Correction",
+                                                  reinterpret_cast<bool *>(&m_toneMappingPass->GetPassRenderOptions().EnableGammaCorrection));
+            ShouldReAccumulate |= ImGui::Checkbox("Enable ToneMapping",
+                                                  reinterpret_cast<bool *>(&m_toneMappingPass->GetPassRenderOptions().EnableToneMapping));
+            ShouldReAccumulate |= ImGui::InputFloat("Adapted Luminance", &m_toneMappingPass->GetPassRenderOptions().AdaptedLuminance);
+
 
             ImGui::NewLine();
             ImGui::Separator();
             ImGui::NewLine();
             ImGui::Text("Path Tracing Options");
             ShouldReAccumulate |= ImGui::Checkbox("Enable Accumulation",
-                                                  reinterpret_cast<bool *>(&m_renderOptions.EnableAccumulation));
+                                                  reinterpret_cast<bool *>(&m_PathTracingOptions.EnableAccumulation));
             ShouldReAccumulate |= ImGui::Checkbox("Enable Emissive",
-                                                  reinterpret_cast<bool *>(&m_renderOptions.EnableEmissive));
-            ShouldReAccumulate |= ImGui::InputFloat("Min Ray Bias", &m_renderOptions.RayMinBias,
+                                                  reinterpret_cast<bool *>(&m_PathTracingOptions.EnableEmissive));
+            ShouldReAccumulate |= ImGui::InputFloat("Min Ray Bias",
+                                                    &m_PathTracingOptions.RayMinBias,
                                                     1e-3f);
-            ShouldReAccumulate |= ImGui::InputInt("Bounce", &m_renderOptions.Bounce, 1.f);
+            ShouldReAccumulate |= ImGui::InputInt("Bounce", &m_PathTracingOptions.Bounce, 1.f);
             ShouldReAccumulate |= ImGui::Checkbox("Enable SkyLight",
-                                                  reinterpret_cast<bool *>(&m_renderOptions.EnableSkyLight));
+                                                  reinterpret_cast<bool *>(&m_PathTracingOptions.EnableSkyLight));
 
             // TODO: Choose Obj
             if (ImGui::Button("Open Obj")) {
@@ -568,7 +609,8 @@ namespace Shadowy {
         ViewUniformBufferBinding.binding = 0;
         ViewUniformBufferBinding.descriptorCount = 1;
         ViewUniformBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        ViewUniformBufferBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+        ViewUniformBufferBinding.stageFlags =
+                VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
         VkDescriptorSetLayoutBinding TLASBinding{};
         TLASBinding.binding = 1;
@@ -662,7 +704,6 @@ namespace Shadowy {
             DescriptorWrites[2].dstArrayElement = 0;
             DescriptorWrites[2].descriptorCount = 1;
             DescriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            DescriptorWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
             DescriptorWrites[2].pImageInfo = &OutImageInfo;
 
             VkDescriptorImageInfo InImageInfo{};
@@ -708,7 +749,7 @@ namespace Shadowy {
                                        VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
                                        VK_SHADER_STAGE_MISS_BIT_KHR;
         RenderOptionRange.offset = 0;
-        RenderOptionRange.size = sizeof(RenderOptions);
+        RenderOptionRange.size = sizeof(PathTracingOptions);
 
         VkPipelineLayoutCreateInfo CreateInfo{};
         CreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -903,7 +944,7 @@ namespace Shadowy {
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             m_viewportImages[i] = new Texture2D(m_viewportSize.x,
                                                 m_viewportSize.y,
-                                                TextureFormat::RGBA,
+                                                TextureFormat::RGBA_SFLOAT,
                                                 TextureUsage::UAV);
             SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
             SrcInput.AccessMask = 0;
@@ -922,7 +963,7 @@ namespace Shadowy {
         }
         m_lastFrameViewportImage = new Texture2D(m_viewportSize.x,
                                                  m_viewportSize.y,
-                                                 TextureFormat::RGBA,
+                                                 TextureFormat::RGBA_SFLOAT,
                                                  TextureUsage::SRV);
         SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
         SrcInput.AccessMask = 0;
@@ -936,6 +977,8 @@ namespace Shadowy {
     }
 
     void VulkanRayTracingApp::ResizeViewportImages() {
+        ResetFrameNum();
+
         vkDeviceWaitIdle(m_device);
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             ImGui_ImplVulkan_RemoveTexture(m_viewportImageDescriptorSets[i]);
@@ -944,10 +987,10 @@ namespace Shadowy {
         delete m_lastFrameViewportImage;
         CreateViewportImages();
         m_gBuffer->OnResize(m_viewportSize.x, m_viewportSize.y);
-        UpdateRTDescriptorSets();
-        ResetFrameNum();
-
         m_camera->OnWindowResize(m_viewportSize.x, m_viewportSize.y);
+
+        UpdateRTDescriptorSets();
+        m_toneMappingPass->UpdateDescriptorSets(m_viewportImages);
     }
 
     void VulkanRayTracingApp::CreateGBuffer() {
@@ -985,6 +1028,11 @@ namespace Shadowy {
         vkDestroyPipeline(m_device, m_RTPipeline, nullptr);
         CreateRTPipeline();
         CreateRTSBT();
+    }
+
+    void VulkanRayTracingApp::CreatePostProcessPasses() {
+        m_toneMappingPass = new ToneMappingPass();
+        m_toneMappingPass->UpdateDescriptorSets(m_viewportImages);
     }
 
 } // namespace Shadowy

@@ -13,13 +13,16 @@ namespace Shadowy {
     enum class TextureFormat : uint8_t {
         None = 0x0,
         RGB,
-        RGBA,
+        SRGBA,
+        RGBA_UNORM,
+        RGBA_SNORM,
+        RGBA_SFLOAT,
         Depth32,
         Depth32Stencil8,
         Depth24Stencil8
     };
 
-    auto GetTextureFormat(int Channels) -> TextureFormat;
+    auto GetTextureFormat(int Channels, bool IsSRGB) -> TextureFormat;
 
     auto GetVKFormat(TextureFormat Format) -> VkFormat;
 

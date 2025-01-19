@@ -37,6 +37,7 @@ float3 sample_sky_texture(in float3 dir) {
     return SkyTexture.SampleLevel(SkyTextureSampler, uint_vector_to_hdri_uv(dir), 0).rgb;
 }
 
+// TODO: Move Sampling Code to a new header file
 float3 UniformSampleHemisphere(in float rnd1, in float rnd2) {
     float3 dir = float3(cos(2 * PI * rnd1) * sqrt(1 - rnd2), sin(2 * PI * rnd1) * sqrt(1 - rnd2), sqrt(rnd2));
     return dir;

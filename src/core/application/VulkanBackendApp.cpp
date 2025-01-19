@@ -9,7 +9,7 @@
 #include <core/buffer/VertexBuffer.h>
 #include "core/RHI.h"
 #include <random>
-#include "core/shader_compiler/CompilerHLSL.h"
+#include "core/shader_compiler/HLSLCompiler.h"
 #include "core/Utils.h"
 
 
@@ -36,6 +36,7 @@ namespace Shadowy {
             DrawFrame();
 
             Present();
+            m_accumulatedFrameNum++;
             m_frameNum++;
             m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
         }
@@ -1025,10 +1026,10 @@ namespace Shadowy {
         ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();
         ViewUniformBuffer_.ProjTrans = m_camera->GetProjMatrix();
         ViewUniformBuffer_.CameraPos = m_camera->GetCameraPos();
-        ViewUniformBuffer_.DebugColor = glm::vec3(.5f, .9f, .6f);
         ViewUniformBuffer_.DeltaTime = m_fpsCalculator
                                        ? static_cast<float>(m_fpsCalculator->GetDeltaTime())
                                        : 0.f;
+        ViewUniformBuffer_.AccumulatedFrameNum = m_accumulatedFrameNum;
         ViewUniformBuffer_.FrameNum = m_frameNum;
         ViewUniformBuffer_.InvView = glm::transpose(m_camera->GetViewMatrix());
         ViewUniformBuffer_.InvProj = glm::inverse(m_camera->GetProjMatrix());
@@ -1041,17 +1042,18 @@ namespace Shadowy {
     }
 
     void VulkanBackendApp::CreateDescriptorPool() {
+        // TODO: PoolSize
         std::array<VkDescriptorPoolSize, 6> PoolSizes{};
         PoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        PoolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT * 10;
+        PoolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT * 20;
         PoolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        PoolSizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT * 10;
+        PoolSizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT * 20;
         PoolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         PoolSizes[2].descriptorCount = MAX_FRAMES_IN_FLIGHT * 20;
         PoolSizes[3].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-        PoolSizes[3].descriptorCount = MAX_FRAMES_IN_FLIGHT * 10;
+        PoolSizes[3].descriptorCount = MAX_FRAMES_IN_FLIGHT * 20;
         PoolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        PoolSizes[4].descriptorCount = MAX_FRAMES_IN_FLIGHT * 10;
+        PoolSizes[4].descriptorCount = MAX_FRAMES_IN_FLIGHT * 20;
         PoolSizes[5].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
         PoolSizes[5].descriptorCount = MAX_FRAMES_IN_FLIGHT;
 
@@ -1059,7 +1061,7 @@ namespace Shadowy {
         PoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         PoolInfo.poolSizeCount = PoolSizes.size();
         PoolInfo.pPoolSizes = PoolSizes.data();
-        PoolInfo.maxSets = 4;
+        PoolInfo.maxSets = MAX_FRAMES_IN_FLIGHT * 10;
         PoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
         VK_CHECK(vkCreateDescriptorPool(m_device, &PoolInfo, nullptr, &m_descriptorPool));
     }
@@ -1160,10 +1162,10 @@ namespace Shadowy {
         ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();
         ViewUniformBuffer_.ProjTrans = m_camera->GetProjMatrix();
         ViewUniformBuffer_.CameraPos = m_camera->GetCameraPos();
-        ViewUniformBuffer_.DebugColor = glm::vec3(.5f, .9f, .6f);
         ViewUniformBuffer_.DeltaTime = m_fpsCalculator
                                        ? static_cast<float>(m_fpsCalculator->GetDeltaTime())
                                        : 0.f;
+        ViewUniformBuffer_.AccumulatedFrameNum = m_accumulatedFrameNum;
         ViewUniformBuffer_.FrameNum = m_frameNum;
         ViewUniformBuffer_.InvView = glm::transpose(m_camera->GetViewMatrix());
         ViewUniformBuffer_.InvProj = glm::inverse(m_camera->GetProjMatrix());
@@ -1311,7 +1313,7 @@ namespace Shadowy {
 
         m_msaaBuffers->MSAAColorBuffer = new Texture2D(m_swapChain.Extent.width,
                                                        m_swapChain.Extent.height,
-                                                       TextureFormat::RGBA,
+                                                       TextureFormat::RGBA_UNORM,
                                                        TextureUsage::ColorAttachmentMSAA,
                                                        GetVKSampleCount(m_msaaSamples));
         m_msaaBuffers->MSAADepthBuffer = new Texture2D(m_swapChain.Extent.width,

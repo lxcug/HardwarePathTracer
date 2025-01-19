@@ -16,6 +16,8 @@ MESSAGE(STATUS ${SOURCES})
 add_executable(Shadowy
         ${SOURCES}
         ${stb_SOURCES}
+        src/core/post_processing/ToneMapping.cpp
+        src/core/post_processing/ToneMapping.h
 )
 
 target_include_directories(

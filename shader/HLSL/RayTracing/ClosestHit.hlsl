@@ -1,5 +1,6 @@
 #pragma shader_stage(closesthit)
 
+#include "../../../src/host_device_shared/ViewUniformBuffer.h"
 #include "RayTracingCommon.hlsl"
 
 

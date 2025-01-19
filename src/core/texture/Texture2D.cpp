@@ -13,9 +13,9 @@
 namespace Shadowy {
     // TextureUsage is ShaderResourceView when giving a TexturePath
     Texture2D::Texture2D(const std::filesystem::path &TexturePath, uint MSAASamples,
-                         bool GenerateMips)
+                         bool GenerateMips, bool SRGB)
             : m_msaaSamples(MSAASamples), m_generateMips(GenerateMips),
-              m_textureUsage(TextureUsage::SRV) {
+              m_textureUsage(TextureUsage::SRV), m_isSRGB(SRGB) {
         CreateTexture(TexturePath);
     }
 
@@ -77,7 +77,7 @@ namespace Shadowy {
                                     reinterpret_cast<int *>(&m_height),
                                     &Channels, STBI_rgb_alpha);
         Check(Pixels);
-        m_format = GetTextureFormat(Channels);
+        m_format = GetTextureFormat(Channels, m_isSRGB);
 
         if (m_generateMips) {
             m_numMips = CalculateNumMips(m_width, m_height);
@@ -130,9 +130,6 @@ namespace Shadowy {
         CreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         CreateInfo.image = m_texture;
         CreateInfo.format = GetVKFormat(m_format);
-        if (m_textureUsage == TextureUsage::UAV || m_textureUsage == TextureUsage::SRV) {
-            CreateInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-        }
         CreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         VkImageAspectFlags AspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
         if (IsDepthStencilTexture(m_format)) {

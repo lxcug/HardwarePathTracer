@@ -12,6 +12,7 @@
 #include "core/gbuffer/GBuffer.h"
 #include "host_device_shared/Light.h"
 #include "host_device_shared/RenderOptions.h"
+#include "core/post_processing/ToneMapping.h"
 
 
 namespace Shadowy {
@@ -56,6 +57,8 @@ namespace Shadowy {
 
         void ReCompileShaders();
 
+        void CreatePostProcessPasses();
+
         VkDescriptorSetLayout m_RTDescriptorSetLayout = VK_NULL_HANDLE;
         std::vector<VkDescriptorSet> m_RTDescriptorSets;
         VkPipelineLayout m_RTPipelineLayout = VK_NULL_HANDLE;
@@ -89,12 +92,12 @@ namespace Shadowy {
         glm::vec2 m_viewportOffset = glm::vec2(0.f, 0.f);
         std::vector<VkDescriptorSet> m_viewportImageDescriptorSets;
         GBuffer *m_gBuffer = nullptr;
-        RenderOptions m_renderOptions;
-
-        Texture2D *m_skyTexture = nullptr;
+        PathTracingOptions m_PathTracingOptions;
 
         // NOTE: Store Last Frame Operations and Execute before RenderPipeline Begins
         std::vector<std::function<void()>> m_deferredOperations;
+
+        ToneMappingPass *m_toneMappingPass = nullptr;
     };
 } // namespace Shadowy
 

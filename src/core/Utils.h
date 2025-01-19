@@ -26,9 +26,12 @@ namespace Shadowy::Utils {
 
     auto FindQueueFamilies() -> QueueFamilyIndices;
 
-    auto GLMToVulkanMatrix(const glm::mat4& Mat) -> VkTransformMatrixKHR;
+    auto GLMToVulkanMatrix(const glm::mat4 &Mat) -> VkTransformMatrixKHR;
 
     auto Align(uint Size, uint Alignment) -> uint;
+
+    auto GetThreadGroupCount(const glm::vec3 &DispatchSize,
+                             const glm::vec3 &ThreadGroupSize) -> glm::uvec3;
 }  // namespace Shadowy::Utils
 
 #endif //HARDWAREPATHTRACER_UTILS_H
