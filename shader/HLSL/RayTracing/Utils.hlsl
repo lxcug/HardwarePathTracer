@@ -1,5 +1,7 @@
 #pragma once
 
+#define SHADOWY_SMALL_NUMBER 1e-6
+
 float max(float3 value) {
     return max(value.x, max(value.y, value.z));
 }
@@ -55,6 +57,12 @@ void GetCoordBasis(in float3 normal, out float3 tangent, out float3 bitangent) {
     tangent = cross(bitangent, z);
 }
 
+float3 LocalToWorld(in float3 normal, in float3 local_dir) {
+    float3 tangent, bitangent;
+    GetCoordBasis(normal, tangent, bitangent);
+    return local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * normal;
+}
+
 float3 UniformSampleHemisphere(in float rnd1, in float rnd2, in float3 normal) {
     float3 local_dir = UniformSampleHemisphere(rnd1, rnd2);
     float3 tangent, bitangent;
@@ -106,4 +114,83 @@ float4 CosineSampleHemisphere(in float2 rnd, in float3 normal) {
     float pdf = cos_theta / PI;
 
     return float4(dir_world, pdf);
+}
+
+float4 UniformSampleCone( float2 E, float CosThetaMax )
+{
+	float Phi = 2 * PI * E.x;
+	float CosTheta = lerp( CosThetaMax, 1, E.y );
+	float SinTheta = sqrt( 1 - CosTheta * CosTheta );
+
+	float3 L;
+	L.x = SinTheta * cos( Phi );
+	L.y = SinTheta * sin( Phi );
+	L.z = CosTheta;
+
+	float PDF = 1.0 / ( 2 * PI * (1 - CosThetaMax) );
+
+	return float4( L, PDF );
+}
+
+// Same as the function above, but uses SinThetaMax^2 as the parameter
+// so that the solid angle can be computed more accurately for very small angles
+// The caller is expected to ensure that SinThetaMax2 is <= 1
+float4 UniformSampleConeRobust(float2 E, float SinThetaMax2)
+{
+	float Phi = 2 * PI * E.x;
+	// The expression 1-sqrt(1-x) is susceptible to catastrophic cancelation.
+	// Instead, use a series expansion about 0 which is accurate within 10^-7
+	// and much more numerically stable.
+	float OneMinusCosThetaMax = SinThetaMax2 < 0.01 ? SinThetaMax2 * (0.5 + 0.125 * SinThetaMax2) : 1 - sqrt(1 - SinThetaMax2);
+
+	float CosTheta = 1 - OneMinusCosThetaMax * E.y;
+	float SinTheta = sqrt(1 - CosTheta * CosTheta);
+
+	float3 L;
+	L.x = SinTheta * cos(Phi);
+	L.y = SinTheta * sin(Phi);
+	L.z = CosTheta;
+	float PDF = 1.0 / (2 * PI * OneMinusCosThetaMax);
+
+	return float4(L, PDF);
+}
+
+float MISWeightRobust(float Pdf, float OtherPdf) {
+	// The straightforward implementation above is prone to numerical overflow and divisions by 0
+	// and does not work well with +inf inputs.
+
+	// We want this function to have the following properties:
+	//  0 <= w(a,b) <= 1 for all possible positive floats a and b (including 0 and +inf)
+	//  w(a, b) + w(b, a) == 1.0
+
+	// The formulation below is much more stable across the range of all possible inputs
+	// and guarantees the sum always adds up to 1.0.
+
+	if (Pdf == OtherPdf)
+	{
+		// Catch potential NaNs from (0,0) and (+inf, +inf)
+		return 0.5f;
+	}
+
+	// Evaluate the expression using the ratio of the smaller value to the bigger one for greater
+	// numerical stability. The math would also work using the ratio of bigger to smaller value,
+	// which would underflow less but would make the weights asymmetric. Underflow to 0 is not a
+	// bad property to have in rendering application as it ensures more weights are exactly 0
+	// which allows some evaluations to be skipped.
+	if (OtherPdf < Pdf)
+	{
+		float x = OtherPdf / Pdf;
+		return 1.0 / (1.0 + x * x);
+	}
+	else
+	{
+		// this form guarantees the weights add back up to one when arguments are swapped
+		float x = Pdf / OtherPdf;
+		return 1.0 - 1.0 / (1.0 + x * x);
+	}
+}
+
+float Luminance( float3 LinearColor )
+{
+	return dot( LinearColor, float3( 0.3, 0.59, 0.11 ) );
 }

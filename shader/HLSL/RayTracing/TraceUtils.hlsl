@@ -29,14 +29,17 @@ LightHitSample TraceDirectionalLight(in RayDesc ray, in Light light) {
     LightHitSample light_sample;
     light_sample.radiance = light.Intensity * light.Color;
 //     light_sample.pdf = TODO
-    light_sample.direction = -normalize(light.Direction);
+    light_sample.direction = -light.Direction;
     light_sample.hit_t = render_options.MaxTraceDistance;
 
     return light_sample;
 }
 
+float PointLightAttenuation(in Light light, in float distance2) {
+    return 1.f - min(distance2 / pow(light.Radius, 2), 1.f);
+}
+
 LightHitSample TracePointLight(in RayDesc ray, in Light light) {
-    float radius2 = light.Radius * light.Radius;
 //     float3 oc = ray.Origin - light.Position;
 //     float b = dot(oc, ray.Direction);
 //     float h = radius2 - dot(oc - b * ray.Direction, oc - b * ray.Direction);
@@ -46,8 +49,8 @@ LightHitSample TracePointLight(in RayDesc ray, in Light light) {
     float dis2 = dot(to_light, to_light);
     float3 radiance = float3(0.f, 0.f, 0.f);
 
-    float distance_attenuation = 1.f - min(dis2 / radius2, 1.f);
-    radiance = light.Intensity * light.Color * distance_attenuation;
+    float distance_attenuation = PointLightAttenuation(light, dis2);
+    radiance = light.Intensity * light.Color / (PI * pow(light.Radius, 2)) * distance_attenuation;
 
 
 //     if (h > 0) {

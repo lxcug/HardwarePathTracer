@@ -47,7 +47,7 @@ namespace Shadowy {
 
         CreatePostProcessPasses();
 
-        m_camera->SetCameraPosition(glm::vec3(0, 0, 17));
+        m_camera->SetCameraPosition(glm::vec3(0, 0, 20));
 //        m_camera->SetCameraPosition(glm::vec3(-600, 510, 40));
 //        m_camera->SetCameraRotation(-0.13, -1.41);
 //        m_camera->SetCameraRotation(-glm::radians(10.f), glm::radians(10.f));
@@ -493,7 +493,8 @@ namespace Shadowy {
                                                   reinterpret_cast<bool *>(&m_toneMappingPass->GetPassRenderOptions().EnableGammaCorrection));
             ShouldReAccumulate |= ImGui::Checkbox("Enable ToneMapping",
                                                   reinterpret_cast<bool *>(&m_toneMappingPass->GetPassRenderOptions().EnableToneMapping));
-            ShouldReAccumulate |= ImGui::InputFloat("Adapted Luminance", &m_toneMappingPass->GetPassRenderOptions().AdaptedLuminance);
+            ShouldReAccumulate |= ImGui::InputFloat("Adapted Luminance",
+                                                    &m_toneMappingPass->GetPassRenderOptions().AdaptedLuminance);
 
 
             ImGui::NewLine();
@@ -504,6 +505,8 @@ namespace Shadowy {
                                                   reinterpret_cast<bool *>(&m_PathTracingOptions.EnableAccumulation));
             ShouldReAccumulate |= ImGui::Checkbox("Enable Emissive",
                                                   reinterpret_cast<bool *>(&m_PathTracingOptions.EnableEmissive));
+            ShouldReAccumulate |= ImGui::Checkbox("Enable NEE",
+                                                  reinterpret_cast<bool *>(&m_PathTracingOptions.EnableNEE));
             ShouldReAccumulate |= ImGui::InputFloat("Min Ray Bias",
                                                     &m_PathTracingOptions.RayMinBias,
                                                     1e-3f);
@@ -905,9 +908,11 @@ namespace Shadowy {
 
         // TODO: Choose a default sky texture
         m_RTScene->CreateSkyTexture("../../asset/env/wildflower_field_4k.hdr");
-        m_RTScene->AddModel("../../asset/sponza/sponza.obj");
+//        m_RTScene->AddModel("../../asset/sponza/sponza.obj");
 //        m_RTScene->AddModel("../../asset/house_with_tree/house_with_tree.obj");
+//        m_RTScene->AddModel("../../asset/house_with_tree/house_with_tree_glossy.obj");
 //        m_RTScene->AddModel("../../asset/cornell_box/cornell_box.obj");
+        m_RTScene->AddModel("../../asset/cornell_box_glossy/cornell_box.obj");
         m_RTScene->AddLight(
                 glm::normalize(glm::vec3(.0f, -1.f, -.1f)),
                 LightType::Directional,
@@ -924,6 +929,18 @@ namespace Shadowy {
                 LightType::Point,
                 glm::vec3(1.f, 2.f, 2.f),
                 5.f,  // Radius
+                glm::vec3(1.f, 1.f, 1.f),
+                2.f,  // Intensity
+                0.f,
+                0.f,
+                0.f
+        );
+
+        m_RTScene->AddLight(
+                glm::vec3(0.f, 0.f, 0.f),
+                LightType::Point,
+                glm::vec3(0.f, 1.f, 2.5f),
+                4.f,  // Radius
                 glm::vec3(1.f, 1.f, 1.f),
                 2.f,  // Intensity
                 0.f,

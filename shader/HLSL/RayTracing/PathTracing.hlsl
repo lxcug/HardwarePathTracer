@@ -2,6 +2,7 @@
 
 #include "Utils.hlsl"
 #include "MaterialSampling.hlsl"
+#include "LightSampling.hlsl"
 
 
 struct PathTracingPayload {
@@ -26,7 +27,7 @@ struct PathTracingPayload {
 void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, out PathTracingPayload pt_payload) {
     RayDesc ray;
     ray.Origin = origin;
-    ray.Direction = direction;
+    ray.Direction = normalize(direction);
     ray.TMin = render_options.RayMinBias;
     ray.TMax = render_options.MaxTraceDistance;
     pt_payload.hit_t = -1.f;
@@ -36,6 +37,9 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
     float3 path_throughput = float3(1.f, 1.f, 1.f);
     float3 first_pos, first_normal;
     RayPayload payload;
+
+    float light_pick_cdf[64];
+    // i = 0 NEE will do one bounce lighting, since i < render_options.Bounce
     for (int i = 0; i < render_options.Bounce; i++) {
         bool is_camera_ray = i == 0;
         bool is_last_bounce = (i == render_options.Bounce);
@@ -60,14 +64,57 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
             radiance += path_throughput * payload.emissive * payload.opacity;
         }
 
+        float4 random_sample = rnd4(seed);
+
+        if (render_options.EnableNEE && render_options.NumLights > 0) {
+            float light_pick_cdf_sum = 0.f;
+            float3 pos = payload.pos;
+            float3 normal = payload.normal;
+
+            for (int idx = 0; idx < render_options.NumLights; idx++) {
+                Light light = Lights[idx];
+                light_pick_cdf_sum += EstimateLight(light, pos, normal);
+                light_pick_cdf[idx] = light_pick_cdf_sum;
+            }
+
+            if (light_pick_cdf_sum > 0.f) {
+                uint selected_light_index;
+                float selected_light_pdf;
+                SelectLight(random_sample.x * light_pick_cdf_sum, light_pick_cdf, selected_light_index, selected_light_pdf);
+                selected_light_pdf /= light_pick_cdf_sum;
+
+                Light selected_light = Lights[selected_light_index];
+                LightSample light_sample = SampleLight(selected_light, random_sample.yz, pos, normal);
+                light_sample.radiance_over_pdf /= selected_light_pdf;
+                light_sample.pdf *= selected_light_pdf;
+
+                if (light_sample.pdf > 0.f) {
+                    RayDesc light_ray;
+                    light_ray.Origin = pos;
+                    light_ray.Direction = light_sample.direction;
+                    light_ray.TMin = render_options.RayMinBias;
+                    light_ray.TMax = light_sample.distance;
+
+                    light_sample.radiance_over_pdf *= TraceVisibilityRay(light_ray);
+                }
+
+                if (any(light_sample.radiance_over_pdf) > 0.f) {
+                    MaterialEval material_eval = EvalMaterial(-ray.Direction, light_sample.direction, payload);
+                    float3 light_contrib = path_throughput * light_sample.radiance_over_pdf * material_eval.weight * material_eval.pdf;
+//                     light_contrib *= MISWeightRobust(light_sample.pdf, material_eval.pdf);
+                    radiance += light_contrib;
+                }
+            }
+        }
+
         // Sample Material
-        MaterialSample material_sample = SampleMaterial(payload, rnd4(seed));
-        if (material_sample.pdf < 1e-3f || asuint(material_sample.pdf) > 0x7f800000) {
+        MaterialSample material_sample = SampleMaterial(ray.Direction, payload, random_sample);
+        if (material_sample.pdf < SHADOWY_SMALL_NUMBER || asuint(material_sample.pdf) > 0x7f800000) {
             break;
         }
 
         // Update PathThroughput and Russian Roulette
-        float3 next_path_throughput = path_throughput * material_sample.weight;  // TODO: Sample Material
+        float3 next_path_throughput = path_throughput * material_sample.weight;
         // Russian Roulette reference UnrealEngine, TODO: Use EARS or MARS to further improve quality
         float continue_prob = sqrt(max(next_path_throughput) / max(path_throughput));
         if (continue_prob < 1.f) {
@@ -83,26 +130,22 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
         ray.Origin = payload.pos;
         ray.Direction = material_sample.direction;
 
-        // Only Sample Material Now, TODO: MIS
-        for (uint idx = 0; idx < render_options.NumLights; idx++) {
-            Light light = Lights[idx];
+        if (!render_options.EnableNEE) {
+            for (uint idx = 0; idx < render_options.NumLights; idx++) {
+                Light light = Lights[idx];
 
-            LightHitSample hit_sample = TraceLight(ray, light);
-            float3 light_contrib = hit_sample.radiance;
-            if (any(light_contrib) > 0.f) {
-                RayDesc light_ray = ray;
-                light_ray.Direction = hit_sample.direction;
-                light_ray.TMax = hit_sample.hit_t;
+                LightHitSample hit_sample = TraceLight(ray, light);
+                float3 light_contrib = hit_sample.radiance;
+                if (any(light_contrib) > 0.f) {
+                    RayDesc light_ray = ray;
+                    light_ray.Direction = hit_sample.direction;
+                    light_ray.TMax = hit_sample.hit_t;
 
-                light_contrib *= TraceVisibilityRay(light_ray);
+                    light_contrib *= TraceVisibilityRay(light_ray);
 
-                /*
-                 * Only use sample material now,
-                 * iterate all lights, and path_throughput / PI = brdf
-                 * the following code = \sum brdf * radiance * cos
-                 * TODO: sample light + material and MIS
-                 */
-                radiance += path_throughput / PI * light_contrib * dot(payload.normal, hit_sample.direction);
+                    // Not physically correct, but result is fine.... TODO: Use NEE and MIS
+                    radiance += path_throughput * light_contrib * max(dot(payload.normal, hit_sample.direction), 0.f);
+                }
             }
         }
     }

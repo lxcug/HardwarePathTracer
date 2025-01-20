@@ -33,9 +33,8 @@ Control the scene lights in the UI panel.
 ## Features
 
 * RayTracing AO
-
-* Path Tracing Diffuse Material
-
+* Path Tracing Microfacet Material
+* Next Event Estimation
 * PostProcess: ToneMapping
 
 ## Dev Log
@@ -118,6 +117,7 @@ Control the scene lights in the UI panel.
 > 2025.1.20
 >
 > * Separate RenderOptions for each pass as push constants
->
 > * Uncharted and ACES Tone Mapping(fixed sky texture isn't init with SRGB Format)
 >   ![](imgs/w_o_ToneMapping.png)
+> * Microfacet Material + Next Event Estimation
+>   ![](imgs/Microfacet.png)
