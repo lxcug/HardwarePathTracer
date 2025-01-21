@@ -73,7 +73,7 @@ float GGX_PDF(float3 H, float3 N, float roughness)
     float NdotH = max(dot(N, H), 0.0f);
     float D = GGX_D(H, N, roughness);
 
-    return D / (4.0f * NdotH);
+    return max(D / (4.0f * NdotH), SHADOWY_SMALL_NUMBER);
 }
 
 float BRDF_PDF(float3 V, float3 L, float3 N, float roughness, float F0)

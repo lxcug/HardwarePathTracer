@@ -205,6 +205,7 @@ namespace Shadowy {
     void Scene::FinalizeScene() {
         CreateAccel();
         CreateModelDescBuffer();
+        AppendSkyLightToSceneLights();
         CreateSceneLightsBuffer();
         if (m_sceneModelTextures.empty()) {
             m_sceneModelTextures.emplace_back(
@@ -233,5 +234,22 @@ namespace Shadowy {
         m_sceneModelTextures.clear();
         s_instanceIDCounter = 0;
         Shadowy::ASBuilder::OnRebuildAccel();
+    }
+
+    void Scene::AppendSkyLightToSceneLights() {
+        if (m_skyTexture) {
+            Light SkyLight{
+                    glm::vec3(0.f, 0.f, 0.f),
+                    LightType::Sky,
+                    glm::vec3(0.f, 0.f, 0.f),
+                    0.f,
+                    float3(1.f, 1.f, 1.f),
+                    1.f,
+                    0.f,
+                    0.f,
+                    0.f
+            };
+            m_sceneLights.push_back(SkyLight);
+        }
     }
 } // namespace Shadowy

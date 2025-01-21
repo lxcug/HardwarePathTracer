@@ -57,6 +57,8 @@ namespace Shadowy {
 
         void CreateAccel();
 
+        void AppendSkyLightToSceneLights();
+
         auto GetAccelBuilder() -> std::shared_ptr<ASBuilder> & {
             return m_accelBuilder;
         }

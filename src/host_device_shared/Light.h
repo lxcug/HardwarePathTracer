@@ -16,6 +16,7 @@ BEGIN_HWPT_NAMESPACE
         Point,
         Spot,
         Rect,
+        Sky,
         LightTypeMax = 0x7fffffff
     };
 
@@ -31,7 +32,8 @@ BEGIN_HWPT_NAMESPACE
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float3, Color, float3(1.f, 0.f, 0.f));
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, Intensity, 1.f);
 
-        float AngleSizeOrInvRange;
+        // For directional light, half angle is 2\degree
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, HalfSinAngleOrRange, 0.0349);
         float InnerAngle;
         float OuterAngle;
         int Padding;

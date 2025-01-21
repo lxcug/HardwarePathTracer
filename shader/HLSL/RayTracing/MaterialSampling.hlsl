@@ -43,14 +43,16 @@ MaterialSample SampleMaterial(in float3 ray_direction, in RayPayload payload, in
 
 struct MaterialEval
 {
-	float3 weight;  // brdf * cos for NEE
+	float3 weight;  // brdf * cos / pdf
 	float pdf;
 };
 
 MaterialEval EvalMaterial(in float3 V, in float3 L, in RayPayload payload) {
     MaterialEval mat_eval;
+    static float specular_threshold = 1e-3f;
     static float roughness_threshold = .999f;
     float roughness = payload.roughness;
+
     if (roughness < roughness_threshold) {
         const float F0 = 0.04f;
         mat_eval.pdf = BRDF_PDF(V, L, payload.normal, roughness, F0);

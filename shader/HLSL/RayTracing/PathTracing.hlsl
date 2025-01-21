@@ -38,6 +38,9 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
     float3 first_pos, first_normal;
     RayPayload payload;
 
+    bool use_MIS = render_options.MISMode == 2;
+    bool b_sample_light = render_options.MISMode == 0;
+    bool b_sample_material = render_options.MISMode == 1;
     float light_pick_cdf[64];
     // i = 0 NEE will do one bounce lighting, since i < render_options.Bounce
     for (int i = 0; i < render_options.Bounce; i++) {
@@ -48,7 +51,7 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
 
         if (payload.is_miss()) {
             // TODO
-            if (render_options.EnableSkyLight || is_camera_ray) {
+            if (render_options.EnableSkyLight && is_camera_ray) {
                 radiance += path_throughput * sample_sky_texture(-ray.Direction);
             }
             break;
@@ -66,8 +69,8 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
 
         float4 random_sample = rnd4(seed);
 
-        if (render_options.EnableNEE && render_options.NumLights > 0) {
-            float light_pick_cdf_sum = 0.f;
+        float light_pick_cdf_sum = 0.f;
+        if ((b_sample_light || use_MIS) && render_options.NumLights > 0) {
             float3 pos = payload.pos;
             float3 normal = payload.normal;
 
@@ -101,7 +104,9 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
                 if (any(light_sample.radiance_over_pdf) > 0.f) {
                     MaterialEval material_eval = EvalMaterial(-ray.Direction, light_sample.direction, payload);
                     float3 light_contrib = path_throughput * light_sample.radiance_over_pdf * material_eval.weight * material_eval.pdf;
-//                     light_contrib *= MISWeightRobust(light_sample.pdf, material_eval.pdf);
+                    if (use_MIS) {
+                        light_contrib *= MISWeightRobust(light_sample.pdf, material_eval.pdf);
+                    }
                     radiance += light_contrib;
                 }
             }
@@ -129,23 +134,29 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
         // Update Ray
         ray.Origin = payload.pos;
         ray.Direction = material_sample.direction;
+        ray.TMin = render_options.RayMinBias;
+        ray.TMax = render_options.MaxTraceDistance;
 
-        if (!render_options.EnableNEE) {
+        if (b_sample_material || use_MIS) {
             for (uint idx = 0; idx < render_options.NumLights; idx++) {
                 Light light = Lights[idx];
-
                 LightHitSample hit_sample = TraceLight(ray, light);
-                float3 light_contrib = hit_sample.radiance;
-                if (any(light_contrib) > 0.f) {
-                    RayDesc light_ray = ray;
-                    light_ray.Direction = hit_sample.direction;
-                    light_ray.TMax = hit_sample.hit_t;
-
-                    light_contrib *= TraceVisibilityRay(light_ray);
-
-                    // Not physically correct, but result is fine.... TODO: Use NEE and MIS
-                    radiance += path_throughput * light_contrib * max(dot(payload.normal, hit_sample.direction), 0.f);
+                if (hit_sample.is_miss()) {
+                    continue;
                 }
+                float3 light_contrib = path_throughput * hit_sample.radiance;
+
+                RayDesc light_ray = ray;
+                light_ray.TMax = hit_sample.hit_t;
+                light_contrib *= TraceVisibilityRay(light_ray);
+
+                if (use_MIS && light_pick_cdf_sum > 0.f) {
+                    float prev_cdf = idx > 0 ? light_pick_cdf[idx - 1] : 0.0;
+                    float light_pick_pdf = (light_pick_cdf[idx] - prev_cdf) / light_pick_cdf_sum;
+                    light_contrib *= MISWeightRobust(material_sample.pdf, hit_sample.pdf * light_pick_pdf);
+                }
+
+                radiance += light_contrib;
             }
         }
     }
@@ -168,23 +179,3 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
     pt_payload.radiance = radiance * ao;
     pt_payload.ao = ao;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

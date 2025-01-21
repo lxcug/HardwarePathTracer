@@ -1,7 +1,7 @@
-# Blender 4.3.2 MTL File: 'None'
+# Blender 4.3.2 MTL File: 'house_with_tree.blend'
 # www.blender.org
 
-newmtl Bark___0.jpg
+newmtl Bark___0.jpg.002
 Ks 0.500000 0.500000 0.500000
 Ke 0.000000 0.000000 0.000000
 Ni 1.450000
@@ -14,9 +14,9 @@ Pc 0.000000
 Pcr 0.030000
 aniso 0.000000
 anisor 0.000000
-map_Kd Texture/Bark___0.jpg
+map_Kd F:/ShadowyRenderer/asset/tree/Texture/Bark___0.jpg
 
-newmtl Bark___0.jpg.001
+newmtl Bark___0.jpg.003
 Ks 0.500000 0.500000 0.500000
 Ke 0.000000 0.000000 0.000000
 Ni 1.450000
@@ -29,16 +29,16 @@ Pc 0.000000
 Pcr 0.030000
 aniso 0.000000
 anisor 0.000000
-map_Kd Texture/Bark___0.jpg
+map_Kd F:/HardwarePathTracer/asset/tree/Texture/Bark___0.jpg
 
-newmtl 材质
-Kd 0.132374 0.731467 0.801826
+newmtl 材质.004
+Kd 0.802227 0.757599 0.757599
 Ks 0.500000 0.500000 0.500000
-Ke 0.000000 0.613091 1.000000
+Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-Pr 1.000000
+Pr 0.500000
 Pm 0.000000
 Ps 0.000000
 Pc 0.000000
@@ -46,14 +46,14 @@ Pcr 0.030000
 aniso 0.000000
 anisor 0.000000
 
-newmtl 材质.001
+newmtl 材质.005
 Kd 0.800000 0.800000 0.800000
 Ks 0.500000 0.500000 0.500000
 Ke 0.000000 0.000000 0.000000
 Ni 1.500000
 d 1.000000
 illum 2
-Pr 0.300000
+Pr 0.000000
 Pm 0.000000
 Ps 0.000000
 Pc 0.000000
@@ -61,23 +61,8 @@ Pcr 0.030000
 aniso 0.000000
 anisor 0.000000
 
-newmtl 材质.002
+newmtl 材质.006
 Kd 0.596078 0.580392 0.580392
-Ks 0.500000 0.500000 0.500000
-Ke 0.000000 0.000000 0.000000
-Ni 1.500000
-d 1.000000
-illum 2
-Pr 1.000000
-Pm 0.000000
-Ps 0.000000
-Pc 0.000000
-Pcr 0.030000
-aniso 0.000000
-anisor 0.000000
-
-newmtl 材质.003
-Kd 0.802227 0.757599 0.757599
 Ks 0.500000 0.500000 0.500000
 Ke 0.000000 0.000000 0.000000
 Ni 1.500000
