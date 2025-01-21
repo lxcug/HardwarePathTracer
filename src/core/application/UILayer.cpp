@@ -194,20 +194,30 @@ namespace Shadowy {
                                            150.f, 0.f, 1.f);
                 UILayer::DrawInputFloatControl("Intensity", Light.Intensity, 0.f,
                                                ValueChangedSignal, 150.f, 1.f);
+                UILayer::DrawSlideFloatControl("Half Sin Angle", Light.HalfSinAngleOrRange, 0.f,
+                                               ValueChangedSignal, 150.f, 0.f, 0.1f, "%.3f");
             } else if (Light.Type == LightType::Point) {
                 ImGui::Text("Type: Point");
                 UILayer::DrawFloat3Control("Position", Light.Position, 0.f,
                                            ValueChangedSignal);
-                UILayer::DrawInputFloatControl("Radius", Light.Radius, 2.f,
-                                               ValueChangedSignal, 150.f, .5f, "%.1f");
+                UILayer::DrawInputFloatControl("Range", Light.HalfSinAngleOrRange, 5.f,
+                                               ValueChangedSignal, 150.f, 1.f, "%.1f");
                 UILayer::DrawFloat3Control("Color", Light.Color, 1.f, ValueChangedSignal,
                                            150.f, 0.f, 1.f);
                 UILayer::DrawInputFloatControl("Intensity", Light.Intensity, 0.f,
                                                ValueChangedSignal, 150.f, 1.f, "%.1f");
+                UILayer::DrawSlideFloatControl("Physical Radius", Light.Radius, 0.f,
+                                               ValueChangedSignal, 150.f, 1e-6f, 1.f, "%.1f");
             } else if (Light.Type == LightType::Spot) {
 
             } else if (Light.Type == LightType::Rect) {
 
+            } else if (Light.Type == LightType::Sky) {
+                ImGui::Text("Type: Sky");
+                UILayer::DrawFloat3Control("Color", Light.Color, 1.f, ValueChangedSignal,
+                                           150.f, 0.f, 1.f);
+                UILayer::DrawInputFloatControl("Intensity", Light.Intensity, 0.f,
+                                               ValueChangedSignal, 150.f, 1.f, "%.1f");
             }
         }
         ImGui::PopID();

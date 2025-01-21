@@ -121,3 +121,10 @@ Control the scene lights in the UI panel.
 >   ![](imgs/w_o_ToneMapping.png)
 > * Microfacet Material + Next Event Estimation
 >   ![](imgs/Microfacet.png)
+
+
+
+> 2025.1.21
+>
+> * Multi Importance Sampling
+>   ![](imgs/MIS.png)

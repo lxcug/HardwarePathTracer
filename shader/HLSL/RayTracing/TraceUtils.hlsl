@@ -14,7 +14,6 @@ float TraceVisibilityRay(in RayDesc ray) {
 struct LightHitSample {
     float3 radiance;
     float pdf;
-    float3 direction;
     float hit_t;
 
     bool is_hit() {
@@ -26,44 +25,68 @@ struct LightHitSample {
 };
 
 LightHitSample TraceDirectionalLight(in RayDesc ray, in Light light) {
-    LightHitSample light_sample;
-    light_sample.radiance = light.Intensity * light.Color;
-//     light_sample.pdf = TODO
-    light_sample.direction = -light.Direction;
-    light_sample.hit_t = render_options.MaxTraceDistance;
+    if (ray.TMax >= render_options.MaxTraceDistance) {
+        float sin_theta_max = 0.035;
+        float sin_theta_max2 = pow(sin_theta_max, 2);
+        float one_minus_cos_theta_max = sin_theta_max2 < 1e-2f ? sin_theta_max2 * (.5f + .125f * sin_theta_max2) : 1 - sqrt(1 - sin_theta_max2);
+        float cos_theta = saturate(dot(ray.Direction, normalize(-light.Direction)));
 
-    return light_sample;
+        // If the ray intersect the directional light cone
+        if (1 - cos_theta < one_minus_cos_theta_max) {
+            LightHitSample light_sample;
+            light_sample.radiance = light.Intensity * light.Color;
+            light_sample.hit_t = render_options.MaxTraceDistance;
+            float solid_angle = 2 * PI * one_minus_cos_theta_max;
+            light_sample.pdf = 1.f / solid_angle;
+
+            return light_sample;
+        }
+    }
+
+    return (LightHitSample)0;
 }
 
 float PointLightAttenuation(in Light light, in float distance2) {
-    return 1.f - min(distance2 / pow(light.Radius, 2), 1.f);
+    return 1.f - min(distance2 / pow(light.HalfSinAngleOrRange, 2), 1.f);
 }
 
 LightHitSample TracePointLight(in RayDesc ray, in Light light) {
-//     float3 oc = ray.Origin - light.Position;
-//     float b = dot(oc, ray.Direction);
-//     float h = radius2 - dot(oc - b * ray.Direction, oc - b * ray.Direction);
+    float radius = light.Radius;
+    if (radius == 0.f) {
+        return (LightHitSample)0;
+    }
 
-    float3 to_light = light.Position - ray.Origin;
+    float radius2 = pow(radius, 2);
+    float3 oc = ray.Origin - light.Position;
+    float b = dot(oc, ray.Direction);
+    float h = radius2 - length(oc - b * ray.Direction);
 
-    float dis2 = dot(to_light, to_light);
-    float3 radiance = float3(0.f, 0.f, 0.f);
+    if (h > 0.f) {
+        float t = -b - sqrt(h);
+        if (t > ray.TMin && t < ray.TMax) {
+            LightHitSample hit_sample;
+            float dis2 = dot(oc, oc);
+            float3 power = light.Color * light.Intensity / (PI * radius2);
+            float attenuation = PointLightAttenuation(light, dis2);
+            hit_sample.radiance = power * attenuation;
+            hit_sample.hit_t = t;
 
-    float distance_attenuation = PointLightAttenuation(light, dis2);
-    radiance = light.Intensity * light.Color / (PI * pow(light.Radius, 2)) * distance_attenuation;
+            float sin_theta_max2 = saturate(radius2 / dis2);
+            float one_minus_cos_theta_max = sin_theta_max2 < 1e-2f ? sin_theta_max2 * (.5f + .125f * sin_theta_max2) : 1 - sqrt(1 - sin_theta_max2);
+            float solid_angle = 2 * PI * one_minus_cos_theta_max;
+            hit_sample.pdf = 1.f / solid_angle;
 
+            return hit_sample;
+        }
+    }
+    return (LightHitSample)0;
+}
 
-//     if (h > 0) {
-//         float t = -b - sqrt(h);
-//         if (t > ray.TMin && t < ray.TMax) {  // TODO: Check this
-
-//         }
-//     }
-
+LightHitSample TraceSkyLight(in RayDesc ray, in Light light) {
     LightHitSample hit_sample;
-    hit_sample.radiance = radiance;
-    hit_sample.direction = normalize(to_light);
-    hit_sample.hit_t = length(to_light);
+    hit_sample.pdf = 1 / (4 * PI);
+    hit_sample.radiance = light.Intensity * sample_sky_texture(-ray.Direction);
+    hit_sample.hit_t = render_options.MaxTraceDistance;
 
     return hit_sample;
 }
@@ -74,6 +97,8 @@ LightHitSample TraceLight(in RayDesc ray, in Light light) {
             return TraceDirectionalLight(ray, light);
         case LightType::Point:
             return TracePointLight(ray, light);
+        case LightType::Sky:
+            return TraceSkyLight(ray, light);
         default:
             return (LightHitSample)0;
     }

@@ -116,6 +116,22 @@ float4 CosineSampleHemisphere(in float2 rnd, in float3 normal) {
     return float4(dir_world, pdf);
 }
 
+float4 UniformSampleSphere(float2 E)
+{
+	float Phi = 2 * PI * E.x;
+	float CosTheta = 1 - 2 * E.y;
+	float SinTheta = sqrt( 1 - CosTheta * CosTheta );
+
+	float3 H;
+	H.x = SinTheta * cos( Phi );
+	H.y = SinTheta * sin( Phi );
+	H.z = CosTheta;
+
+	float PDF = 1.0 / (4 * PI);
+
+	return float4( H, PDF );
+}
+
 float4 UniformSampleCone( float2 E, float CosThetaMax )
 {
 	float Phi = 2 * PI * E.x;
@@ -194,3 +210,35 @@ float Luminance( float3 LinearColor )
 {
 	return dot( LinearColor, float3( 0.3, 0.59, 0.11 ) );
 }
+
+float2 InverseEquiAreaSphericalMapping(float3 Direction)
+{
+	float3 AbsDir = abs(Direction);
+	float R = sqrt(1 - AbsDir.z);
+	float Epsilon = 5.42101086243e-20; // 2^-64 (this avoids 0/0 without changing the rest of the mapping)
+	float x = min(AbsDir.x, AbsDir.y) / (max(AbsDir.x, AbsDir.y) + Epsilon);
+
+	// Coefficients for 6th degree minimax approximation of atan(x)*2/pi, x=[0,1].
+	const float t1 = 0.406758566246788489601959989e-5f;
+	const float t2 = 0.636226545274016134946890922156f;
+	const float t3 = 0.61572017898280213493197203466e-2f;
+	const float t4 = -0.247333733281268944196501420480f;
+	const float t5 = 0.881770664775316294736387951347e-1f;
+	const float t6 = 0.419038818029165735901852432784e-1f;
+	const float t7 = -0.251390972343483509333252996350e-1f;
+
+	// Polynomial approximation of atan(x)*2/pi
+	float Phi = t6 + t7 * x;
+	Phi = t5 + Phi * x;
+	Phi = t4 + Phi * x;
+	Phi = t3 + Phi * x;
+	Phi = t2 + Phi * x;
+	Phi = t1 + Phi * x;
+
+	Phi = (AbsDir.x < AbsDir.y) ? 1 - Phi : Phi;
+	float2 UV = float2(R - Phi * R, Phi * R);
+	UV = (Direction.z < 0) ? 1 - UV.yx : UV;
+	UV = asfloat(asuint(UV) ^ (asuint(Direction.xy) & 0x80000000u));
+	return UV * 0.5 + 0.5;
+}
+

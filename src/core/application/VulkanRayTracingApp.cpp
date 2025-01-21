@@ -505,8 +505,24 @@ namespace Shadowy {
                                                   reinterpret_cast<bool *>(&m_PathTracingOptions.EnableAccumulation));
             ShouldReAccumulate |= ImGui::Checkbox("Enable Emissive",
                                                   reinterpret_cast<bool *>(&m_PathTracingOptions.EnableEmissive));
-            ShouldReAccumulate |= ImGui::Checkbox("Enable NEE",
-                                                  reinterpret_cast<bool *>(&m_PathTracingOptions.EnableNEE));
+            ShouldReAccumulate |= ImGui::InputInt("MIS Model", &m_PathTracingOptions.MISMode);
+            static std::array<const char *, 3> items = {"Sample Light Only",
+                                                        "Sample Material Only", "MIS"};
+            static int item_current_idx = 2;
+            if (ImGui::BeginCombo("Sample Mode", items[item_current_idx])) {
+                for (int n = 0; n < items.size(); n++) {
+                    const bool is_selected = (item_current_idx == n);
+                    if (ImGui::Selectable(items[n], is_selected)) {
+                        ShouldReAccumulate = true;
+                        item_current_idx = n;
+                    }
+                    if (is_selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            m_PathTracingOptions.MISMode = item_current_idx;
             ShouldReAccumulate |= ImGui::InputFloat("Min Ray Bias",
                                                     &m_PathTracingOptions.RayMinBias,
                                                     1e-3f);
@@ -591,6 +607,10 @@ namespace Shadowy {
             UILayer::DrawLights(m_RTScene->GetSceneLights(), &ShouldUpdateLight);
             if (ShouldUpdateLight) {
                 m_deferredOperations.emplace_back([this]() {
+                    // NOTE: normalize direction on cpu
+                    for (auto& light : m_RTScene->GetSceneLights()) {
+                        light.Direction = glm::normalize(light.Direction);
+                    }
                     ResetFrameNum();
                     m_RTScene->CreateSceneLightsBuffer();
                     m_RTScene->UpdateModelDescDescriptorSets();
@@ -920,7 +940,7 @@ namespace Shadowy {
                 0.f,
                 glm::vec3(1.f, 1.f, 1.f),
                 2.f * 3.1415926f,
-                0.f,
+                0.0349f,
                 0.f,
                 0.f
         );
@@ -928,25 +948,25 @@ namespace Shadowy {
                 glm::vec3(0.f, 0.f, 0.f),
                 LightType::Point,
                 glm::vec3(1.f, 2.f, 2.f),
-                5.f,  // Radius
+                1.f,  // Physical Radius
                 glm::vec3(1.f, 1.f, 1.f),
-                2.f,  // Intensity
-                0.f,
+                10.f,  // Intensity
+                5.f,  // Range
                 0.f,
                 0.f
         );
 
-        m_RTScene->AddLight(
-                glm::vec3(0.f, 0.f, 0.f),
-                LightType::Point,
-                glm::vec3(0.f, 1.f, 2.5f),
-                4.f,  // Radius
-                glm::vec3(1.f, 1.f, 1.f),
-                2.f,  // Intensity
-                0.f,
-                0.f,
-                0.f
-        );
+//        m_RTScene->AddLight(
+//                glm::vec3(0.f, 0.f, 0.f),
+//                LightType::Point,
+//                glm::vec3(0.f, 1.f, 2.5f),
+//                0.f,  // Ideal Point Light
+//                glm::vec3(1.f, 1.f, 1.f),
+//                10.f,  // Intensity
+//                5.f,
+//                0.f,
+//                0.f
+//        );
 
         m_RTScene->FinalizeScene();
     }
