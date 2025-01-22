@@ -23,6 +23,11 @@ struct PathTracingPayload {
     }
 };
 
+struct TraceMaterialState {
+    float3 radiance;
+    LightType light_type;
+    float distance;
+};
 
 void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, out PathTracingPayload pt_payload) {
     RayDesc ray;
@@ -42,15 +47,33 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
     bool b_sample_light = render_options.MISMode == 0;
     bool b_sample_material = render_options.MISMode == 1;
     float light_pick_cdf[64];
-    // i = 0 NEE will do one bounce lighting, since i < render_options.Bounce
+    TraceMaterialState trace_material_state[64];
+    uint valid_num_trace_light_state = 0;
+
     for (int i = 0; i < render_options.Bounce; i++) {
         bool is_camera_ray = i == 0;
         bool is_last_bounce = (i == render_options.Bounce);
 
         TraceRay(TLAS, RAY_FLAG_NONE, 0xff, 0, 0, 0, ray, payload);
 
+        if (render_options.DeferredTraceMaterial) {
+            for (int idx = 0; idx < valid_num_trace_light_state; idx++) {
+                TraceMaterialState curr_state = trace_material_state[idx];
+                if (curr_state.light_type == LightType::Sky || curr_state.light_type == LightType::Directional) {
+                    if (payload.is_miss()) {
+                        radiance += curr_state.radiance;
+                    }
+                } else {
+                    if (payload.hit_t > curr_state.distance) {
+                        radiance += curr_state.radiance;
+                    }
+                }
+            }
+            valid_num_trace_light_state = 0;
+        }
+
         if (payload.is_miss()) {
-            // TODO
+            // For Displaying SkyTexture
             if (render_options.EnableSkyLight && is_camera_ray) {
                 radiance += path_throughput * sample_sky_texture(-ray.Direction);
             }
@@ -137,7 +160,7 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
         ray.TMin = render_options.RayMinBias;
         ray.TMax = render_options.MaxTraceDistance;
 
-        if (b_sample_material || use_MIS) {
+        if ((b_sample_material || use_MIS) && render_options.NumLights > 0) {
             for (uint idx = 0; idx < render_options.NumLights; idx++) {
                 Light light = Lights[idx];
                 LightHitSample hit_sample = TraceLight(ray, light);
@@ -146,17 +169,24 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
                 }
                 float3 light_contrib = path_throughput * hit_sample.radiance;
 
-                RayDesc light_ray = ray;
-                light_ray.TMax = hit_sample.hit_t;
-                light_contrib *= TraceVisibilityRay(light_ray);
-
                 if (use_MIS && light_pick_cdf_sum > 0.f) {
                     float prev_cdf = idx > 0 ? light_pick_cdf[idx - 1] : 0.0;
                     float light_pick_pdf = (light_pick_cdf[idx] - prev_cdf) / light_pick_cdf_sum;
                     light_contrib *= MISWeightRobust(material_sample.pdf, hit_sample.pdf * light_pick_pdf);
                 }
 
-                radiance += light_contrib;
+                if (render_options.DeferredTraceMaterial) {
+                    TraceMaterialState curr_state;
+                    curr_state.radiance = light_contrib;
+                    curr_state.light_type = light.Type;
+                    curr_state.distance = hit_sample.hit_t;
+                    trace_material_state[valid_num_trace_light_state++] = curr_state;
+                } else {
+                    RayDesc light_ray = ray;
+                    light_ray.TMax = hit_sample.hit_t;
+                    light_contrib *= TraceVisibilityRay(light_ray);
+                    radiance += light_contrib;
+                }
             }
         }
     }

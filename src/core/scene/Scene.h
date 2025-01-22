@@ -107,8 +107,6 @@ namespace Shadowy {
             m_skyTexture = std::make_shared<Texture2D>(Path, 1, false, true);
         }
 
-        void ReloadObj(const std::filesystem::path &ObjPath);
-
     private:
         std::shared_ptr<ASBuilder> m_accelBuilder;
         std::vector<std::shared_ptr<Model>> m_models;
