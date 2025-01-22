@@ -505,6 +505,8 @@ namespace Shadowy {
                                                   reinterpret_cast<bool *>(&m_PathTracingOptions.EnableAccumulation));
             ShouldReAccumulate |= ImGui::Checkbox("Enable Emissive",
                                                   reinterpret_cast<bool *>(&m_PathTracingOptions.EnableEmissive));
+            ShouldReAccumulate |= ImGui::Checkbox("Deferred Trace Light",
+                                                  reinterpret_cast<bool *>(&m_PathTracingOptions.DeferredTraceMaterial));
             ShouldReAccumulate |= ImGui::InputInt("MIS Model", &m_PathTracingOptions.MISMode);
             static std::array<const char *, 3> items = {"Sample Light Only",
                                                         "Sample Material Only", "MIS"};
@@ -607,10 +609,6 @@ namespace Shadowy {
             UILayer::DrawLights(m_RTScene->GetSceneLights(), &ShouldUpdateLight);
             if (ShouldUpdateLight) {
                 m_deferredOperations.emplace_back([this]() {
-                    // NOTE: normalize direction on cpu
-                    for (auto& light : m_RTScene->GetSceneLights()) {
-                        light.Direction = glm::normalize(light.Direction);
-                    }
                     ResetFrameNum();
                     m_RTScene->CreateSceneLightsBuffer();
                     m_RTScene->UpdateModelDescDescriptorSets();

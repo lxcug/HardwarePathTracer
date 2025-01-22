@@ -189,6 +189,9 @@ namespace Shadowy {
 
     void Scene::CreateSceneLightsBuffer() {
         if (!m_sceneLights.empty()) {
+            for (auto& Light : m_sceneLights) {
+                Light.Direction = glm::normalize(Light.Direction);
+            }
             m_sceneLightsBuffer = std::make_shared<ArbitraryBuffer>(
                     sizeof(Light) * m_sceneLights.size(),
                     m_sceneLights.data(),
@@ -205,7 +208,7 @@ namespace Shadowy {
     void Scene::FinalizeScene() {
         CreateAccel();
         CreateModelDescBuffer();
-        AppendSkyLightToSceneLights();
+        AppendSkyLightToSceneLights();  // TODO: Reload Scene will create two SkyLightItem in Buffer
         CreateSceneLightsBuffer();
         if (m_sceneModelTextures.empty()) {
             m_sceneModelTextures.emplace_back(

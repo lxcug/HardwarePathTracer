@@ -22,6 +22,7 @@ BEGIN_HWPT_NAMESPACE
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableSkyLight, 1);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableEmissive, 0);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, MISMode, 2);  // 0 for NEE 1 for sample material 2 for MIS
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, DeferredTraceMaterial, 1);
     };
 
     struct ToneMappingOptions {

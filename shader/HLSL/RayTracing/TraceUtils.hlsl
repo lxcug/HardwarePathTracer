@@ -26,7 +26,7 @@ struct LightHitSample {
 
 LightHitSample TraceDirectionalLight(in RayDesc ray, in Light light) {
     if (ray.TMax >= render_options.MaxTraceDistance) {
-        float sin_theta_max = 0.035;
+        float sin_theta_max = light.HalfSinAngleOrRange;
         float sin_theta_max2 = pow(sin_theta_max, 2);
         float one_minus_cos_theta_max = sin_theta_max2 < 1e-2f ? sin_theta_max2 * (.5f + .125f * sin_theta_max2) : 1 - sqrt(1 - sin_theta_max2);
         float cos_theta = saturate(dot(ray.Direction, normalize(-light.Direction)));
@@ -79,10 +79,15 @@ LightHitSample TracePointLight(in RayDesc ray, in Light light) {
             return hit_sample;
         }
     }
+
     return (LightHitSample)0;
 }
 
 LightHitSample TraceSkyLight(in RayDesc ray, in Light light) {
+    if (light.Intensity == 0.f) {
+        return (LightHitSample)0;
+    }
+
     LightHitSample hit_sample;
     hit_sample.pdf = 1 / (4 * PI);
     hit_sample.radiance = light.Intensity * sample_sky_texture(-ray.Direction);

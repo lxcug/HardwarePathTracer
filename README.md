@@ -128,3 +128,16 @@ Control the scene lights in the UI panel.
 >
 > * Multi Importance Sampling
 >   ![](imgs/MIS.png)
+
+
+
+> 2025.1.22
+>
+> * Deferred Trace Material Ray(Defer Material Ray and Light Intersection to the next bounce).
+>
+> ![](imgs/DeferredTraceMaterial.png)
+>
+> <center>
+>     <b>FPS 39 -> 51
+>     </b>
+> </center>
