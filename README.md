@@ -138,6 +138,6 @@ Control the scene lights in the UI panel.
 > ![](imgs/DeferredTraceMaterial.png)
 >
 > <center>
->     <b>FPS 39 -> 51
+>     <b>FPS 32 -> 48
 >     </b>
 > </center>
