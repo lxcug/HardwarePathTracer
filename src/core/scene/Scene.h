@@ -53,6 +53,10 @@ namespace Shadowy {
             m_sceneLights.emplace_back(Light{Args_...});
         }
 
+        void AddLight(const Light& Light) {
+            m_sceneLights.emplace_back(Light);
+        }
+
         void FinalizeScene();
 
         void CreateAccel();
