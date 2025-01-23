@@ -130,8 +130,6 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
                     if (use_MIS) {
                         light_contrib *= MISWeightRobust(light_sample.pdf, material_eval.pdf);
                     }
-//                     radiance = float3(light_sample.pdf, light_sample.pdf, light_sample.pdf);
-//                     break;
                     radiance += light_contrib;
                 }
             }
