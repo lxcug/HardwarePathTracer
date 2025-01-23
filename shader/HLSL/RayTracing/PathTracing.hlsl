@@ -130,6 +130,8 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
                     if (use_MIS) {
                         light_contrib *= MISWeightRobust(light_sample.pdf, material_eval.pdf);
                     }
+//                     radiance = float3(light_sample.pdf, light_sample.pdf, light_sample.pdf);
+//                     break;
                     radiance += light_contrib;
                 }
             }
@@ -200,7 +202,7 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
         ao_ray.TMax = render_options.AORayLength;
         ao = 0.f;
         for (int ray_idx = 0; ray_idx < render_options.NumAORays; ray_idx++) {
-            ao_ray.Direction = UniformSampleHemisphere(rnd2(seed), first_normal);
+            ao_ray.Direction = UniformSampleHemisphere(rnd2(seed), first_normal).xyz;
             ao += TraceVisibilityRay(ao_ray);
         }
         ao /= render_options.NumAORays;

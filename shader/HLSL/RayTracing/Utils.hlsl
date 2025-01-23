@@ -71,12 +71,12 @@ float3 UniformSampleHemisphere(in float rnd1, in float rnd2, in float3 normal) {
     return local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * normal;
 }
 
-float3 UniformSampleHemisphere(in float2 rnd, in float3 normal) {
+float4 UniformSampleHemisphere(in float2 rnd, in float3 normal) {
     float3 local_dir = UniformSampleHemisphere(rnd);
     float3 tangent, bitangent;
 
     GetCoordBasis(normal, tangent, bitangent);
-    return local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * normal;
+    return float4(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * normal, 1.f / (2.f * PI));
 }
 
 float4 CosineSampleHemisphere(in float2 rnd) {
