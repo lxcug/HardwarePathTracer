@@ -34,10 +34,10 @@ LightHitSample TraceDirectionalLight(in RayDesc ray, in Light light) {
         // If the ray intersect the directional light cone
         if (1 - cos_theta < one_minus_cos_theta_max) {
             LightHitSample light_sample;
-            light_sample.radiance = light.Intensity * light.Color;
             light_sample.hit_t = render_options.MaxTraceDistance;
             float solid_angle = 2 * PI * one_minus_cos_theta_max;
             light_sample.pdf = 1.f / solid_angle;
+            light_sample.radiance = light.Intensity * light.Color / solid_angle;
 
             return light_sample;
         }

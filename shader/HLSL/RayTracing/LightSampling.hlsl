@@ -95,8 +95,10 @@ LightSample SamplePointLight(in Light light, in float2 rnd, in float3 pos, in fl
 
 LightSample SampleSkyLight(in Light light, in float2 rnd, in float3 pos, in float3 normal) {
     LightSample light_sample;
-    light_sample.direction = UniformSampleSphere(rnd).xyz;
-    light_sample.pdf = 1 / (4 * PI);
+//     float4 sample_value = UniformSampleSphere(rnd);
+    float4 sample_value = UniformSampleHemisphere(rnd, normal);
+    light_sample.direction = sample_value.xyz;
+    light_sample.pdf = sample_value.w;
     light_sample.radiance_over_pdf = light.Intensity * sample_sky_texture(-light_sample.direction) /
                                      light_sample.pdf;
     light_sample.distance = render_options.MaxTraceDistance;

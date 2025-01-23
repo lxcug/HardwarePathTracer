@@ -16,6 +16,7 @@ struct RayPayload
 
     float opacity;
     float roughness;
+    float metallic;
 
     bool is_miss() {
         return !is_hit;

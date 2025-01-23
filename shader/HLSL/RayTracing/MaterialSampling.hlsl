@@ -23,11 +23,11 @@ MaterialSample SampleMaterial(in float3 ray_direction, in RayPayload payload, in
         mat_sample.weight = payload.albedo * max(dot(payload.normal, mat_sample.direction), 0.f);
         mat_sample.pdf = 1.f;
     } else if (roughness < roughness_threshold) {
-        const float F0 = 0.04f;
+        const float min_f0 = 0.04f, max_f0 = 1.f;
+        const float F0 = lerp(min_f0, max_f0, payload.metallic);
         float3 dir = SampleGGX(rnd.xy, -ray_direction, payload.normal, roughness);
         mat_sample.direction = dir;
         mat_sample.pdf = BRDF_PDF(-ray_direction, dir, payload.normal, roughness, F0);
-        // weight = brdf / pdf * cos
         mat_sample.weight = payload.albedo *
         CookTorranceBRDF(-ray_direction, dir, payload.normal, roughness, F0) /
         mat_sample.pdf * max(dot(payload.normal, dir), 0.f);
@@ -53,8 +53,15 @@ MaterialEval EvalMaterial(in float3 V, in float3 L, in RayPayload payload) {
     static float roughness_threshold = .999f;
     float roughness = payload.roughness;
 
-    if (roughness < roughness_threshold) {
-        const float F0 = 0.04f;
+    if (roughness < specular_threshold) {
+        float3 H = normalize(V + L);
+        if (dot(H, payload.normal) < SHADOWY_SMALL_NUMBER) {
+            mat_eval.pdf = 1.f;
+            mat_eval.weight = payload.albedo * max(dot(payload.normal, L), 0.f);
+        }
+    } else if (roughness < roughness_threshold) {
+        const float min_f0 = 0.04f, max_f0 = 1.f;
+        const float F0 = lerp(min_f0, max_f0, payload.metallic);
         mat_eval.pdf = BRDF_PDF(V, L, payload.normal, roughness, F0);
         mat_eval.weight = payload.albedo * CookTorranceBRDF(V, L, payload.normal, roughness, F0) *
         max(dot(payload.normal, L), 0.f) / mat_eval.pdf;
