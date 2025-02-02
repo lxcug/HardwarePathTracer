@@ -2,6 +2,7 @@
 
 #include "../../../src/host_device_shared/ViewUniformBuffer.h"
 #include "RayTracingCommon.hlsl"
+#include "Utils.hlsl"
 
 
 [shader("closesthit")]
@@ -25,20 +26,35 @@ void main(inout RayPayload payload, in HitAttribute attrib)
     int material_index = vk::RawBufferLoad<int>(MaterialIndexBufferAddress + sizeof(int) * PrimitiveIndex());
 
     Material material = GetMaterial(InstanceID(), PrimitiveIndex());
+    int TextureIndexOffset = ModelInfo[InstanceID()].TextureIndexOffset;
     float3 albedo = material.Albedo;
     if (material.AlbedoTextureID >= 0) {
-        int TextureIndexOffset = ModelInfo[InstanceID()].TextureIndexOffset;
         int TextureIndex = material.AlbedoTextureID + TextureIndexOffset;
         albedo = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0).rgb;
+    }
+    float roughness = material.Roughness;
+    if (material.RoughnessTextureID >= 0) {
+        int TextureIndex = material.RoughnessTextureID + TextureIndexOffset;
+        roughness = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0).r;
+    }
+    float metallic = material.Metallic;
+    if (material.MetallicTextureID >= 0) {
+        int TextureIndex = material.MetallicTextureID + TextureIndexOffset;
+        metallic = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0).r;
+    }
+    float3 emissive = material.Emissive;
+    if (material.EmissiveTextureID >= 0) {
+        int TextureIndex = material.EmissiveTextureID + TextureIndexOffset;
+        emissive = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0).rgb;
     }
 
     payload.pos = hit_pos;
     payload.albedo = albedo;
     payload.normal = hit_normal;
-    payload.emissive = material.Emissive;
+    payload.emissive = emissive;
     payload.opacity = material.Opacity;
-    payload.roughness = material.Roughness;
-    payload.metallic = material.Metallic;
+    payload.roughness = roughness;
+    payload.metallic = max(metallic, SHADOWY_SMALL_NUMBER);
     payload.is_hit = true;
     payload.hit_t = RayTCurrent();
     payload.instance_id = InstanceID();

@@ -59,14 +59,8 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
         if (render_options.DeferredTraceMaterial) {
             for (int idx = 0; idx < valid_num_trace_light_state; idx++) {
                 TraceMaterialState curr_state = trace_material_state[idx];
-                if (curr_state.light_type == LightType::Sky || curr_state.light_type == LightType::Directional) {
-                    if (payload.is_miss()) {
-                        radiance += curr_state.radiance;
-                    }
-                } else {
-                    if (payload.hit_t > curr_state.distance) {
-                        radiance += curr_state.radiance;
-                    }
+                if (payload.is_miss() || payload.hit_t >= curr_state.distance) {
+                    radiance += curr_state.radiance;
                 }
             }
             valid_num_trace_light_state = 0;

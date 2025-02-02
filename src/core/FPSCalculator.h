@@ -20,6 +20,7 @@ namespace Shadowy {
             return m_fps;
         }
 
+        // Return Seconds
         [[nodiscard]] auto GetDeltaTime() const -> double {
             return m_deltaTime;
         }

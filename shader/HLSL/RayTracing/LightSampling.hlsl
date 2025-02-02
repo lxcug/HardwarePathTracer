@@ -64,6 +64,9 @@ LightSample SampleDirectionalLight(in Light light, in float2 rnd, in float3 pos,
     LightSample light_sample;
     light_sample.direction = LocalToWorld(-light.Direction, dir_and_pdf.xyz);
     light_sample.pdf = dir_and_pdf.w;
+    /*
+     * NOTE: For Directional Light, Lo / pdf = light.Color * light.Intensity
+     */
     light_sample.radiance_over_pdf = light.Color * light.Intensity;
     light_sample.distance = render_options.MaxTraceDistance;
 
