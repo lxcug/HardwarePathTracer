@@ -86,7 +86,7 @@ namespace Shadowy
 
         virtual void DrawImGuiFrame();
 
-        void ResetFrameNum()
+        virtual void ResetFrameNum()
         {
             m_accumulatedFrameNum = 0;
         }

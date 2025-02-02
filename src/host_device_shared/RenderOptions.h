@@ -10,8 +10,9 @@
 BEGIN_HWPT_NAMESPACE
     struct PathTracingOptions
     {
-        // TODO: Pack Bool into Int/UInt
+        // TODO: Pack Bool into 4B Int
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableAccumulation, 1);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, ShouldRenderThisFrame, 1);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableAO, 0);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, NumAORays, 4);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, AORayLength, 1.f);
@@ -23,6 +24,8 @@ BEGIN_HWPT_NAMESPACE
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableEmissive, 0);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, MISMode, 2);  // 0 for NEE 1 for sample material 2 for MIS
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, DeferredTraceMaterial, 1);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableEARS, 1);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableMARS, 0);
     };
 
     struct ToneMappingOptions {

@@ -20,6 +20,15 @@ namespace Shadowy {
     public:
         explicit VulkanRayTracingApp(const std::string &Title = "Shadowy");
 
+        void Run() override;
+
+        void ResetFrameNum() override
+        {
+            m_PathTracingOptions.ShouldRenderThisFrame = 1;
+            m_accumulatedFrameNum = 0;
+            m_currentAccumulatedRenderTime = 0.f;
+        }
+
         void InitVulkan() override;
 
         void DrawFrame() override;
@@ -93,6 +102,9 @@ namespace Shadowy {
         std::vector<VkDescriptorSet> m_viewportImageDescriptorSets;
         GBuffer *m_gBuffer = nullptr;
         PathTracingOptions m_PathTracingOptions;
+        float m_currentAccumulatedRenderTime = 0.f;  // Seconds
+        float m_maxRenderTime = -1.f;
+        int m_maxAccumulatedFrames = 128;
 
         // NOTE: Store Last Frame Operations and Execute before RenderPipeline Begins
         std::vector<std::function<void()>> m_deferredOperations;

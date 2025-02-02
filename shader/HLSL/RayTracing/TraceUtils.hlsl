@@ -35,8 +35,12 @@ LightHitSample TraceDirectionalLight(in RayDesc ray, in Light light) {
         if (1 - cos_theta < one_minus_cos_theta_max) {
             LightHitSample light_sample;
             light_sample.hit_t = render_options.MaxTraceDistance;
+            // Hemisphere solid angle 2 * PI
             float solid_angle = 2 * PI * one_minus_cos_theta_max;
             light_sample.pdf = 1.f / solid_angle;
+            /*
+             * NOTE: For Directional Light, Lo = light.Intensity * light.Color * pdf = light.Intensity * light.Color / solid_angle
+             */
             light_sample.radiance = light.Intensity * light.Color / solid_angle;
 
             return light_sample;

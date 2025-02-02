@@ -53,6 +53,38 @@ namespace Shadowy {
 //        m_camera->SetCameraRotation(-glm::radians(10.f), glm::radians(10.f));
     }
 
+    void VulkanRayTracingApp::Run() {
+        Check(m_contextInited);
+
+        while (!glfwWindowShouldClose(m_window)) {
+            m_fpsCalculator->Tick();
+
+            if (m_camera->IsMoving()) {
+                ResetFrameNum();
+            }
+
+            glfwPollEvents();
+            DrawFrame();
+
+            Present();
+
+            if (m_maxRenderTime < 0.f || m_currentAccumulatedRenderTime < m_maxRenderTime) {
+                m_currentAccumulatedRenderTime += m_fpsCalculator->GetDeltaTime();
+                m_accumulatedFrameNum++;
+            } else {
+                m_PathTracingOptions.ShouldRenderThisFrame = false;
+            }
+            if (m_maxAccumulatedFrames > 0 && m_accumulatedFrameNum > m_maxAccumulatedFrames) {
+                m_PathTracingOptions.ShouldRenderThisFrame = false;
+            }
+            m_frameNum++;
+            m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+        }
+
+        vkDeviceWaitIdle(m_device);
+        CleanUp();
+    }
+
     void VulkanRayTracingApp::CleanUp() {
         Sampler::ReleaseSamplers();
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -503,6 +535,8 @@ namespace Shadowy {
             ImGui::Text("Path Tracing Options");
             ShouldReAccumulate |= ImGui::Checkbox("Enable Accumulation",
                                                   reinterpret_cast<bool *>(&m_PathTracingOptions.EnableAccumulation));
+            ShouldReAccumulate |= ImGui::InputInt("Max Accumulated Frames", &m_maxAccumulatedFrames);
+            ShouldReAccumulate |= ImGui::InputFloat("Max Render Time In Seconds", &m_maxRenderTime);
             ShouldReAccumulate |= ImGui::Checkbox("Enable Emissive",
                                                   reinterpret_cast<bool *>(&m_PathTracingOptions.EnableEmissive));
             ShouldReAccumulate |= ImGui::Checkbox("Deferred Trace Light",
