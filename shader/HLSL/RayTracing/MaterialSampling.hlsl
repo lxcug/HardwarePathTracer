@@ -29,10 +29,8 @@ MaterialSample SampleMaterial(in float3 ray_direction, in RayPayload payload, in
         float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.albedo, payload.metallic);
         float3 F = Fresnel_Schlick(max(dot(payload.normal, V), 0.0), F0);
 
-        float diffuse_lobe_selected_weight = LobeSelectionProb((1.0 - F) * (1.0 - metallic) * payload.albedo, payload.albedo);
-        if (payload.metallic >= 1.0) {
-            diffuse_lobe_selected_weight = 0.0;
-        }
+        float3 kd = (1 - F) * (1 - metallic);
+        float diffuse_lobe_selected_weight = LobeSelectionProb(kd * payload.albedo, payload.albedo);
 
         float4 sample;
         if (rnd.w < diffuse_lobe_selected_weight) {
@@ -50,7 +48,7 @@ MaterialSample SampleMaterial(in float3 ray_direction, in RayPayload payload, in
         float3 specular_weight = CookTorranceBRDF(V, L, payload.normal, roughness, payload.metallic, payload.albedo, F0) * NoL / specular_pdf;
 
         mat_sample.pdf = 0.f;
-        AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, diffuse_weight, diffuse_pdf, diffuse_lobe_selected_weight);
+        AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, kd * diffuse_weight, diffuse_pdf, diffuse_lobe_selected_weight);
         AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, specular_weight, specular_pdf, 1.f - diffuse_lobe_selected_weight);
     }
 
@@ -84,10 +82,8 @@ MaterialEval EvalMaterial(in float3 V, in float3 L, in RayPayload payload) {
         float HoV = max(dot(H, V), 0.f);
         float3 F = Fresnel_Schlick(HoV, F0);
 
-        float diffuse_lobe_selected_weight = LobeSelectionProb((1.0 - F) * (1.0 - metallic) * payload.albedo, payload.albedo);
-        if (payload.metallic >= 1.0) {
-            diffuse_lobe_selected_weight = 0.0;
-        }
+        float3 kd = (1 - F) * (1 - metallic);
+        float diffuse_lobe_selected_weight = LobeSelectionProb(kd * payload.albedo, payload.albedo);
 
         float diffuse_pdf = max(NoL / PI, SHADOWY_SMALL_NUMBER);
         float3 diffuse_weight = payload.albedo;
@@ -95,7 +91,7 @@ MaterialEval EvalMaterial(in float3 V, in float3 L, in RayPayload payload) {
         float3 specular_weight = CookTorranceBRDF(V, L, payload.normal, roughness, payload.metallic, payload.albedo, F0) * NoL / specular_pdf;
 
         mat_eval.pdf = 0.f;
-        AddLobeWithMIS(mat_eval.weight, mat_eval.pdf, diffuse_weight, diffuse_pdf, diffuse_lobe_selected_weight);
+        AddLobeWithMIS(mat_eval.weight, mat_eval.pdf, kd * diffuse_weight, diffuse_pdf, diffuse_lobe_selected_weight);
         AddLobeWithMIS(mat_eval.weight, mat_eval.pdf, specular_weight, specular_pdf, 1.f - diffuse_lobe_selected_weight);
     }
 
