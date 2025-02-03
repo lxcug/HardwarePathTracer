@@ -131,7 +131,8 @@ void PathTracingKernel(in float3 origin, in float3 direction, inout uint seed, o
 
         // Sample Material
         MaterialSample material_sample = SampleMaterial(ray.Direction, payload, random_sample);
-        if (material_sample.pdf < SHADOWY_SMALL_NUMBER || asuint(material_sample.pdf) > 0x7f800000) {
+        if (material_sample.pdf <= SHADOWY_SMALL_NUMBER || asuint(material_sample.pdf) > 0x7F800000) {
+//             radiance = float3(0, 0, 100.f);
             break;
         }
 

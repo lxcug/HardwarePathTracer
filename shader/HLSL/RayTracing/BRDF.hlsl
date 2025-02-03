@@ -8,83 +8,81 @@ float3 diffuse_lambert(float3 albedo) {
 
 float GGX_D(float3 H, float3 N, float roughness)
 {
-    float NdotH = max(dot(N, H), 0.0f);
-    float alpha = roughness * roughness;
-    float alpha2 = alpha * alpha;
-    float NdotH2 = NdotH * NdotH;
-
-    float denom = NdotH2 * (alpha2 - 1.0f) + 1.0f;
-    return alpha2 / (PI * denom * denom);
+    float a = roughness * roughness;
+    float a2 = a * a;
+    float NdotH = max(dot(N, H), 0.0);
+    float denom = (NdotH * NdotH) * (a2 - 1.0) + 1.0;
+    return a2 / (PI * denom * denom);
 }
 
-float GGX_Smith(float3 V, float3 H, float3 N, float roughness)
+float GGX_Smith(float3 V, float3 L, float3 N, float roughness)
 {
-    float NdotV = max(dot(N, V), 0.0f);
-    float NdotH = max(dot(N, H), 0.0f);
-    float VdotH = max(dot(V, H), 0.0f);
+    float a = roughness * roughness;
+    float k = (a + 1.0) * (a + 1.0) / 8.0;
 
-    float alpha = roughness * roughness;
-    float k = (alpha + 1.0f) / 2.0f;
+    float NdotV = max(dot(N, V), 0.0);
+    float G1_V = NdotV / (NdotV * (1.0 - k) + k);
 
-    float G1 = NdotV / (NdotV * (1.0f - k) + k);
-    float G2 = NdotH / (NdotH * (1.0f - k) + k);
+    float NdotL = max(dot(N, L), 0.0);
+    float G1_L = NdotL / (NdotL * (1.0 - k) + k);
 
-    return G1 * G2;
+    return G1_V * G1_L;
 }
 
-float Fresnel_Schlick(float cosTheta, float F0)
+float3 Fresnel_Schlick(float cosTheta, float3 F0)
 {
-    return F0 + (1.0f - F0) * pow(1.0f - cosTheta, 5.0f);
+    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
-float3 CookTorranceBRDF(float3 V, float3 L, float3 N, float roughness, float F0)
+float3 CookTorranceBRDF(float3 V, float3 L, float3 N, float roughness, float metallic, float3 albedo, float3 F0)
 {
     float3 H = normalize(V + L);
 
     float D = GGX_D(H, N, roughness);
-    float G = GGX_Smith(V, H, N, roughness);
-    float F = Fresnel_Schlick(max(dot(V, H), 0.0f), F0);
+    float G = GGX_Smith(V, L, N, roughness);
+    float3 F = Fresnel_Schlick(max(dot(V, H), 0.0f), F0);
+
+    float NoV = max(dot(N, V), 0.0f);
+    float NoL = max(dot(N, L), 0.0f);
 
     float3 nominator = D * G * F;
-    float denominator = 4.0f * max(dot(N, V), 0.0f) * max(dot(N, L), 0.0f) + 1e-5;
-    return max(nominator / denominator, SHADOWY_SMALL_NUMBER);
+    float denominator = 4.0f * NoV * NoL + SHADOWY_SMALL_NUMBER;
+    return nominator / denominator;
 }
 
-float3 SampleGGX(float2 u, float3 V, float3 N, float roughness)
+float4 SampleGGXNormal(float2 u, float3 V, float3 N, float roughness)
 {
-    float alpha = roughness * roughness;
+    float a = roughness * roughness;
+    float a2 = a * a;
 
-    float phi = 2.0f * PI * u.x;
-    float cosTheta = sqrt((1.0f - u.y) / (1.0f + (alpha * alpha - 1.0f) * u.y));
-    float sinTheta = sqrt(1.0f - cosTheta * cosTheta);
+    float phi = 2.0 * PI * u.x;
+    float cosTheta = sqrt((1.0 - u.y) / (1.0 + (a * a - 1.0) * u.y));
+    float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
 
     float3 H = float3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
     float3 tangent, bitangent;
     GetCoordBasis(N, tangent, bitangent);
     H = H.x * tangent + H.y * bitangent + H.z * N;
+    float HoV = max(dot(H, V), 0.f);
 
-    float3 T = normalize(2.0f * dot(V, H) * H - V);
-
-    return T;
-}
-
-float GGX_PDF(float3 H, float3 N, float roughness)
-{
-    float NdotH = max(dot(N, H), 0.0f);
     float D = GGX_D(H, N, roughness);
+	float PDF = D * cosTheta / (4.0 * HoV + SHADOWY_SMALL_NUMBER);
 
-    return max(D / (4.0f * NdotH), SHADOWY_SMALL_NUMBER);
+    return float4(H, PDF);
 }
 
-float BRDF_PDF(float3 V, float3 L, float3 N, float roughness, float F0)
+float4 SampleGGXReflection(float2 u, float3 V, float3 N, float roughness)
 {
+    float4 H = SampleGGXNormal(u, V, N, roughness);
+    return float4(reflect(-V, H.xyz), H.w);
+}
+
+float BRDF_PDF(float3 V, float3 L, float3 N, float roughness, float3 F0) {
     float3 H = normalize(V + L);
     float D = GGX_D(H, N, roughness);
-    float G_v = GGX_Smith(V, H, N, roughness);
-    float G_l = GGX_Smith(L, H, N, roughness);
-    float F = Fresnel_Schlick(max(dot(V, H), 0.0f), F0);
+    float HoN = max(dot(H, N), 0.f);
+    float HoV = max(dot(H, V), 0.f);
 
-    float pdf = D * G_v * G_l * F / (4.0f * max(dot(N, V), 0.0f) * max(dot(N, L), 0.0f));
-
+    float pdf = D * HoN / (4.0 * HoV + SHADOWY_SMALL_NUMBER);
     return max(pdf, SHADOWY_SMALL_NUMBER);
 }

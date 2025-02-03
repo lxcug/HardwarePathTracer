@@ -109,6 +109,15 @@ namespace Shadowy {
                     m_textureNames.push_back(MtlPath + '/' + Material.diffuse_texname);
                     Mat.AlbedoTextureID = static_cast<int>(m_textureNames.size()) - 1;
                 }
+                if (Material.specular) {
+                    Mat.Specular = {
+                            Material.specular[0], Material.specular[1], Material.specular[2]
+                    };
+                }
+                if (!Material.specular_texname.empty()) {
+                    m_textureNames.push_back(MtlPath + '/' + Material.specular_texname);
+                    Mat.SpecularTextureID = static_cast<int>(m_textureNames.size()) - 1;
+                }
                 if (Material.emission) {
                     Mat.Emissive = {
                             Material.emission[0], Material.emission[1], Material.emission[2]
