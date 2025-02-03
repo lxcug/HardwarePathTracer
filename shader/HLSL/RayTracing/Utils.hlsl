@@ -2,6 +2,7 @@
 
 #define SHADOWY_SMALL_NUMBER 1e-6
 
+
 float max(float3 value) {
     return max(value.x, max(value.y, value.z));
 }
@@ -208,7 +209,7 @@ float MISWeightRobust(float Pdf, float OtherPdf) {
 
 float Luminance( float3 LinearColor )
 {
-	return dot( LinearColor, float3( 0.3, 0.59, 0.11 ) );
+	return dot(LinearColor, float3(0.3, 0.59, 0.11));
 }
 
 float2 InverseEquiAreaSphericalMapping(float3 Direction)
@@ -240,5 +241,33 @@ float2 InverseEquiAreaSphericalMapping(float3 Direction)
 	UV = (Direction.z < 0) ? 1 - UV.yx : UV;
 	UV = asfloat(asuint(UV) ^ (asuint(Direction.xy) & 0x80000000u));
 	return UV * 0.5 + 0.5;
+}
+
+float LobeSelectionProb(float3 A, float3 B)
+{
+	const float SumA = A.x + A.y + A.z;
+	const float SumB = B.x + B.y + B.z;
+	return SumA / (SumA + SumB + 1e-6);
+}
+
+void AddLobeWithMIS(inout float3 Weight, inout float Pdf, float3 LobeWeight, float LobePdf, float LobeProb)
+{
+	const float MinLobeProb = 1.1754943508e-38; // smallest normal float
+	if (LobeProb > MinLobeProb)
+	{
+		LobePdf *= LobeProb;
+		LobeWeight *= 1 / LobeProb;
+
+		float MISWeight;
+		if (Pdf < LobePdf)
+			MISWeight = 1 / (1 + Pdf / LobePdf);
+		else if (LobePdf < Pdf)
+			MISWeight = 1 - 1 / (1 + LobePdf / Pdf);
+		else
+			MISWeight = 0.5f; // avoid (rare) inf/inf
+
+		Weight = lerp(Weight, LobeWeight, MISWeight);
+		Pdf += LobePdf;
+	}
 }
 

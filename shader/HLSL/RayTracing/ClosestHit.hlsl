@@ -47,14 +47,20 @@ void main(inout RayPayload payload, in HitAttribute attrib)
         int TextureIndex = material.EmissiveTextureID + TextureIndexOffset;
         emissive = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0).rgb;
     }
+    float3 specular = material.Specular;
+    if (material.SpecularTextureID >= 0) {
+        int TextureIndex = material.SpecularTextureID + TextureIndexOffset;
+        emissive = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0).rgb;
+    }
 
     payload.pos = hit_pos;
     payload.albedo = albedo;
     payload.normal = hit_normal;
     payload.emissive = emissive;
+    payload.specular = specular;
     payload.opacity = material.Opacity;
     payload.roughness = roughness;
-    payload.metallic = max(metallic, SHADOWY_SMALL_NUMBER);
+    payload.metallic = metallic;
     payload.is_hit = true;
     payload.hit_t = RayTCurrent();
     payload.instance_id = InstanceID();

@@ -25,6 +25,9 @@ BEGIN_HWPT_NAMESPACE
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float3, Albedo, float3(.5f, .5f, .5f));
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, AlbedoTextureID, -1);
 
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float3, Specular, float3(.5f, .5f, .5f));
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, SpecularTextureID, -1);
+
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float3, Emissive, float3(0.f, 0.f, 0.f));
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EmissiveTextureID, -1);
 

@@ -980,7 +980,7 @@ namespace Shadowy {
                 glm::vec3(0.f, 0.f, 0.f),
                 LightType::Point,
                 glm::vec3(1.f, 2.f, 2.f),
-                1.f,  // Physical Radius
+                .1f,  // Physical Radius
                 glm::vec3(1.f, 1.f, 1.f),
                 10.f,  // Intensity
                 5.f,  // Range

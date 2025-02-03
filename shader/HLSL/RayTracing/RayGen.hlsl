@@ -6,6 +6,7 @@
 #include "BRDF.hlsl"
 #include "TraceUtils.hlsl"
 #include "PathTracing.hlsl"
+// #include "ReSTIR/ReSTIRCommon.hlsl"
 
 
 [shader("raygeneration")]

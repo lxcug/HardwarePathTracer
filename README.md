@@ -39,7 +39,7 @@ Control the scene lights in the UI panel.
 
 ## Gallery
 
-
+![](imgs/CornellBoxGallery.png)
 
 ## Dev Log
 
@@ -153,3 +153,9 @@ Control the scene lights in the UI panel.
 >     <b>FPS 32 -> 48
 >     </b>
 > </center>
+
+
+
+> 2025.2.4
+>
+> * Handle Mix Microfacet + DiffuseLambert Material
