@@ -288,7 +288,7 @@ namespace Shadowy
 
         uint m_currentFrame = 0;
         uint m_imageIndex = 0;
-        uint m_accumulatedFrameNum = -1;
+        int m_accumulatedFrameNum = 0;
         uint m_frameNum = 0;
 
         inline static VulkanBackendApp* s_application = nullptr;
