@@ -8,7 +8,7 @@
 #include "BaseDefinitions.h"
 
 
-BEGIN_HWPT_NAMESPACE
+BEGIN_SHADOWY_NAMESPACE
 
 struct ViewUniformBuffer
 {
@@ -30,6 +30,6 @@ struct ViewUniformBuffer
 ConstantBuffer<ViewUniformBuffer> view_uniform_buffer : register(b0, space0);
 #endif
 
-END_HWPT_NAME_SPACE
+END_SHADOWY_NAME_SPACE
 
 #endif //VIEWUNIFORMBUFFER_H

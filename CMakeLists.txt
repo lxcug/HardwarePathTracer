@@ -18,6 +18,9 @@ add_executable(Shadowy
         ${stb_SOURCES}
         src/core/post_processing/ToneMapping.cpp
         src/core/post_processing/ToneMapping.h
+        src/host_device_shared/ReSTIRCommon.h
+        src/core/restir/ReSTIRResource.cpp
+        src/core/restir/ReSTIRResource.h
 )
 
 target_include_directories(

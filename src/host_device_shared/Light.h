@@ -8,7 +8,7 @@
 #include "BaseDefinitions.h"
 
 
-BEGIN_HWPT_NAMESPACE
+BEGIN_SHADOWY_NAMESPACE
 
     enum class LightType
     {
@@ -39,6 +39,6 @@ BEGIN_HWPT_NAMESPACE
         int Padding;
     };
 
-END_HWPT_NAME_SPACE
+END_SHADOWY_NAME_SPACE
 
 #endif //LIGHT_H

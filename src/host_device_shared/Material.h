@@ -9,7 +9,7 @@
 #include "Light.h"
 
 
-BEGIN_HWPT_NAMESPACE
+BEGIN_SHADOWY_NAMESPACE
     struct ModelDesc
     {
         // NOLINT
@@ -77,6 +77,6 @@ Vertex3 GetVertices(uint InstanceID, uint PrimitiveIndex) {
 
 #endif
 
-END_HWPT_NAME_SPACE
+END_SHADOWY_NAME_SPACE
 
 #endif //MATERIAL_H
