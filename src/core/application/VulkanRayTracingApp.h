@@ -26,7 +26,7 @@ namespace Shadowy {
         void ResetFrameNum() override
         {
             m_PathTracingOptions.ShouldRenderThisFrame = 1;
-            m_accumulatedFrameNum = -1;
+            m_accumulatedFrameNum = 0;
             m_currentAccumulatedRenderTime = 0.f;
         }
 
@@ -104,8 +104,8 @@ namespace Shadowy {
         GBuffer *m_gBuffer = nullptr;
         PathTracingOptions m_PathTracingOptions;
         float m_currentAccumulatedRenderTime = 0.f;  // Seconds
-        float m_maxRenderTime = -1.f;
-        int m_maxAccumulatedFrames = -1;
+        float m_maxRenderTime = 0.f;  // <= 0 means infinite accumulation
+        int m_maxAccumulatedFrames = 0; // <= 0 means infinite accumulation
 
         // NOTE: Store Last Frame Operations and Execute before RenderPipeline Begins
         std::vector<std::function<void()>> m_deferredOperations;

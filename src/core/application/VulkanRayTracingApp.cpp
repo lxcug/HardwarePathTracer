@@ -59,26 +59,33 @@ namespace Shadowy {
         while (!glfwWindowShouldClose(m_window)) {
             m_fpsCalculator->Tick();
 
+            // NOTE: ResetFrameNum Should Invoke before m_accumulatedFrameNum++
             if (m_camera->IsMoving()) {
                 ResetFrameNum();
             }
+            if (!m_PathTracingOptions.EnableAccumulation || m_camera->IsMoving()) {
+                ResetFrameNum();
+            }
+            for (auto &Operation: m_deferredOperations) {
+                Operation();
+            }
+            m_deferredOperations.clear();
 
-            glfwPollEvents();
-
-            if (m_maxRenderTime < 0.f || m_currentAccumulatedRenderTime < m_maxRenderTime) {
+            if (m_maxRenderTime <= 0.f || m_currentAccumulatedRenderTime < m_maxRenderTime) {
                 m_currentAccumulatedRenderTime += m_fpsCalculator->GetDeltaTime();
-                m_accumulatedFrameNum++;
             } else {
                 m_PathTracingOptions.ShouldRenderThisFrame = false;
             }
-            if (m_maxAccumulatedFrames >= 0 && m_accumulatedFrameNum > m_maxAccumulatedFrames) {
+            if (m_maxAccumulatedFrames <= 0 || m_accumulatedFrameNum < m_maxAccumulatedFrames) {
+                m_accumulatedFrameNum++;
+            } else {
                 m_PathTracingOptions.ShouldRenderThisFrame = false;
             }
             m_frameNum++;
             m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
 
+            glfwPollEvents();
             DrawFrame();
-
             Present();
         }
 
@@ -126,15 +133,6 @@ namespace Shadowy {
     }
 
     void VulkanRayTracingApp::DrawFrame() {
-        std::cout << "Frame Num" << m_accumulatedFrameNum << std::endl;
-        if (!m_PathTracingOptions.EnableAccumulation || m_camera->IsMoving()) {
-            ResetFrameNum();
-        }
-        for (auto &Operation: m_deferredOperations) {
-            Operation();
-        }
-        m_deferredOperations.clear();
-
         // Update ViewUniformBuffer
         ViewUniformBuffer ViewUniformBuffer_{};
         ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();
@@ -1048,7 +1046,6 @@ namespace Shadowy {
     }
 
     void VulkanRayTracingApp::ResizeViewportImages() {
-        std::cout << "Resize " << m_viewportSize.x << " " << m_viewportSize.y << "\n";
         ResetFrameNum();
 
         vkDeviceWaitIdle(m_device);
