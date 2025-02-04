@@ -5,7 +5,7 @@
 #include "Vertex.h"
 
 
-BEGIN_HWPT_NAMESPACE
+BEGIN_SHADOWY_NAMESPACE
 
     auto Vertex::GetBindingDescription() -> VkVertexInputBindingDescription
     {
@@ -44,4 +44,4 @@ BEGIN_HWPT_NAMESPACE
         return AttributeDescriptions;
     }
 
-END_HWPT_NAME_SPACE
+END_SHADOWY_NAME_SPACE

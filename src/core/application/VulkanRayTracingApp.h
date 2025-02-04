@@ -13,6 +13,7 @@
 #include "host_device_shared/Light.h"
 #include "host_device_shared/RenderOptions.h"
 #include "core/post_processing/ToneMapping.h"
+#include "core/restir/ReSTIRResource.h"
 
 
 namespace Shadowy {
@@ -25,7 +26,7 @@ namespace Shadowy {
         void ResetFrameNum() override
         {
             m_PathTracingOptions.ShouldRenderThisFrame = 1;
-            m_accumulatedFrameNum = 0;
+            m_accumulatedFrameNum = -1;
             m_currentAccumulatedRenderTime = 0.f;
         }
 
@@ -104,12 +105,14 @@ namespace Shadowy {
         PathTracingOptions m_PathTracingOptions;
         float m_currentAccumulatedRenderTime = 0.f;  // Seconds
         float m_maxRenderTime = -1.f;
-        int m_maxAccumulatedFrames = 128;
+        int m_maxAccumulatedFrames = -1;
 
         // NOTE: Store Last Frame Operations and Execute before RenderPipeline Begins
         std::vector<std::function<void()>> m_deferredOperations;
 
         ToneMappingPass *m_toneMappingPass = nullptr;
+
+        ReSTIRResource* m_restirResource = nullptr;
     };
 } // namespace Shadowy
 

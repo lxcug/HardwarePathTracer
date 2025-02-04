@@ -7,7 +7,7 @@
 
 #include "BaseDefinitions.h"
 
-BEGIN_HWPT_NAMESPACE
+BEGIN_SHADOWY_NAMESPACE
     struct PathTracingOptions
     {
         // TODO: Pack Bool into 4B Int
@@ -24,8 +24,7 @@ BEGIN_HWPT_NAMESPACE
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableEmissive, 0);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, MISMode, 2);  // 0 for NEE 1 for sample material 2 for MIS
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, DeferredTraceMaterial, 1);
-        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableEARS, 1);
-        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableMARS, 0);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableReSTIRDI, 1);
     };
 
     struct ToneMappingOptions {
@@ -34,6 +33,6 @@ BEGIN_HWPT_NAMESPACE
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, AdaptedLuminance, 1.f);
     };
 
-END_HWPT_NAME_SPACE
+END_SHADOWY_NAME_SPACE
 
 #endif //RENDEROPTIONS_H

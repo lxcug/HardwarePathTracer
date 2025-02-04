@@ -64,9 +64,6 @@ namespace Shadowy {
             }
 
             glfwPollEvents();
-            DrawFrame();
-
-            Present();
 
             if (m_maxRenderTime < 0.f || m_currentAccumulatedRenderTime < m_maxRenderTime) {
                 m_currentAccumulatedRenderTime += m_fpsCalculator->GetDeltaTime();
@@ -74,11 +71,15 @@ namespace Shadowy {
             } else {
                 m_PathTracingOptions.ShouldRenderThisFrame = false;
             }
-            if (m_maxAccumulatedFrames > 0 && m_accumulatedFrameNum > m_maxAccumulatedFrames) {
+            if (m_maxAccumulatedFrames >= 0 && m_accumulatedFrameNum > m_maxAccumulatedFrames) {
                 m_PathTracingOptions.ShouldRenderThisFrame = false;
             }
             m_frameNum++;
             m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+
+            DrawFrame();
+
+            Present();
         }
 
         vkDeviceWaitIdle(m_device);
@@ -90,6 +91,7 @@ namespace Shadowy {
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             delete m_viewportImages[i];
         }
+        delete m_restirResource;
         delete m_toneMappingPass;
         delete m_gBuffer;
         delete m_lastFrameViewportImage;
@@ -124,6 +126,7 @@ namespace Shadowy {
     }
 
     void VulkanRayTracingApp::DrawFrame() {
+        std::cout << "Frame Num" << m_accumulatedFrameNum << std::endl;
         if (!m_PathTracingOptions.EnableAccumulation || m_camera->IsMoving()) {
             ResetFrameNum();
         }
@@ -146,7 +149,6 @@ namespace Shadowy {
         ViewUniformBuffer_.InvProj = glm::inverse(m_camera->GetProjMatrix());
         m_MVPUniformBuffers[m_imageIndex]->Update(&ViewUniformBuffer_);
 
-        // Wait for last frame render finish
         vkWaitForFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame], VK_TRUE,
                         UINT64_MAX);
         vkResetFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame]);
@@ -221,10 +223,9 @@ namespace Shadowy {
                      &m_callRegion, m_viewportSize.x, m_viewportSize.y, 1);
 
         /*
- * Transition Current ColorAttach to VK_IMAGE_LAYOUT_VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
- * Transition m_lastFrameSceneColor to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL for CopyImage
- */
-        // RHI::TextureTransitionInput SrcInput{}, DstInput{};
+         * Transition Current ColorAttach to VK_IMAGE_LAYOUT_VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+         * Transition m_lastFrameSceneColor to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL for CopyImage
+         */
         SrcInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
         SrcInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
         SrcInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
@@ -234,8 +235,8 @@ namespace Shadowy {
         RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameViewportImage->GetHandle(), 1,
                                      SrcInput, DstInput);
         SrcInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        SrcInput.AccessMask = 0;
-        SrcInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
+        SrcInput.AccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+        SrcInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
         DstInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         DstInput.AccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
         DstInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
@@ -399,6 +400,8 @@ namespace Shadowy {
         CreateRTPipelineLayout();
         CreateRTPipeline();
         CreateRTSBT();
+
+        m_restirResource = new ReSTIRResource(m_viewportSize.x, m_viewportSize.y);
     }
 
     void VulkanRayTracingApp::DrawImGuiFrame() {
@@ -541,7 +544,6 @@ namespace Shadowy {
                                                   reinterpret_cast<bool *>(&m_PathTracingOptions.EnableEmissive));
             ShouldReAccumulate |= ImGui::Checkbox("Deferred Trace Light",
                                                   reinterpret_cast<bool *>(&m_PathTracingOptions.DeferredTraceMaterial));
-            ShouldReAccumulate |= ImGui::InputInt("MIS Model", &m_PathTracingOptions.MISMode);
             static std::array<const char *, 3> items = {"Sample Light Only",
                                                         "Sample Material Only", "MIS"};
             static int item_current_idx = 2;
@@ -1046,6 +1048,7 @@ namespace Shadowy {
     }
 
     void VulkanRayTracingApp::ResizeViewportImages() {
+        std::cout << "Resize " << m_viewportSize.x << " " << m_viewportSize.y << "\n";
         ResetFrameNum();
 
         vkDeviceWaitIdle(m_device);
@@ -1060,6 +1063,7 @@ namespace Shadowy {
 
         UpdateRTDescriptorSets();
         m_toneMappingPass->UpdateDescriptorSets(m_viewportImages);
+        m_restirResource->OnResize(m_viewportSize.x, m_viewportSize.y);
     }
 
     void VulkanRayTracingApp::CreateGBuffer() {

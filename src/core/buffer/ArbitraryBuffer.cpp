@@ -9,7 +9,7 @@
 namespace Shadowy {
 
     ArbitraryBuffer::ArbitraryBuffer(VkDeviceSize Size, VkBufferUsageFlags Usage,
-                                     VkMemoryPropertyFlags MemProps = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
+                                     VkMemoryPropertyFlags MemProps) {
         Size = std::max(Size, static_cast<uint64_t>(1));
         RHI::CreateBuffer(Size, Usage, MemProps, m_buffer, m_bufferMemory);
     }

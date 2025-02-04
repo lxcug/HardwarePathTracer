@@ -13,7 +13,7 @@
 #endif
 
 
-BEGIN_HWPT_NAMESPACE
+BEGIN_SHADOWY_NAMESPACE
 
 struct Vertex
 {
@@ -43,7 +43,7 @@ struct Vertex3 {
     Vertex V0, V1, V2;
 };
 
-END_HWPT_NAME_SPACE
+END_SHADOWY_NAME_SPACE
 
 #if IS_COMPILING_CPP
 #include <glm/gtx/hash.hpp>

@@ -6,7 +6,7 @@
 #include "BRDF.hlsl"
 #include "TraceUtils.hlsl"
 #include "PathTracing.hlsl"
-// #include "ReSTIR/ReSTIRCommon.hlsl"
+#include "../../../src/host_device_shared/ReSTIRCommon.h"
 
 
 [shader("raygeneration")]
@@ -36,7 +36,7 @@ void main()
 
     if (payload.is_hit()) {
         // TODO: Accumulate for the first several frames cause artifacts, to fix
-        if (view_uniform_buffer.AccumulatedFrameNum == 0) {
+        if (view_uniform_buffer.AccumulatedFrameNum <= 0) {
             OutImage[index] = float4(color, 1.0);
         } else if (render_options.ShouldRenderThisFrame) {
             float3 old_radiance = InImage[index].rgb;
