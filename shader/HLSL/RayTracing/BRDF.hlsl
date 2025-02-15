@@ -86,3 +86,19 @@ float BRDF_PDF(float3 V, float3 L, float3 N, float roughness, float3 F0) {
     float pdf = D * HoN / (4.0 * HoV + SHADOWY_SMALL_NUMBER);
     return max(pdf, SHADOWY_SMALL_NUMBER);
 }
+
+// [Burley 2012, "Physically-Based Shading at Disney"]
+float3 Diffuse_Burley_Disney(float3 DiffuseColor, float3 F0, float Roughness, float NoV, float NoL, float HoL)
+{
+    float3 FL = Fresnel_Schlick(NoL, F0), FV = Fresnel_Schlick(NoV, F0);
+
+    float Fd90 = 0.5 + 2 * HoL * HoL * Roughness;
+    float3 Fd = lerp(1.0, Fd90, FL) * lerp(1.0, Fd90, FV);
+
+    return Fd * DiffuseColor / PI;
+
+// 	float FD90 = 0.5 + 2 * HoV * HoV * Roughness;
+// 	float FdV = 1 + (FD90 - 1) * pow( 1 - NoV, 5);
+// 	float FdL = 1 + (FD90 - 1) * pow( 1 - NoL, 5);
+// 	return DiffuseColor * ( (1 / PI) * FdV * FdL );
+}

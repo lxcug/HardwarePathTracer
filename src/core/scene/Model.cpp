@@ -63,7 +63,7 @@ namespace Shadowy {
                                 Attrib.normals[3 * Index.normal_index + 2]
                         };
                     }
-                    if (!Attrib.texcoords.empty()) {
+                    if (!Attrib.texcoords.empty() && (2 * Index.texcoord_index + 1) < Attrib.texcoords.size()) {
                         Vertex_.TexCoord = {
                                 Attrib.texcoords[2 * Index.texcoord_index + 0],
                                 1.f - Attrib.texcoords[2 * Index.texcoord_index + 1]

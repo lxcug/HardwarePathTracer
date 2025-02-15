@@ -25,6 +25,8 @@ namespace Shadowy {
         explicit Texture2D(const std::filesystem::path &TexturePath, uint MSAASamples = 1,
                            bool GenerateMips = false, bool SRGB = false);
 
+        Texture2D(uint Width, uint Height, VkFormat Format, VkImageUsageFlags Usage, VkImageLayout InitialLayout);
+
         Texture2D(uint Width, uint Height, TextureFormat Format, TextureUsage Usage,
                   uint MSAASample = 1, bool GenerateMips = false);
 
@@ -44,6 +46,8 @@ namespace Shadowy {
         VkImage m_texture = VK_NULL_HANDLE;
         VkDeviceMemory m_textureMemory = VK_NULL_HANDLE;
         uint m_width = 0, m_height = 0;
+        bool m_useNativeVkFormat = false;
+        VkFormat m_vkFormat;
         TextureFormat m_format = TextureFormat::None;
         bool IsSRVCreated = false;
         VkImageView m_textureView = VK_NULL_HANDLE;

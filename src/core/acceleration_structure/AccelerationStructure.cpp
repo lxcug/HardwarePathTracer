@@ -78,6 +78,10 @@ namespace Shadowy {
     }
 
     ASBuilder::~ASBuilder() {
+        for (auto blas : m_BLAS) {
+            delete blas;
+        }
+        delete m_TLAS;
         delete m_commandPool;
 
 #if PROFILE_AS_BUILD
@@ -89,7 +93,7 @@ namespace Shadowy {
                               VkBuildAccelerationStructureFlagsKHR BuildFlags) {
         uint NumBLAS = BuildInput.size();
         std::vector<ASBuildData> BuildData(NumBLAS);
-        m_BLAS.resize(NumBLAS);
+        m_BLAS.resize(NumBLAS, new Accel());
 
         VkDeviceSize MaxBuildScratchSize{0};
 
@@ -221,7 +225,7 @@ namespace Shadowy {
 
     auto ASBuilder::ParallelCreateBLAS(VkCommandBuffer CommandBuffer,
                                        std::vector<ASBuildData> &BuildData,
-                                       std::vector<Accel> &BLAS,
+                                       std::vector<Accel*> &BLAS,
                                        const std::vector<VkDeviceAddress> &ScratchAddresses,
                                        VkDeviceSize MemBudget) -> bool {
         VkDeviceSize MemUsed = 0;
@@ -240,7 +244,7 @@ namespace Shadowy {
 
     auto ASBuilder::BuildAccelerationStructures(VkCommandBuffer CommandBuffer,
                                                 std::vector<ASBuildData> &BuildData,
-                                                std::vector<Accel> &BLAS,
+                                                std::vector<Accel*> &BLAS,
                                                 const std::vector<VkDeviceAddress> &ScratchAddresses,
                                                 VkDeviceSize MemBudget,
                                                 VkDeviceSize CurrentBudget) -> VkDeviceSize {
@@ -261,26 +265,26 @@ namespace Shadowy {
                     VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
             CreateInfo.type = Data.ASType;
             CreateInfo.size = Data.SizeInfo.accelerationStructureSize;
-            CurrentBLAS.Buffer = new ArbitraryBuffer(CreateInfo.size,
+            CurrentBLAS->Buffer = new ArbitraryBuffer(CreateInfo.size,
                                                      VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
                                                      VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                                                      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-            CreateInfo.buffer = CurrentBLAS.Buffer->GetHandle();
+            CreateInfo.buffer = CurrentBLAS->Buffer->GetHandle();
             auto CreateASFunc = reinterpret_cast<PFN_vkCreateAccelerationStructureKHR>(vkGetDeviceProcAddr(
                     GetVKDevice(), "vkCreateAccelerationStructureKHR"));
-            CreateASFunc(GetVKDevice(), &CreateInfo, nullptr, &CurrentBLAS.AccelHandle);
+            CreateASFunc(GetVKDevice(), &CreateInfo, nullptr, &CurrentBLAS->AccelHandle);
             VkAccelerationStructureDeviceAddressInfoKHR DeviceAddressInfo{
                     VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
-            DeviceAddressInfo.accelerationStructure = CurrentBLAS.AccelHandle;
+            DeviceAddressInfo.accelerationStructure = CurrentBLAS->AccelHandle;
             auto GetASDeviceAddressFunc = reinterpret_cast<PFN_vkGetAccelerationStructureDeviceAddressKHR>(vkGetDeviceProcAddr(
                     GetVKDevice(), "vkGetAccelerationStructureDeviceAddressKHR"));
-            CurrentBLAS.Address = GetASDeviceAddressFunc(GetVKDevice(), &DeviceAddressInfo);
-            CollectedAccels.push_back(BLAS[s_currentBLASIndex].AccelHandle);
+            CurrentBLAS->Address = GetASDeviceAddressFunc(GetVKDevice(), &DeviceAddressInfo);
+            CollectedAccels.push_back(BLAS[s_currentBLASIndex]->AccelHandle);
 
             // Setup BuildInfo
             Data.BuildInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
             Data.BuildInfo.srcAccelerationStructure = VK_NULL_HANDLE;
-            Data.BuildInfo.dstAccelerationStructure = BLAS[s_currentBLASIndex].AccelHandle;
+            Data.BuildInfo.dstAccelerationStructure = BLAS[s_currentBLASIndex]->AccelHandle;
             Data.BuildInfo.scratchData.deviceAddress = ScratchAddresses[s_currentBLASIndex %
                                                                         ScratchAddresses.size()];
             Data.BuildInfo.geometryCount = Data.ASGeometries.size();
@@ -323,7 +327,9 @@ namespace Shadowy {
 
     void ASBuilder::BuildTLAS(std::vector<VkAccelerationStructureInstanceKHR> &Instances,
                               VkBuildAccelerationStructureFlagsKHR BuildFlags, bool Update) {
-        Check(m_TLAS.AccelHandle == VK_NULL_HANDLE || Update);
+        if (!Update) {
+            m_TLAS = new Accel();
+        }
 
         uint InstanceCount = Instances.size();
         auto CommandBuffer = m_commandPool->BeginCommandBuffer(QueueType::Graphics);
@@ -374,14 +380,14 @@ namespace Shadowy {
 
             CreateInfo.type = BuildData.ASType;
             CreateInfo.size = BuildData.SizeInfo.accelerationStructureSize;
-            m_TLAS.Buffer = new ArbitraryBuffer(CreateInfo.size,
+            m_TLAS->Buffer = new ArbitraryBuffer(CreateInfo.size,
                                                 VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
                                                 VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
                                                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-            CreateInfo.buffer = m_TLAS.Buffer->GetHandle();
+            CreateInfo.buffer = m_TLAS->Buffer->GetHandle();
             auto CreateASFunc = reinterpret_cast<PFN_vkCreateAccelerationStructureKHR>(vkGetDeviceProcAddr(
                     GetVKDevice(), "vkCreateAccelerationStructureKHR"));
-            CreateASFunc(GetVKDevice(), &CreateInfo, nullptr, &m_TLAS.AccelHandle);
+            CreateASFunc(GetVKDevice(), &CreateInfo, nullptr, &m_TLAS->AccelHandle);
 
 #if PROFILE_AS_BUILD
             vkCmdResetQueryPool(CommandBuffer, m_queryPool, 0, 2);
@@ -389,7 +395,7 @@ namespace Shadowy {
                                 VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
                                 m_queryPool, 0);
 #endif
-            BuildData.BuildInfo.dstAccelerationStructure = m_TLAS.AccelHandle;
+            BuildData.BuildInfo.dstAccelerationStructure = m_TLAS->AccelHandle;
             BuildData.BuildInfo.scratchData.deviceAddress = ScratchBufferAddress;
 
             auto BuildASFunc = reinterpret_cast<PFN_vkCmdBuildAccelerationStructuresKHR>(vkGetDeviceProcAddr(
@@ -422,7 +428,7 @@ namespace Shadowy {
 
         VkAccelerationStructureDeviceAddressInfoKHR AddressInfo{
                 VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
-        AddressInfo.accelerationStructure = m_BLAS[BLASIndex].AccelHandle;
+        AddressInfo.accelerationStructure = m_BLAS[BLASIndex]->AccelHandle;
 
         auto GetASDeviceAddressFunc = reinterpret_cast<PFN_vkGetAccelerationStructureDeviceAddressKHR>(vkGetDeviceProcAddr(
                 GetVKDevice(), "vkGetAccelerationStructureDeviceAddressKHR"));

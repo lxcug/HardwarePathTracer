@@ -12,7 +12,6 @@ BEGIN_SHADOWY_NAMESPACE
 
 struct ViewUniformBuffer
 {
-    // float4x4 ModelTrans;
     float4x4 ViewTrans;
     float4x4 ProjTrans;
 
@@ -24,11 +23,10 @@ struct ViewUniformBuffer
 
     uint FrameNum;
     float DeltaTime;
-};
 
-#if IS_COMPILING_SHADER
-ConstantBuffer<ViewUniformBuffer> view_uniform_buffer : register(b0, space0);
-#endif
+    int Width;
+    int Height;
+};
 
 END_SHADOWY_NAME_SPACE
 

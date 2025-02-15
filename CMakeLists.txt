@@ -16,11 +16,8 @@ MESSAGE(STATUS ${SOURCES})
 add_executable(Shadowy
         ${SOURCES}
         ${stb_SOURCES}
-        src/core/post_processing/ToneMapping.cpp
-        src/core/post_processing/ToneMapping.h
-        src/host_device_shared/ReSTIRCommon.h
-        src/core/restir/ReSTIRResource.cpp
-        src/core/restir/ReSTIRResource.h
+        src/core/post_processing/AccumulationPass.cpp
+        src/core/post_processing/AccumulationPass.h
 )
 
 target_include_directories(
@@ -37,4 +34,7 @@ target_link_libraries(
         PUBLIC imgui
         PUBLIC tinyobjloader
         PUBLIC ImGuiFileDialog
+        PUBLIC NRI
+        PUBLIC NRD
+        PUBLIC NRDIntegration
 )

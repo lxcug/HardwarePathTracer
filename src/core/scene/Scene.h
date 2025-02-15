@@ -80,19 +80,19 @@ namespace Shadowy {
 
         void CreateModelTextures(const std::vector<std::string> &TexturePaths);
 
-        void CreateModelDescDescriptorSet();
+        void CreateSceneDescriptorSet();
 
         void OnRecreate();
 
-        void UpdateModelDescDescriptorSets() const;
+        void UpdateSceneDescDescriptorSets() const;
 
-        [[nodiscard]] auto GetModelDescDescriptorSetLayout() const -> VkDescriptorSetLayout {
-            return m_modelDescDescriptorSetLayout;
+        [[nodiscard]] auto GetSceneDescriptorSetLayout() const -> VkDescriptorSetLayout {
+            return m_sceneDescDescriptorSetLayout;
         }
 
         [[nodiscard]] auto GetModelDescDescriptorSet(uint ImageIndex) const -> VkDescriptorSet {
             Check(ImageIndex < MAX_FRAMES_IN_FLIGHT);
-            return m_modelDescDescriptorSets[ImageIndex];
+            return m_sceneDescDescriptorSets[ImageIndex];
         }
 
         void CreateSceneLightsBuffer();
@@ -119,8 +119,8 @@ namespace Shadowy {
         static inline uint s_instanceIDCounter = 0; // TODO: dispatch instance index to models
         std::vector<std::shared_ptr<Texture2D>> m_sceneModelTextures;
 
-        VkDescriptorSetLayout m_modelDescDescriptorSetLayout = VK_NULL_HANDLE;
-        std::vector<VkDescriptorSet> m_modelDescDescriptorSets;
+        VkDescriptorSetLayout m_sceneDescDescriptorSetLayout = VK_NULL_HANDLE;
+        std::vector<VkDescriptorSet> m_sceneDescDescriptorSets;
 
         std::vector<Light> m_sceneLights;
         std::shared_ptr<ArbitraryBuffer> m_sceneLightsBuffer;

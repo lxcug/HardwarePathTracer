@@ -9,11 +9,13 @@
 #include "core/buffer/ArbitraryBuffer.h"
 #include "core/acceleration_structure/AccelerationStructure.h"
 #include "core/scene/Scene.h"
-#include "core/gbuffer/GBuffer.h"
+#include "core/gbuffer/GBufferPass.h"
 #include "host_device_shared/Light.h"
 #include "host_device_shared/RenderOptions.h"
 #include "core/post_processing/ToneMapping.h"
 #include "core/restir/ReSTIRResource.h"
+#include "GlobalTexture.h"
+#include "core/post_processing/AccumulationPass.h"
 
 
 namespace Shadowy {
@@ -25,14 +27,13 @@ namespace Shadowy {
 
         void ResetFrameNum() override
         {
-            m_PathTracingOptions.ShouldRenderThisFrame = 1;
             m_accumulatedFrameNum = 0;
             m_currentAccumulatedRenderTime = 0.f;
         }
 
         void InitVulkan() override;
 
-        void DrawFrame() override;
+        void RenderFrame() override;
 
         void CreateSyncObjects() override;
 
@@ -41,6 +42,16 @@ namespace Shadowy {
         void DrawImGuiFrame() override;
 
         void OnWindowResize() override;
+
+        void UpdateRenderOptions();
+
+        auto GetScene() -> Scene* {
+            return m_RTScene;
+        };
+
+        auto GetLastFrameSceneColor() -> Texture2D* {
+            return m_lastFrameViewportImage;
+        }
 
     protected:
         void InitRayTracing();
@@ -63,11 +74,7 @@ namespace Shadowy {
 
         void ResizeViewportImages();
 
-        void CreateGBuffer();
-
         void ReCompileShaders();
-
-        void CreatePostProcessPasses();
 
         VkDescriptorSetLayout m_RTDescriptorSetLayout = VK_NULL_HANDLE;
         std::vector<VkDescriptorSet> m_RTDescriptorSets;
@@ -82,7 +89,6 @@ namespace Shadowy {
             Intersection,
             StageIndicesMax
         };
-
         std::vector<VkRayTracingShaderGroupCreateInfoKHR> m_RTShaderGroups;
         ArbitraryBuffer *m_RTSBTBuffer = nullptr;
         VkStridedDeviceAddressRegionKHR m_rayGenRegion{};
@@ -95,17 +101,15 @@ namespace Shadowy {
 
         Scene *m_RTScene = nullptr;
 
-        std::vector<Texture2D *> m_viewportImages;
         Texture2D *m_lastFrameViewportImage = nullptr;
 
         glm::vec2 m_viewportSize = glm::vec2(1.f, 1.f);
+        glm::vec2 m_currentViewportImageSize = m_viewportSize;
         glm::vec2 m_viewportOffset = glm::vec2(0.f, 0.f);
         std::vector<VkDescriptorSet> m_viewportImageDescriptorSets;
-        GBuffer *m_gBuffer = nullptr;
-        PathTracingOptions m_PathTracingOptions;
+        PathTracingOptions m_pathTracingOptions;
         float m_currentAccumulatedRenderTime = 0.f;  // Seconds
         float m_maxRenderTime = 0.f;  // <= 0 means infinite accumulation
-        int m_maxAccumulatedFrames = 0; // <= 0 means infinite accumulation
 
         // NOTE: Store Last Frame Operations and Execute before RenderPipeline Begins
         std::vector<std::function<void()>> m_deferredOperations;
@@ -113,6 +117,16 @@ namespace Shadowy {
         ToneMappingPass *m_toneMappingPass = nullptr;
 
         ReSTIRResource* m_restirResource = nullptr;
+        // Delay several frames for correct accumulation when resize viewport images
+        inline static int s_numFramesToDelay = 3;
+        int m_currentDelayFrames = 0;
+
+        // Post Processing
+        GBufferPass* m_gbufferPass = nullptr;
+        AccumulationPass* m_accumulationPass = nullptr;
+
+    public:
+        GlobalTexture* m_globalTexture = nullptr;
     };
 } // namespace Shadowy
 

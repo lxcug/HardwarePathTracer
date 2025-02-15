@@ -20,9 +20,11 @@ namespace Shadowy {
 
         ~ToneMappingPass();
 
+        void DestroyPipeline();
+
         void CreateDescriptorSets();
 
-        void UpdateDescriptorSets(std::vector<Texture2D*> SceneColors);
+        void UpdateDescriptorSets();
 
         void CreatePipeline();
 

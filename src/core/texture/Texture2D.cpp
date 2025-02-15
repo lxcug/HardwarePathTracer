@@ -19,6 +19,46 @@ namespace Shadowy {
         CreateTexture(TexturePath);
     }
 
+    Texture2D::Texture2D(uint Width, uint Height, VkFormat Format, VkImageUsageFlags Usage,
+                         VkImageLayout InitialLayout)
+    : m_width(Width), m_height(Height), m_useNativeVkFormat(true), m_vkFormat(Format) {
+        VkImageCreateInfo CreateInfo{};
+        CreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        CreateInfo.imageType = VK_IMAGE_TYPE_2D;
+        CreateInfo.extent.width = Width;
+        CreateInfo.extent.height = Height;
+        CreateInfo.extent.depth = 1;
+        CreateInfo.mipLevels = 1;
+        CreateInfo.arrayLayers = 1;
+        CreateInfo.format = Format;
+        CreateInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        CreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        CreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        CreateInfo.usage = Usage;
+        CreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        VK_CHECK(vkCreateImage(GetVKDevice(), &CreateInfo, nullptr, &m_texture));
+
+        VkMemoryRequirements MemRequirements;
+        vkGetImageMemoryRequirements(GetVKDevice(), m_texture, &MemRequirements);
+        VkMemoryAllocateInfo AllocateInfo{};
+        AllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        AllocateInfo.allocationSize = MemRequirements.size;
+        AllocateInfo.memoryTypeIndex = RHI::FindMemoryType(MemRequirements.memoryTypeBits,
+                                                      VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        vkAllocateMemory(GetVKDevice(), &AllocateInfo, nullptr, &m_textureMemory);
+        vkBindImageMemory(GetVKDevice(), m_texture, m_textureMemory, 0);
+
+        RHI::TextureTransitionInput SrcInput{}, DstInput{};
+        SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
+        SrcInput.AccessMask = 0;
+        SrcInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
+        DstInput.Layout = InitialLayout;
+        DstInput.AccessMask = 0;
+        DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
+        RHI::TransitionTextureLayout(m_texture, 1, SrcInput, DstInput);
+    }
+
     Texture2D::Texture2D(uint Width, uint Height, TextureFormat Format, TextureUsage Usage,
                          uint MSAASamples, bool GenerateMips)
             : m_width(Width), m_height(Height), m_format(Format),
@@ -129,7 +169,7 @@ namespace Shadowy {
         VkImageViewCreateInfo CreateInfo{};
         CreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         CreateInfo.image = m_texture;
-        CreateInfo.format = GetVKFormat(m_format);
+        CreateInfo.format = m_useNativeVkFormat ? m_vkFormat : GetVKFormat(m_format);
         CreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
         VkImageAspectFlags AspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
         if (IsDepthStencilTexture(m_format)) {

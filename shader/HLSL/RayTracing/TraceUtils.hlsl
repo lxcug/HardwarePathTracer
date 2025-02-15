@@ -94,7 +94,7 @@ LightHitSample TraceSkyLight(in RayDesc ray, in Light light) {
 
     LightHitSample hit_sample;
     hit_sample.pdf = 1 / (4 * PI);
-    hit_sample.radiance = light.Intensity * sample_sky_texture(-ray.Direction);
+    hit_sample.radiance = light.Intensity * SkyTexture.SampleLevel(SkyTextureSampler, uint_vector_to_hdri_uv(-ray.Direction), 0).rgb;
     hit_sample.hit_t = render_options.MaxTraceDistance;
 
     return hit_sample;

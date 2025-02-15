@@ -59,6 +59,9 @@ namespace Shadowy::RHI {
         }
 
         VkResult Res = vkAllocateMemory(GlobalDevice, &AllocateInfo, nullptr, &BufferMemory);
+        if (Res != VK_SUCCESS) {
+            std::cerr << "Invalid Buffer Memory, Size " << AllocateInfo.allocationSize << "B" << std::endl;
+        }
 
         vkBindBufferMemory(GlobalDevice, Buffer, BufferMemory, 0);
     }

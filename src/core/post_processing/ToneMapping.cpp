@@ -15,8 +15,7 @@ namespace Shadowy {
         vkDestroyDescriptorSetLayout(GetVKDevice(), m_descriptorSetLayout, nullptr);
         vkFreeDescriptorSets(GetVKDevice(), VulkanBackendApp::GetApplication()->GetDescriptorPool(),
                              MAX_FRAMES_IN_FLIGHT, m_descriptorSets.data());
-        vkDestroyPipelineLayout(GetVKDevice(), m_pipelineLayout, nullptr);
-        vkDestroyPipeline(GetVKDevice(), m_pipeline, nullptr);
+        DestroyPipeline();
     }
 
     void ToneMappingPass::CreateDescriptorSets() {
@@ -43,12 +42,12 @@ namespace Shadowy {
         VK_CHECK(vkAllocateDescriptorSets(GetVKDevice(), &AllocateInfo, m_descriptorSets.data()));
     }
 
-    void ToneMappingPass::UpdateDescriptorSets(std::vector<Texture2D *> SceneColors) {
+    void ToneMappingPass::UpdateDescriptorSets() {
         std::array<VkWriteDescriptorSet, 1> DescriptorWrites{};
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkDescriptorImageInfo SceneColorBinding{};
             SceneColorBinding.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-            SceneColorBinding.imageView = SceneColors[i]->CreateSRV();
+            SceneColorBinding.imageView = GetViewportImages()[i]->CreateSRV();
             DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             DescriptorWrites[0].dstSet = m_descriptorSets[i];
             DescriptorWrites[0].dstBinding = 0;
@@ -108,6 +107,11 @@ namespace Shadowy {
         // TODO: now threadgroup size is fixed in shader
         glm::uvec3 ThreadGroupCount = Utils::GetThreadGroupCount({Width, Height, 1}, {16, 16, 1});
         vkCmdDispatch(CommandBuffer, ThreadGroupCount.x, ThreadGroupCount.y, ThreadGroupCount.z);
+    }
+
+    void ToneMappingPass::DestroyPipeline() {
+        vkDestroyPipelineLayout(GetVKDevice(), m_pipelineLayout, nullptr);
+        vkDestroyPipeline(GetVKDevice(), m_pipeline, nullptr);
     }
 
 }  // namespace Shadowy

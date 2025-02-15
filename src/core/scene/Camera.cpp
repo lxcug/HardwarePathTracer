@@ -30,6 +30,9 @@ namespace Shadowy
         {
             MoveSpeed *= .1f;
         }
+        if (Input::IsKeyPressed(KeyCode::LeftShift) || Input::IsKeyPressed(KeyCode::RightShift)) {
+            MoveSpeed *= 10.f;
+        }
         if (Input::IsKeyPressed(KeyCode::W))
         {
             m_cameraPos += MoveSpeed * GetForwardDirection();

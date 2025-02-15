@@ -20,3 +20,9 @@
 [submodule "vendor/stb"]
 	path = vendor/stb
 	url = https://github.com/nothings/stb.git
+[submodule "vendor/NRD"]
+	path = vendor/NRD
+	url = https://github.com/NVIDIA-RTX/NRD.git
+[submodule "vendor/nri"]
+	path = vendor/nri
+	url = https://github.com/NVIDIA-RTX/NRI.git

@@ -9,13 +9,14 @@
 
 namespace Shadowy {
     Scene::~Scene() {
-        vkDestroyDescriptorSetLayout(GetVKDevice(), m_modelDescDescriptorSetLayout, nullptr);
+        vkDestroyDescriptorSetLayout(GetVKDevice(), m_sceneDescDescriptorSetLayout, nullptr);
         vkFreeDescriptorSets(GetVKDevice(), VulkanBackendApp::GetApplication()->GetDescriptorPool(),
-                             m_modelDescDescriptorSets.size(), m_modelDescDescriptorSets.data());
+                             m_sceneDescDescriptorSets.size(), m_sceneDescDescriptorSets.data());
     }
 
     void Scene::CreateAccel() {
         m_accelBuilder = std::make_shared<ASBuilder>();
+        m_accelBuilder->ResetBLASIndex();
 
         std::vector<BLASBuildInput> BLASBuildVector;
         std::vector<VkAccelerationStructureInstanceKHR> TLASBuildVector;
@@ -66,7 +67,7 @@ namespace Shadowy {
         RHI::SubmitIntermediateCommandBuffer(CommandBuffer);
     }
 
-    void Scene::CreateModelDescDescriptorSet() {
+    void Scene::CreateSceneDescriptorSet() {
         VkDescriptorSetLayoutBinding ModelInfoBinding{};
         ModelInfoBinding.binding = 0;
         ModelInfoBinding.descriptorCount = 1;
@@ -102,26 +103,27 @@ namespace Shadowy {
         CreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         CreateInfo.bindingCount = Bindings.size();
         CreateInfo.pBindings = Bindings.data();
+        CreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
 
         VK_CHECK(vkCreateDescriptorSetLayout(GetVKDevice(), &CreateInfo, nullptr,
-                                             &m_modelDescDescriptorSetLayout));
+                                             &m_sceneDescDescriptorSetLayout));
 
         std::vector<VkDescriptorSetLayout> Layouts(
-                MAX_FRAMES_IN_FLIGHT, m_modelDescDescriptorSetLayout);
+                MAX_FRAMES_IN_FLIGHT, m_sceneDescDescriptorSetLayout);
         VkDescriptorSetAllocateInfo AllocateInfo{};
         AllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         AllocateInfo.descriptorPool = VulkanBackendApp::GetApplication()->GetDescriptorPool();
         AllocateInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
         AllocateInfo.pSetLayouts = Layouts.data();
 
-        m_modelDescDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+        m_sceneDescDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
         VK_CHECK(
                 vkAllocateDescriptorSets(GetVKDevice(), &AllocateInfo,
-                                         m_modelDescDescriptorSets.data()
+                                         m_sceneDescDescriptorSets.data()
                 ));
     }
 
-    void Scene::UpdateModelDescDescriptorSets() const {
+    void Scene::UpdateSceneDescDescriptorSets() const {
         std::array<VkWriteDescriptorSet, 4> DescriptorWrites{};
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkDescriptorBufferInfo ModelDescBufferInfo{};
@@ -131,7 +133,7 @@ namespace Shadowy {
             ModelDescBufferInfo.offset = 0;
             ModelDescBufferInfo.range = VK_WHOLE_SIZE;
             DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescriptorWrites[0].dstSet = m_modelDescDescriptorSets[i];
+            DescriptorWrites[0].dstSet = m_sceneDescDescriptorSets[i];
             DescriptorWrites[0].dstBinding = 0;
             DescriptorWrites[0].dstArrayElement = 0;
             DescriptorWrites[0].descriptorCount = 1;
@@ -149,7 +151,7 @@ namespace Shadowy {
                 TexturesInfos.emplace_back(TextureInfo);
             }
             DescriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescriptorWrites[1].dstSet = m_modelDescDescriptorSets[i];
+            DescriptorWrites[1].dstSet = m_sceneDescDescriptorSets[i];
             DescriptorWrites[1].dstBinding = 1;
             DescriptorWrites[1].dstArrayElement = 0;
             DescriptorWrites[1].descriptorCount = SceneModelTextures.size();
@@ -163,7 +165,7 @@ namespace Shadowy {
             SceneLightsBufferInfo.offset = 0;
             SceneLightsBufferInfo.range = VK_WHOLE_SIZE;
             DescriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescriptorWrites[2].dstSet = m_modelDescDescriptorSets[i];
+            DescriptorWrites[2].dstSet = m_sceneDescDescriptorSets[i];
             DescriptorWrites[2].dstBinding = 2;
             DescriptorWrites[2].dstArrayElement = 0;
             DescriptorWrites[2].descriptorCount = 1;
@@ -175,7 +177,7 @@ namespace Shadowy {
             SkyTextureInfo.imageView = m_skyTexture->CreateSRV();
             SkyTextureInfo.sampler = Sampler::GetDefaultSample()->GetHandle();
             DescriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescriptorWrites[3].dstSet = m_modelDescDescriptorSets[i];
+            DescriptorWrites[3].dstSet = m_sceneDescDescriptorSets[i];
             DescriptorWrites[3].dstBinding = 3;
             DescriptorWrites[3].dstArrayElement = 0;
             DescriptorWrites[3].descriptorCount = 1;
@@ -208,7 +210,7 @@ namespace Shadowy {
     void Scene::FinalizeScene() {
         CreateAccel();
         CreateModelDescBuffer();
-        AppendSkyLightToSceneLights();  // TODO: Reload Scene will create two SkyLightItem in Buffer
+        AppendSkyLightToSceneLights();  // TODO: Reload Scene will create two SkyLight in Buffer
         CreateSceneLightsBuffer();
         if (m_sceneModelTextures.empty()) {
             m_sceneModelTextures.emplace_back(
@@ -224,19 +226,21 @@ namespace Shadowy {
             RHI::TransitionTextureLayout(m_sceneModelTextures[0]->GetHandle(), 1, SrcInput,
                                          DstInput);
         }
+        CreateSceneDescriptorSet();
+        UpdateSceneDescDescriptorSets();
     }
 
     void Scene::OnRecreate() {
-        vkDestroyDescriptorSetLayout(GetVKDevice(), m_modelDescDescriptorSetLayout, nullptr);
+        vkDestroyDescriptorSetLayout(GetVKDevice(), m_sceneDescDescriptorSetLayout, nullptr);
         vkFreeDescriptorSets(GetVKDevice(), VulkanBackendApp::GetApplication()->GetDescriptorPool(),
-                             m_modelDescDescriptorSets.size(), m_modelDescDescriptorSets.data());
+                             m_sceneDescDescriptorSets.size(), m_sceneDescDescriptorSets.data());
         m_accelBuilder.reset();
         m_models.clear();
         m_modelDescs.clear();
         m_sceneModelDescBuffer.reset();
         m_sceneModelTextures.clear();
         s_instanceIDCounter = 0;
-        Shadowy::ASBuilder::OnRebuildAccel();
+        m_sceneLights.erase(m_sceneLights.end() - 1);
     }
 
     void Scene::AppendSkyLightToSceneLights() {
