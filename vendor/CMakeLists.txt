@@ -24,3 +24,13 @@ endif ()
 if (NOT TARGET glfw)
     add_subdirectory(glfw)
 endif ()
+
+if (NOT TARGET NRI)
+    set(NRI_STATIC_LIBRARY ON)
+    add_subdirectory(nri)
+endif ()
+
+if (NOT TARGET NRD AND NOT TARGET NRDIntegration)
+    set(NRD_STATIC_LIBRARY ON)
+    add_subdirectory(NRD)
+endif ()

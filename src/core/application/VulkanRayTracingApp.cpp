@@ -14,6 +14,36 @@
 
 
 namespace Shadowy {
+    auto GetTLAS() -> VkAccelerationStructureKHR {
+        return dynamic_cast<VulkanRayTracingApp*>(VulkanBackendApp::GetApplication())->GetScene()->GetAccelBuilder()->GetTLAS();
+    }
+
+    auto GetScene() -> Scene* {
+        return dynamic_cast<VulkanRayTracingApp*>(VulkanBackendApp::GetApplication())->GetScene();
+    }
+
+    auto GetViewportImages() -> std::vector<Texture2D*>& {
+        return dynamic_cast<VulkanRayTracingApp*>(VulkanBackendApp::GetApplication())->m_globalTexture->GetGlobalTexture(TextureType::SceneColor);
+    }
+
+    void CreateGlobalTexture(TextureType Type, uint Width, uint Height, VkFormat Format,
+                             VkImageUsageFlags Usage, VkImageLayout InitialLayout) {
+        return dynamic_cast<VulkanRayTracingApp*>(VulkanBackendApp::GetApplication())->
+                m_globalTexture->CreateGlobalTexture(Type, Width, Height, Format, Usage, InitialLayout);
+    }
+
+    auto GetGlobalTexture(TextureType Type, uint ImageIndex) -> Texture2D* {
+        return dynamic_cast<VulkanRayTracingApp*>(VulkanBackendApp::GetApplication())->m_globalTexture->GetGlobalTexture(Type, ImageIndex);
+    }
+
+    auto GetGlobalTextureHandle() -> GlobalTexture* {
+        return dynamic_cast<VulkanRayTracingApp*>(VulkanBackendApp::GetApplication())->m_globalTexture;
+    }
+
+    auto GetLastFrameSceneColor() -> Texture2D* {
+        return dynamic_cast<VulkanRayTracingApp*>(VulkanBackendApp::GetApplication())->GetLastFrameSceneColor();
+    }
+
     VulkanRayTracingApp::VulkanRayTracingApp(const std::string &Title) : VulkanBackendApp(Title) {
         DeviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
         DeviceExtensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
@@ -45,9 +75,11 @@ namespace Shadowy {
 
         InitRayTracing();
 
-        CreatePostProcessPasses();
-
-        m_camera->SetCameraPosition(glm::vec3(0, 0, 20));
+        // ¸©ÊÓÍ¼Î»ÖÃ
+        m_camera->SetCameraPosition(glm::vec3(-2.29f, 118.09f, 21.67f));
+        m_camera->SetCameraRotation(-1.21311, -0.000476454);
+//        m_camera->SetCameraPosition(glm::vec3(-0.66f, 19.46f, 70.f));
+//        m_camera->SetCameraPosition(glm::vec3(0, 0, 20));
 //        m_camera->SetCameraPosition(glm::vec3(-600, 510, 40));
 //        m_camera->SetCameraRotation(-0.13, -1.41);
 //        m_camera->SetCameraRotation(-glm::radians(10.f), glm::radians(10.f));
@@ -57,13 +89,20 @@ namespace Shadowy {
         Check(m_contextInited);
 
         while (!glfwWindowShouldClose(m_window)) {
+            glfwPollEvents();
+
             m_fpsCalculator->Tick();
+
+            if (m_frameBufferResized) {
+                OnWindowResize();
+                m_frameBufferResized = false;
+            }
 
             // NOTE: ResetFrameNum Should Invoke before m_accumulatedFrameNum++
             if (m_camera->IsMoving()) {
                 ResetFrameNum();
             }
-            if (!m_PathTracingOptions.EnableAccumulation || m_camera->IsMoving()) {
+            if (!m_accumulationPass->GetRenderOptions().EnableAccumulation || m_camera->IsMoving()) {
                 ResetFrameNum();
             }
             for (auto &Operation: m_deferredOperations) {
@@ -71,22 +110,23 @@ namespace Shadowy {
             }
             m_deferredOperations.clear();
 
+            if (m_currentDelayFrames-- > 0) {
+                ResetFrameNum();
+            }
+
+            UpdateRenderOptions();
+            RenderFrame();
+            Present();
+
             if (m_maxRenderTime <= 0.f || m_currentAccumulatedRenderTime < m_maxRenderTime) {
                 m_currentAccumulatedRenderTime += m_fpsCalculator->GetDeltaTime();
-            } else {
-                m_PathTracingOptions.ShouldRenderThisFrame = false;
             }
-            if (m_maxAccumulatedFrames <= 0 || m_accumulatedFrameNum < m_maxAccumulatedFrames) {
+            if (m_accumulationPass->GetRenderOptions().MaxAccumulatedFrames <= 0 ||
+                m_accumulatedFrameNum < m_accumulationPass->GetRenderOptions().MaxAccumulatedFrames) {
                 m_accumulatedFrameNum++;
-            } else {
-                m_PathTracingOptions.ShouldRenderThisFrame = false;
             }
             m_frameNum++;
             m_currentFrame = (m_currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-
-            glfwPollEvents();
-            DrawFrame();
-            Present();
         }
 
         vkDeviceWaitIdle(m_device);
@@ -94,13 +134,15 @@ namespace Shadowy {
     }
 
     void VulkanRayTracingApp::CleanUp() {
+        delete m_globalTexture;
+        m_gbufferPass->Release();
+        delete m_gbufferPass;
+        m_accumulationPass->Release();
+        delete m_accumulationPass;
+
         Sampler::ReleaseSamplers();
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            delete m_viewportImages[i];
-        }
         delete m_restirResource;
         delete m_toneMappingPass;
-        delete m_gBuffer;
         delete m_lastFrameViewportImage;
         delete m_RTScene;
         delete m_RTSBTBuffer;
@@ -109,10 +151,10 @@ namespace Shadowy {
         CleanUpSwapChain();
 
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            delete m_MVPUniformBuffers[i];
+            delete m_ViewUniformBuffers[i];
             vkDestroySemaphore(m_device, m_imageAvailableSemaphores[i], nullptr);
             vkDestroySemaphore(m_device, m_renderFinishedSemaphores[i], nullptr);
-            vkDestroyFence(m_device, m_graphicsInFlightFences[i], nullptr);
+            vkDestroyFence(m_device, m_frameInFlightFences[i], nullptr);
         }
 
         vkFreeDescriptorSets(m_device, m_descriptorPool,
@@ -132,29 +174,11 @@ namespace Shadowy {
         glfwTerminate();
     }
 
-    void VulkanRayTracingApp::DrawFrame() {
-        // Update ViewUniformBuffer
-        ViewUniformBuffer ViewUniformBuffer_{};
-        ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();
-        ViewUniformBuffer_.ProjTrans = m_camera->GetProjMatrix();
-        ViewUniformBuffer_.CameraPos = m_camera->GetCameraPos();
-        ViewUniformBuffer_.DeltaTime = m_fpsCalculator
-                                       ? static_cast<float>(m_fpsCalculator->GetDeltaTime())
-                                       : 0.f;
-        ViewUniformBuffer_.AccumulatedFrameNum = m_accumulatedFrameNum;
-        ViewUniformBuffer_.FrameNum = m_frameNum;
-        ViewUniformBuffer_.InvView = glm::transpose(m_camera->GetViewMatrix());
-        ViewUniformBuffer_.InvProj = glm::inverse(m_camera->GetProjMatrix());
-        m_MVPUniformBuffers[m_imageIndex]->Update(&ViewUniformBuffer_);
-
-        vkWaitForFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame], VK_TRUE,
+    void VulkanRayTracingApp::RenderFrame() {
+        // Wait for frame fence
+        vkWaitForFences(m_device, 1, &m_frameInFlightFences[m_currentFrame], VK_TRUE,
                         UINT64_MAX);
-        vkResetFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame]);
-
-        if (m_frameBufferResized) {
-            OnWindowResize();
-            m_frameBufferResized = false;
-        }
+        vkResetFences(m_device, 1, &m_frameInFlightFences[m_currentFrame]);
 
         // Wait for image available
         VkResult Result = vkAcquireNextImageKHR(m_device, m_swapChain.SwapChainHandle, UINT64_MAX,
@@ -167,36 +191,16 @@ namespace Shadowy {
         }
 
         auto CommandBuffer = m_computeCommandBuffers[m_currentFrame];
-        auto CurrentFrameViewportImage = m_viewportImages[m_imageIndex];
+        auto CurrentFrameViewportImage = m_globalTexture->GetGlobalTexture(TextureType::SceneColor, m_currentFrame);
+
         vkResetCommandBuffer(CommandBuffer, 0);
         VkCommandBufferBeginInfo BeginInfo{};
         BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         VK_CHECK(vkBeginCommandBuffer(CommandBuffer, &BeginInfo));
 
-        RHI::TextureTransitionInput SrcInput{}, DstInput{};
-        SrcInput.Layout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
-        SrcInput.AccessMask = 0;
-        SrcInput.PipelineStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        DstInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
-        DstInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-        DstInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
-        RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameViewportImage->GetHandle(), 1,
-                                     SrcInput, DstInput);
+        m_gbufferPass->Dispatch(CommandBuffer, m_imageIndex);
 
-        RHI::TransitionTextureLayout(CommandBuffer,
-                                     m_gBuffer->GetGBufferAlbedo(m_imageIndex)->GetHandle(),
-                                     1, SrcInput, DstInput);
-        RHI::TransitionTextureLayout(CommandBuffer,
-                                     m_gBuffer->GetGBufferNormal(m_imageIndex)->GetHandle(),
-                                     1, SrcInput, DstInput);
-        RHI::TransitionTextureLayout(CommandBuffer,
-                                     m_gBuffer->GetGBufferPos(m_imageIndex)->GetHandle(),
-                                     1, SrcInput, DstInput);
-        RHI::TransitionTextureLayout(CommandBuffer,
-                                     m_gBuffer->GetGBufferDepth(m_imageIndex)->GetHandle(),
-                                     1, SrcInput, DstInput);
-
-        // TODO: Add RayTracing Code Here
+        // Dispatch Ray Tracing Pass
         std::array<VkDescriptorSet, 2> BindingDescriptorSets = {
                 m_RTDescriptorSets[m_imageIndex],
                 m_RTScene->GetModelDescDescriptorSet(m_imageIndex)
@@ -210,140 +214,169 @@ namespace Shadowy {
                                 0, BindingDescriptorSets.size(),
                                 BindingDescriptorSets.data(),
                                 0, nullptr);
-        m_PathTracingOptions.NumLights = m_RTScene->GetSceneLights().size();
         vkCmdPushConstants(CommandBuffer, m_RTPipelineLayout,
                            VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
                            VK_SHADER_STAGE_MISS_BIT_KHR,
-                           0, sizeof(PathTracingOptions), &m_PathTracingOptions);
-        auto RayTraceFunc = reinterpret_cast<PFN_vkCmdTraceRaysKHR>(vkGetDeviceProcAddr(m_device,
-                                                                                        "vkCmdTraceRaysKHR"));
+                           0, sizeof(PathTracingOptions), &m_pathTracingOptions);
+
+        auto RayTraceFunc = reinterpret_cast<PFN_vkCmdTraceRaysKHR>(vkGetDeviceProcAddr(
+                m_device, "vkCmdTraceRaysKHR"));
         RayTraceFunc(CommandBuffer, &m_rayGenRegion, &m_missRegion, &m_hitRegion,
                      &m_callRegion, m_viewportSize.x, m_viewportSize.y, 1);
 
-        /*
-         * Transition Current ColorAttach to VK_IMAGE_LAYOUT_VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
-         * Transition m_lastFrameSceneColor to VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL for CopyImage
-         */
-        SrcInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
+//        if (m_pathTracingOptions.EnableReSTIRGI) {
+//            VkMemoryBarrier ReservoirBufferBarrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+//            ReservoirBufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+//            ReservoirBufferBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+//            vkCmdPipelineBarrier(CommandBuffer,
+//                                 VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+//                                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+//                                 0, 1, &ReservoirBufferBarrier,
+//                                 0, nullptr, 0, nullptr);
+//
+//            m_restirResource->DispatchTemporalReusePass(CommandBuffer, CurrentFrameViewportImage,
+//                                                        m_imageIndex,
+//                                                        m_viewportSize.x, m_viewportSize.y);
+//            m_restirResource->DispatchSpatialReusePass(CommandBuffer, CurrentFrameViewportImage,
+//                                                       m_imageIndex,
+//                                                       m_viewportSize.x, m_viewportSize.y);
+//        }
+
+        RHI::TextureTransitionInput SrcInput{}, DstInput{};
+//        SrcInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
+//        SrcInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+//        SrcInput.PipelineStage = m_pathTracingOptions.EnableReSTIRGI
+//                                 ? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+//                                 : VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
+//        DstInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+//        DstInput.AccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+//        DstInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+//        RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameViewportImage->GetHandle(), 1,
+//                                     SrcInput, DstInput);
+//        SrcInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+//        SrcInput.AccessMask = 0;
+//        SrcInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
+//        DstInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+//        DstInput.AccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+//        DstInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+//        RHI::TransitionTextureLayout(CommandBuffer, m_lastFrameViewportImage->GetHandle(), 1,
+//                                     SrcInput,
+//                                     DstInput);
+//
+//        VkImageCopy ImageCopy{};
+//        ImageCopy.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+//        ImageCopy.srcSubresource.baseArrayLayer = 0;
+//        ImageCopy.srcSubresource.layerCount = 1;
+//        ImageCopy.srcSubresource.mipLevel = 0;
+//        ImageCopy.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+//        ImageCopy.dstSubresource.baseArrayLayer = 0;
+//        ImageCopy.dstSubresource.layerCount = 1;
+//        ImageCopy.dstSubresource.mipLevel = 0;
+//        VkOffset3D Offset{0, 0, 0};
+//        ImageCopy.srcOffset = Offset;
+//        ImageCopy.dstOffset = Offset;
+//        VkExtent3D Extent3D{
+//                static_cast<uint>(m_currentViewportImageSize.x), static_cast<uint>(m_currentViewportImageSize.y), 1
+//        };
+//        ImageCopy.extent = Extent3D;
+//        vkCmdCopyImage(
+//                CommandBuffer,
+//                CurrentFrameViewportImage->GetHandle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+//                m_lastFrameViewportImage->GetHandle(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+//                1, &ImageCopy
+//        );
+//        SrcInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+//        SrcInput.AccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+//        SrcInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+//        DstInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
+//        DstInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+//        DstInput.PipelineStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+//        RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameViewportImage->GetHandle(),
+//                                     1, SrcInput, DstInput);
+//        SrcInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+//        SrcInput.AccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+//        SrcInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+//        DstInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+//        DstInput.AccessMask = 0;
+//        DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
+//        RHI::TransitionTextureLayout(CommandBuffer, m_lastFrameViewportImage->GetHandle(),
+//                                     1, SrcInput, DstInput);
+
         SrcInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
         SrcInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
-        DstInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        DstInput.AccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-        DstInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameViewportImage->GetHandle(), 1,
-                                     SrcInput, DstInput);
-        SrcInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        SrcInput.AccessMask = VK_ACCESS_2_SHADER_READ_BIT;
-        SrcInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
-        DstInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        DstInput.AccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        DstInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        RHI::TransitionTextureLayout(CommandBuffer, m_lastFrameViewportImage->GetHandle(), 1,
-                                     SrcInput,
-                                     DstInput);
-        VkImageCopy ImageCopy{};
-        ImageCopy.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        ImageCopy.srcSubresource.baseArrayLayer = 0;
-        ImageCopy.srcSubresource.layerCount = 1;
-        ImageCopy.srcSubresource.mipLevel = 0;
-        ImageCopy.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        ImageCopy.dstSubresource.baseArrayLayer = 0;
-        ImageCopy.dstSubresource.layerCount = 1;
-        ImageCopy.dstSubresource.mipLevel = 0;
-        VkOffset3D Offset{0, 0, 0};
-        ImageCopy.srcOffset = Offset;
-        ImageCopy.dstOffset = Offset;
-        VkExtent3D Extent3D{
-                static_cast<uint>(m_viewportSize.x), static_cast<uint>(m_viewportSize.y), 1
-        };
-        ImageCopy.extent = Extent3D;
-        vkCmdCopyImage(
-                CommandBuffer,
-                CurrentFrameViewportImage->GetHandle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                m_lastFrameViewportImage->GetHandle(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                1, &ImageCopy
-        );
-
-        // NOTE: Must Do Tone Mapping after Copy To LastFrameViewportImage, since ToneMapped color shouldn't be accumulate
-        SrcInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        SrcInput.AccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-        SrcInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        DstInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
+        SrcInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
         DstInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
         DstInput.PipelineStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-        RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameViewportImage->GetHandle(), 1,
-                                     SrcInput, DstInput);
+        DstInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
+        RHI::TransitionTextureLayout(CommandBuffer,
+                                     m_globalTexture->GetGlobalTexture(TextureType::SceneColor, m_imageIndex)->GetHandle(),
+                                     1, SrcInput, DstInput);
+        RHI::TransitionTextureLayout(CommandBuffer,
+                                     m_lastFrameViewportImage->GetHandle(),
+                                     1, SrcInput, DstInput);
 
-        // Sync RT and ToneMapping Pass
+
+        m_accumulationPass->Dispatch(CommandBuffer, m_imageIndex);
+
+        SrcInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        SrcInput.PipelineStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        SrcInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
+        DstInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        DstInput.PipelineStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        DstInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
+        RHI::TransitionTextureLayout(CommandBuffer,
+                                     m_globalTexture->GetGlobalTexture(TextureType::SceneColor, m_imageIndex)->GetHandle(),
+                                     1, SrcInput, DstInput);
+        RHI::TransitionTextureLayout(CommandBuffer,
+                                     m_lastFrameViewportImage->GetHandle(),
+                                     1, SrcInput, DstInput);
+
+        bool ShouldToneMapping = m_toneMappingPass->GetPassRenderOptions().EnableToneMapping |
+                                 m_toneMappingPass->GetPassRenderOptions().EnableGammaCorrection;
+
         VkImageMemoryBarrier Barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
         Barrier.image = CurrentFrameViewportImage->GetHandle();
         Barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
         Barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
         Barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         Barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-        Barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        Barrier.dstAccessMask = ShouldToneMapping ? VK_ACCESS_SHADER_WRITE_BIT
+                                                  : VK_ACCESS_SHADER_READ_BIT;
         Barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         Barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         Barrier.subresourceRange.baseMipLevel = 0;
         Barrier.subresourceRange.levelCount = 1;
         Barrier.subresourceRange.baseArrayLayer = 0;
         Barrier.subresourceRange.layerCount = 1;
-        vkCmdPipelineBarrier(CommandBuffer, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
-                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr,
+        vkCmdPipelineBarrier(CommandBuffer,
+                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                             ShouldToneMapping ? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT :
+                             VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                             0, 0, nullptr, 0, nullptr,
                              1, &Barrier);
-        m_toneMappingPass->Dispatch(CommandBuffer, m_imageIndex, m_viewportSize.x,
-                                    m_viewportSize.y);
 
-        /*
-         * Transition Current ColorAttach to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR/VK_IMAGE_LAYOUT_GENERAL(if ToneMapping) for ColorAttach and Present
-         * Transition m_lastFrameSceneColor to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-         */
-        SrcInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
-        SrcInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-        SrcInput.PipelineStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-        DstInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        DstInput.AccessMask = VK_ACCESS_SHADER_READ_BIT;
-        DstInput.PipelineStage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameViewportImage->GetHandle(), 1,
-                                     SrcInput, DstInput);
-        SrcInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        SrcInput.AccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        SrcInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        DstInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        DstInput.AccessMask = VK_ACCESS_SHADER_READ_BIT;
-        DstInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
-        RHI::TransitionTextureLayout(CommandBuffer, m_lastFrameViewportImage->GetHandle(),
-                                     1, SrcInput, DstInput);
+        if (ShouldToneMapping) {
+            m_toneMappingPass->Dispatch(CommandBuffer, m_imageIndex, m_viewportSize.x,
+                                        m_viewportSize.y);
+        }
 
-        SrcInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
-        SrcInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-        SrcInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
-        DstInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        DstInput.AccessMask = VK_ACCESS_SHADER_READ_BIT;
-        DstInput.PipelineStage = VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-        RHI::TransitionTextureLayout(CommandBuffer,
-                                     m_gBuffer->GetGBufferAlbedo(m_imageIndex)->GetHandle(),
-                                     1, SrcInput, DstInput);
-        RHI::TransitionTextureLayout(CommandBuffer,
-                                     m_gBuffer->GetGBufferNormal(m_imageIndex)->GetHandle(),
-                                     1, SrcInput, DstInput);
-        RHI::TransitionTextureLayout(CommandBuffer,
-                                     m_gBuffer->GetGBufferPos(m_imageIndex)->GetHandle(),
-                                     1, SrcInput, DstInput);
-        RHI::TransitionTextureLayout(CommandBuffer,
-                                     m_gBuffer->GetGBufferDepth(m_imageIndex)->GetHandle(),
-                                     1, SrcInput, DstInput);
+        VkMemoryBarrier MemBarrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+        MemBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        MemBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        vkCmdPipelineBarrier(CommandBuffer,
+                             VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                             VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                             0, 1, &MemBarrier,
+                             0, nullptr, 0, nullptr);
 
         m_imguiInfrastructure->BeginImGui();
         DrawImGuiFrame();
         m_imguiInfrastructure->EndImGui(CommandBuffer);
 
         vkEndCommandBuffer(CommandBuffer);
-        // Submit Commands
-        VkSubmitInfo SubmitInfo{};
-        SubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+        VkSubmitInfo SubmitInfo{VK_STRUCTURE_TYPE_SUBMIT_INFO};
         std::array<VkSemaphore, 1> WaitSemaphores = {
                 m_imageAvailableSemaphores[m_currentFrame]
         };
@@ -353,19 +386,19 @@ namespace Shadowy {
         SubmitInfo.pWaitDstStageMask = WaitStages.data();
         SubmitInfo.waitSemaphoreCount = WaitSemaphores.size();
         SubmitInfo.pWaitSemaphores = WaitSemaphores.data();
+        SubmitInfo.signalSemaphoreCount = 1;
+        SubmitInfo.pSignalSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
 
         SubmitInfo.commandBufferCount = 1;
         SubmitInfo.pCommandBuffers = &CommandBuffer;
-        SubmitInfo.signalSemaphoreCount = 1;
-        SubmitInfo.pSignalSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
-        VK_CHECK(vkQueueSubmit(m_commandPool->GetGraphicsQueue(), 1, &SubmitInfo,
-                               m_graphicsInFlightFences[m_currentFrame]));
+        VK_CHECK(vkQueueSubmit(m_commandPool->GetComputeQueue(), 1, &SubmitInfo,
+                               m_frameInFlightFences[m_currentFrame]));
     }
 
     void VulkanRayTracingApp::CreateSyncObjects() {
         m_imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         m_renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-        m_graphicsInFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+        m_frameInFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
 
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkSemaphoreCreateInfo SemaphoreInfo{};
@@ -374,8 +407,8 @@ namespace Shadowy {
             VkFenceCreateInfo FenceInfo{};
             FenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
             FenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+            VK_CHECK(vkCreateFence(m_device, &FenceInfo, nullptr, &m_frameInFlightFences[i]));
 
-            VK_CHECK(vkCreateFence(m_device, &FenceInfo, nullptr, &m_graphicsInFlightFences[i]));
             VK_CHECK(vkCreateSemaphore(m_device, &SemaphoreInfo, nullptr,
                                        &m_imageAvailableSemaphores[i]));
             VK_CHECK(vkCreateSemaphore(m_device, &SemaphoreInfo, nullptr,
@@ -384,22 +417,46 @@ namespace Shadowy {
     }
 
     void VulkanRayTracingApp::InitRayTracing() {
+        m_globalTexture = new GlobalTexture();
+
         // Requesting ray tracing properties
         VkPhysicalDeviceProperties2 Props2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
         Props2.pNext = &m_RTProps;
         vkGetPhysicalDeviceProperties2(m_physicalDevice, &Props2);
 
         CreateViewportImages();
-        CreateGBuffer();
 
         InitScene();
+
+        m_restirResource = new ReSTIRResource(m_viewportSize.x, m_viewportSize.y);
+        m_restirResource->CreateTemporalReusePassSets();
+        m_restirResource->CreateTemporalReusePassPipeline();
+        m_restirResource->CreateSpatialReusePassSets();
+        m_restirResource->CreateSpatialReusePassPipeline();
+
         CreateRTDescriptorSets();
-        UpdateRTDescriptorSets();
         CreateRTPipelineLayout();
         CreateRTPipeline();
         CreateRTSBT();
 
-        m_restirResource = new ReSTIRResource(m_viewportSize.x, m_viewportSize.y);
+        m_gbufferPass = new GBufferPass();
+        m_gbufferPass->Init(m_viewportSize.x, m_viewportSize.y);
+        m_gbufferPass->CreateSets();
+        m_gbufferPass->CreatePipeline();
+
+        m_accumulationPass = new AccumulationPass();
+        m_accumulationPass->Init(m_viewportSize.x, m_viewportSize.y);
+        m_accumulationPass->CreateSets();
+        m_accumulationPass->CreatePipeline();
+
+        m_toneMappingPass = new ToneMappingPass();
+
+        UpdateRTDescriptorSets();
+        m_gbufferPass->UpdateSets();
+        m_accumulationPass->UpdateSets();
+        m_restirResource->UpdateTemporalReusePassSets();
+        m_restirResource->UpdateSpatialReusePassSets();
+        m_toneMappingPass->UpdateDescriptorSets();
     }
 
     void VulkanRayTracingApp::DrawImGuiFrame() {
@@ -419,7 +476,7 @@ namespace Shadowy {
                 m_viewportSize.y = ViewportSize.y;
                 m_deferredOperations.emplace_back([this]() {
                     ResizeViewportImages();
-                    m_gBuffer->OnResize(m_viewportSize);
+                    ResetFrameNum();
                 });
             }
 
@@ -436,48 +493,6 @@ namespace Shadowy {
 
         static bool ShouldReAccumulate = false;
         ShouldReAccumulate = false;
-        static bool ShowGBuffer = false;
-        {
-            if (ShowGBuffer) {
-                ImGui::Begin("GBuffer");
-                ImVec2 GBufferWindowSize = ImGui::GetContentRegionAvail();
-                float ViewPortAspectRatio = m_viewportSize.x / m_viewportSize.y;
-                float GBufferAspectRatio = GBufferWindowSize.x / GBufferWindowSize.y;
-
-                ImVec2 ImageRegion{};
-                // GBuffer Window Width is lager, align with WindowHeight
-                if (GBufferAspectRatio >= ViewPortAspectRatio) {
-                    ImageRegion = {
-                            GBufferWindowSize.y * ViewPortAspectRatio, GBufferWindowSize.y
-                    };
-                } else // GBuffer Window Height is lager, align with WindowWidth
-                {
-                    ImageRegion = {
-                            GBufferWindowSize.x, GBufferWindowSize.x / ViewPortAspectRatio
-                    };
-                }
-                ImVec2 SizePerGBufferImage = {
-                        ImageRegion.x / 2.05f, ImageRegion.y / 2.05f
-                };
-
-                ImGui::Image(reinterpret_cast<ImTextureID>(m_gBuffer->GetGBufferAlbedoDescriptorSet(
-                                     m_imageIndex)),
-                             SizePerGBufferImage);
-                ImGui::SameLine();
-                ImGui::Image(reinterpret_cast<ImTextureID>(m_gBuffer->GetGBufferNormalDescriptorSet(
-                                     m_imageIndex)),
-                             SizePerGBufferImage);
-                ImGui::Image(reinterpret_cast<ImTextureID>(m_gBuffer->GetGBufferPosDescriptorSet(
-                                     m_imageIndex)),
-                             SizePerGBufferImage);
-                ImGui::SameLine();
-                ImGui::Image(reinterpret_cast<ImTextureID>(m_gBuffer->GetGBufferDepthDescriptorSet(
-                                     m_imageIndex)),
-                             SizePerGBufferImage);
-
-                ImGui::End();
-            }
-        }
 
         {
             ImGuiInfrastructure::Begin("Settings");
@@ -504,9 +519,9 @@ namespace Shadowy {
                 Input::IsKeyPressed(KeyCode::LeftControl) &&
                 Input::IsKeyPressed(KeyCode::LeftAlt) && Input::IsKeyPressed(KeyCode::Period)) {
                 m_deferredOperations.emplace_back([this]() {
-                    ResetFrameNum();
                     vkDeviceWaitIdle(m_device);
                     ReCompileShaders();
+                    ResetFrameNum();
                 });
             }
 
@@ -514,13 +529,12 @@ namespace Shadowy {
             ImGui::Separator();
             ImGui::NewLine();
             ImGui::Text("Render Options");
-            ImGui::Checkbox("Show GBuffer", &ShowGBuffer);
             ShouldReAccumulate |= ImGui::Checkbox("Enable AO",
-                                                  reinterpret_cast<bool *>(&m_PathTracingOptions.EnableAO));
-            ShouldReAccumulate |= ImGui::InputInt("Num AO Rays", &m_PathTracingOptions.NumAORays,
+                                                  reinterpret_cast<bool *>(&m_pathTracingOptions.EnableAO));
+            ShouldReAccumulate |= ImGui::InputInt("Num AO Rays", &m_pathTracingOptions.NumAORays,
                                                   1.f);
             ShouldReAccumulate |= ImGui::InputFloat("AO Ray Length",
-                                                    &m_PathTracingOptions.AORayLength,
+                                                    &m_pathTracingOptions.AORayLength,
                                                     .5f, 1.f, "%.1f");
             ShouldReAccumulate |= ImGui::Checkbox("Enable Gamma Correction",
                                                   reinterpret_cast<bool *>(&m_toneMappingPass->GetPassRenderOptions().EnableGammaCorrection));
@@ -534,14 +548,24 @@ namespace Shadowy {
             ImGui::Separator();
             ImGui::NewLine();
             ImGui::Text("Path Tracing Options");
+            ShouldReAccumulate |= ImGui::Checkbox("Enable ReSTIRGI",
+                                                  reinterpret_cast<bool *>(&m_pathTracingOptions.EnableReSTIRGI));
+            ShouldReAccumulate |= ImGui::Checkbox("Enable SpatialReuse",
+                                                  reinterpret_cast<bool *>(&m_restirResource->GetSpatialReuseOptions().EnableSpatialReuse));
+            ShouldReAccumulate |= ImGui::InputInt("Reuse Radius",
+                                                  &m_restirResource->GetSpatialReuseOptions().ReuseRadius,
+                                                  1);
+            ShouldReAccumulate |= ImGui::Checkbox("Show Indirect Only",
+                                                  reinterpret_cast<bool *>(&m_pathTracingOptions.ShowIndirectOnly));
             ShouldReAccumulate |= ImGui::Checkbox("Enable Accumulation",
-                                                  reinterpret_cast<bool *>(&m_PathTracingOptions.EnableAccumulation));
-            ShouldReAccumulate |= ImGui::InputInt("Max Accumulated Frames", &m_maxAccumulatedFrames);
+                                                  reinterpret_cast<bool *>(&m_accumulationPass->GetRenderOptions().EnableAccumulation));
+            ShouldReAccumulate |= ImGui::InputInt("Max Accumulated Frames",
+                                                  &m_accumulationPass->GetRenderOptions().MaxAccumulatedFrames);
             ShouldReAccumulate |= ImGui::InputFloat("Max Render Time In Seconds", &m_maxRenderTime);
             ShouldReAccumulate |= ImGui::Checkbox("Enable Emissive",
-                                                  reinterpret_cast<bool *>(&m_PathTracingOptions.EnableEmissive));
+                                                  reinterpret_cast<bool *>(&m_pathTracingOptions.EnableEmissive));
             ShouldReAccumulate |= ImGui::Checkbox("Deferred Trace Light",
-                                                  reinterpret_cast<bool *>(&m_PathTracingOptions.DeferredTraceMaterial));
+                                                  reinterpret_cast<bool *>(&m_pathTracingOptions.DeferredTraceMaterial));
             static std::array<const char *, 3> items = {"Sample Light Only",
                                                         "Sample Material Only", "MIS"};
             static int item_current_idx = 2;
@@ -558,13 +582,13 @@ namespace Shadowy {
                 }
                 ImGui::EndCombo();
             }
-            m_PathTracingOptions.MISMode = item_current_idx;
+            m_pathTracingOptions.MISMode = item_current_idx;
             ShouldReAccumulate |= ImGui::InputFloat("Min Ray Bias",
-                                                    &m_PathTracingOptions.RayMinBias,
+                                                    &m_pathTracingOptions.RayMinBias,
                                                     1e-3f);
-            ShouldReAccumulate |= ImGui::InputInt("Bounce", &m_PathTracingOptions.Bounce, 1.f);
+            ShouldReAccumulate |= ImGui::InputInt("Bounce", &m_pathTracingOptions.Bounce, 1);
             ShouldReAccumulate |= ImGui::Checkbox("Enable SkyLight",
-                                                  reinterpret_cast<bool *>(&m_PathTracingOptions.EnableSkyLight));
+                                                  reinterpret_cast<bool *>(&m_pathTracingOptions.EnableSkyLight));
 
             // TODO: Choose Obj
             if (ImGui::Button("Open Obj")) {
@@ -585,9 +609,8 @@ namespace Shadowy {
                     std::string FilePathName = ImGuiFileDialog::Instance()->GetFilePathName();
                     std::string FilePath = ImGuiFileDialog::Instance()->GetCurrentPath();
                     m_deferredOperations.emplace_back([this, FilePathName]() {
-                        vkDeviceWaitIdle(m_device);
-                        ResetFrameNum();
                         ReloadScene(std::filesystem::path(FilePathName));
+                        ResetFrameNum();
                     });
                 }
                 ImGuiFileDialog::Instance()->Close();
@@ -600,7 +623,7 @@ namespace Shadowy {
                     m_deferredOperations.emplace_back([this, FilePathName]() {
                         ResetFrameNum();
                         m_RTScene->CreateSkyTexture(FilePathName);
-                        m_RTScene->UpdateModelDescDescriptorSets();
+                        m_RTScene->UpdateSceneDescDescriptorSets();
                     });
                 }
                 ImGuiFileDialog::Instance()->Close();
@@ -645,7 +668,7 @@ namespace Shadowy {
                 m_deferredOperations.emplace_back([this]() {
                     ResetFrameNum();
                     m_RTScene->CreateSceneLightsBuffer();
-                    m_RTScene->UpdateModelDescDescriptorSets();
+                    m_RTScene->UpdateSceneDescDescriptorSets();
                 });
             }
 
@@ -683,25 +706,45 @@ namespace Shadowy {
         VkDescriptorSetLayoutBinding InImageBinding{};
         InImageBinding.binding = 3;
         InImageBinding.descriptorCount = 1;
-        InImageBinding.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        InImageBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         InImageBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
         VkDescriptorSetLayoutBinding GBufferBinding{};
         GBufferBinding.binding = 4;
-        GBufferBinding.descriptorCount = 4;
+        GBufferBinding.descriptorCount = 3;
         GBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         GBufferBinding.stageFlags =
                 VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
-        std::array<VkDescriptorSetLayoutBinding, 5> Bindings = {
-                ViewUniformBufferBinding, TLASBinding, OutImageBinding, InImageBinding,
-                GBufferBinding
+        VkDescriptorSetLayoutBinding InitialSampleBufferBinding{};
+        InitialSampleBufferBinding.binding = 5;
+        InitialSampleBufferBinding.descriptorCount = 1;
+        InitialSampleBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        InitialSampleBufferBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+
+        VkDescriptorSetLayoutBinding DiffuseHitDisBinding{};
+        DiffuseHitDisBinding.binding = 6;
+        DiffuseHitDisBinding.descriptorCount = 1;
+        DiffuseHitDisBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        DiffuseHitDisBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+
+        VkDescriptorSetLayoutBinding SpecularHitDisBinding{};
+        SpecularHitDisBinding.binding = 7;
+        SpecularHitDisBinding.descriptorCount = 1;
+        SpecularHitDisBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        SpecularHitDisBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+
+        std::array<VkDescriptorSetLayoutBinding, 8> Bindings = {
+                ViewUniformBufferBinding, TLASBinding, OutImageBinding,
+                InImageBinding, GBufferBinding, InitialSampleBufferBinding,
+                DiffuseHitDisBinding, SpecularHitDisBinding
         };
 
         VkDescriptorSetLayoutCreateInfo CreateInfo{};
         CreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
         CreateInfo.bindingCount = Bindings.size();
         CreateInfo.pBindings = Bindings.data();
+        CreateInfo.flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_UPDATE_AFTER_BIND_POOL_BIT_EXT;
 
         VK_CHECK(vkCreateDescriptorSetLayout(m_device, &CreateInfo, nullptr,
                                              &m_RTDescriptorSetLayout));
@@ -716,16 +759,13 @@ namespace Shadowy {
 
         m_RTDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
         VK_CHECK(vkAllocateDescriptorSets(m_device, &AllocateInfo, m_RTDescriptorSets.data()));
-
-        // Create Model Desc DescriptorSets
-        m_RTScene->CreateModelDescDescriptorSet();
     }
 
     void VulkanRayTracingApp::UpdateRTDescriptorSets() {
-        std::array<VkWriteDescriptorSet, 5> DescriptorWrites{};
+        std::array<VkWriteDescriptorSet, 8> DescriptorWrites{};
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkDescriptorBufferInfo BufferInfo{};
-            BufferInfo.buffer = m_MVPUniformBuffers[i]->GetHandle();
+            BufferInfo.buffer = m_ViewUniformBuffers[i]->GetHandle();
             BufferInfo.offset = 0;
             BufferInfo.range = VK_WHOLE_SIZE;
             DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -752,7 +792,7 @@ namespace Shadowy {
 
             VkDescriptorImageInfo OutImageInfo{};
             OutImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-            OutImageInfo.imageView = m_viewportImages[i]->CreateSRV();
+            OutImageInfo.imageView = m_globalTexture->GetGlobalTexture(TextureType::SceneColor, i)->CreateSRV();
             DescriptorWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             DescriptorWrites[2].dstSet = m_RTDescriptorSets[i];
             DescriptorWrites[2].dstBinding = 2;
@@ -762,25 +802,24 @@ namespace Shadowy {
             DescriptorWrites[2].pImageInfo = &OutImageInfo;
 
             VkDescriptorImageInfo InImageInfo{};
-            InImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            InImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
             InImageInfo.imageView = m_lastFrameViewportImage->CreateSRV();
             DescriptorWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             DescriptorWrites[3].dstSet = m_RTDescriptorSets[i];
             DescriptorWrites[3].dstBinding = 3;
             DescriptorWrites[3].dstArrayElement = 0;
             DescriptorWrites[3].descriptorCount = 1;
-            DescriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+            DescriptorWrites[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
             DescriptorWrites[3].pImageInfo = &InImageInfo;
 
-            std::vector<VkDescriptorImageInfo> GBufferInfos(4);
+            std::vector<VkDescriptorImageInfo> GBufferInfos(3);
             for (int index = 0; index < GBufferInfos.size(); index++) {
                 GBufferInfos[index].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
                 GBufferInfos[index].sampler = Sampler::GetDefaultSample()->GetHandle();
             }
-            GBufferInfos[0].imageView = m_gBuffer->GetGBufferAlbedo(i)->CreateSRV();
-            GBufferInfos[1].imageView = m_gBuffer->GetGBufferNormal(i)->CreateSRV();
-            GBufferInfos[2].imageView = m_gBuffer->GetGBufferPos(i)->CreateSRV();
-            GBufferInfos[3].imageView = m_gBuffer->GetGBufferDepth(i)->CreateSRV();
+            GBufferInfos[0].imageView = GetGlobalTexture(TextureType::Albedo_Metallic, i)->CreateSRV();
+            GBufferInfos[1].imageView = GetGlobalTexture(TextureType::Normal_Roughness, i)->CreateSRV();
+            GBufferInfos[2].imageView = GetGlobalTexture(TextureType::WorldPosition, i)->CreateSRV();
             DescriptorWrites[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             DescriptorWrites[4].dstSet = m_RTDescriptorSets[i];
             DescriptorWrites[4].dstBinding = 4;
@@ -789,13 +828,44 @@ namespace Shadowy {
             DescriptorWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
             DescriptorWrites[4].pImageInfo = GBufferInfos.data();
 
-            vkUpdateDescriptorSets(m_device, DescriptorWrites.size(), DescriptorWrites.data(),
-                                   0,
-                                   nullptr);
-        }
+            VkDescriptorBufferInfo InitialSampleBufferInfo{};
+            InitialSampleBufferInfo.buffer = m_restirResource->GetInitialSampleBuffer(
+                    i)->GetHandle();
+            InitialSampleBufferInfo.offset = 0;
+            InitialSampleBufferInfo.range = VK_WHOLE_SIZE;
+            DescriptorWrites[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            DescriptorWrites[5].dstSet = m_RTDescriptorSets[i];
+            DescriptorWrites[5].dstBinding = 5;
+            DescriptorWrites[5].dstArrayElement = 0;
+            DescriptorWrites[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            DescriptorWrites[5].descriptorCount = 1;
+            DescriptorWrites[5].pBufferInfo = &InitialSampleBufferInfo;
 
-        // Update ModelDesc DescriptorSets
-        m_RTScene->UpdateModelDescDescriptorSets();
+            VkDescriptorImageInfo DiffuseHitDisBinding{};
+            DiffuseHitDisBinding.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            DiffuseHitDisBinding.imageView = m_globalTexture->GetGlobalTexture(TextureType::Diffuse_Radiance_HitDis, i)->CreateSRV();
+            DescriptorWrites[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            DescriptorWrites[6].dstSet = m_RTDescriptorSets[i];
+            DescriptorWrites[6].dstBinding = 6;
+            DescriptorWrites[6].dstArrayElement = 0;
+            DescriptorWrites[6].descriptorCount = 1;
+            DescriptorWrites[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            DescriptorWrites[6].pImageInfo = &DiffuseHitDisBinding;
+
+            VkDescriptorImageInfo SpecularHitDisBinding{};
+            SpecularHitDisBinding.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            SpecularHitDisBinding.imageView = m_globalTexture->GetGlobalTexture(TextureType::Specular_Radiance_HitDis, i)->CreateSRV();
+            DescriptorWrites[7].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            DescriptorWrites[7].dstSet = m_RTDescriptorSets[i];
+            DescriptorWrites[7].dstBinding = 7;
+            DescriptorWrites[7].dstArrayElement = 0;
+            DescriptorWrites[7].descriptorCount = 1;
+            DescriptorWrites[7].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            DescriptorWrites[7].pImageInfo = &SpecularHitDisBinding;
+
+            vkUpdateDescriptorSets(m_device, DescriptorWrites.size(), DescriptorWrites.data(),
+                                   0, nullptr);
+        }
     }
 
     void VulkanRayTracingApp::CreateRTPipelineLayout() {
@@ -810,7 +880,7 @@ namespace Shadowy {
         CreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         std::array<VkDescriptorSetLayout, 2> Layouts = {
                 m_RTDescriptorSetLayout,
-                m_RTScene->GetModelDescDescriptorSetLayout()
+                m_RTScene->GetSceneDescriptorSetLayout()
         };
         CreateInfo.setLayoutCount = Layouts.size();
         CreateInfo.pSetLayouts = Layouts.data();
@@ -959,34 +1029,35 @@ namespace Shadowy {
         m_RTScene = new Scene();
 
         // TODO: Choose a default sky texture
-        m_RTScene->CreateSkyTexture("../../asset/env/wildflower_field_4k.hdr");
-//        m_RTScene->AddModel("../../asset/sponza/sponza.obj");
+        m_RTScene->CreateSkyTexture("../../asset/env/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
+        m_RTScene->AddModel("../../asset/test_material/test_material.obj");
+//        m_RTScene->AddModel("../../asset/dragon/Dragon_Baked_Actions.obj");
 //        m_RTScene->AddModel("../../asset/house_with_tree/house_with_tree.obj");
 //        m_RTScene->AddModel("../../asset/house_with_tree/house_with_tree_glossy.obj");
 //        m_RTScene->AddModel("../../asset/cornell_box/cornell_box.obj");
-        m_RTScene->AddModel("../../asset/cornell_box_glossy/cornell_box.obj");
+//        m_RTScene->AddModel("../../asset/cornell_box_glossy/cornell_box.obj");
         m_RTScene->AddLight(
-                glm::normalize(glm::vec3(.0f, -1.f, -.1f)),
+                glm::normalize(glm::vec3(-.41f, -.91f, -0.09f)),
                 LightType::Directional,
                 glm::vec3(.5f, .5f, .5f),
                 0.f,
                 glm::vec3(1.f, 1.f, 1.f),
-                2.f * 3.1415926f,
+                3.f,
                 0.0349f,
                 0.f,
                 0.f
         );
-        m_RTScene->AddLight(
-                glm::vec3(0.f, 0.f, 0.f),
-                LightType::Point,
-                glm::vec3(1.f, 2.f, 2.f),
-                .1f,  // Physical Radius
-                glm::vec3(1.f, 1.f, 1.f),
-                10.f,  // Intensity
-                5.f,  // Range
-                0.f,
-                0.f
-        );
+//        m_RTScene->AddLight(
+//                glm::vec3(0.f, 0.f, 0.f),
+//                LightType::Point,
+//                glm::vec3(1.f, 2.f, 2.f),
+//                .1f,  // Physical Radius
+//                glm::vec3(1.f, 1.f, 1.f),
+//                10.f,  // Intensity
+//                5.f,  // Range
+//                0.f,
+//                0.f
+//        );
 
 //        m_RTScene->AddLight(
 //                glm::vec3(0.f, 0.f, 0.f),
@@ -1004,105 +1075,172 @@ namespace Shadowy {
     }
 
     void VulkanRayTracingApp::CreateViewportImages() {
-        if (m_viewportImages.size() != MAX_FRAMES_IN_FLIGHT) {
-            m_viewportImages.resize(MAX_FRAMES_IN_FLIGHT);
-            m_viewportImageDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-        }
-        auto CommandBuffer = RHI::BeginIntermediateCommandBuffer();
-        RHI::TextureTransitionInput SrcInput{}, DstInput{};
-        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            m_viewportImages[i] = new Texture2D(m_viewportSize.x,
-                                                m_viewportSize.y,
-                                                TextureFormat::RGBA_SFLOAT,
-                                                TextureUsage::UAV);
-            SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
-            SrcInput.AccessMask = 0;
-            SrcInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
-            DstInput.Layout = VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL;
-            DstInput.AccessMask = 0;
-            DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
-            RHI::TransitionTextureLayout(CommandBuffer, m_viewportImages[i]->GetHandle(), 1,
-                                         SrcInput, DstInput);
+        m_globalTexture->CreateGlobalTexture(TextureType::SceneColor,
+                                             m_viewportSize.x, m_viewportSize.y,
+                                             VK_FORMAT_R32G32B32A32_SFLOAT,
+                                             VK_IMAGE_USAGE_STORAGE_BIT |
+                                             VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                                             VK_IMAGE_USAGE_SAMPLED_BIT,
+                                             VK_IMAGE_LAYOUT_GENERAL);
+        m_globalTexture->CreateGlobalTexture(TextureType::Diffuse_Radiance_HitDis,
+                                             m_viewportSize.x, m_viewportSize.y,
+                                             VK_FORMAT_R16G16B16A16_SFLOAT,
+                                             VK_IMAGE_USAGE_STORAGE_BIT |
+                                             VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                                             VK_IMAGE_USAGE_SAMPLED_BIT,
+                                             VK_IMAGE_LAYOUT_GENERAL);
+        m_globalTexture->CreateGlobalTexture(TextureType::Specular_Radiance_HitDis,
+                                             m_viewportSize.x, m_viewportSize.y,
+                                             VK_FORMAT_R16G16B16A16_SFLOAT,
+                                             VK_IMAGE_USAGE_STORAGE_BIT |
+                                             VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                                             VK_IMAGE_USAGE_SAMPLED_BIT,
+                                             VK_IMAGE_LAYOUT_GENERAL);
 
-            m_viewportImageDescriptorSets[i] = ImGui_ImplVulkan_AddTexture(
-                    Sampler::GetDefaultSample()->GetHandle(),
-                    m_viewportImages[i]->
-                            CreateSRV(),
-                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-        }
+        m_viewportImageDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
+        m_currentViewportImageSize = m_viewportSize;
+
+        auto CommandBuffer = RHI::BeginIntermediateCommandBuffer(QueueType::Compute);
+        RHI::TextureTransitionInput SrcInput{}, DstInput{};
         m_lastFrameViewportImage = new Texture2D(m_viewportSize.x,
                                                  m_viewportSize.y,
-                                                 TextureFormat::RGBA_SFLOAT,
-                                                 TextureUsage::SRV);
+                                                 TextureFormat::RGBA32_SFLOAT,
+                                                 TextureUsage::UAV);
         SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
         SrcInput.AccessMask = 0;
         SrcInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
-        DstInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        DstInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
         DstInput.AccessMask = 0;
         DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
         RHI::TransitionTextureLayout(CommandBuffer, m_lastFrameViewportImage->GetHandle(), 1,
                                      SrcInput, DstInput);
-        RHI::SubmitIntermediateCommandBuffer(CommandBuffer);
+        RHI::SubmitIntermediateCommandBuffer(CommandBuffer, QueueType::Compute);
+
+        m_viewportImageDescriptorSets[0] = ImGui_ImplVulkan_AddTexture(
+                Sampler::GetDefaultSample()->GetHandle(),
+                GetGlobalTexture(TextureType::SceneColor, 0)->CreateSRV(),
+                VK_IMAGE_LAYOUT_GENERAL);
+        m_viewportImageDescriptorSets[1] = ImGui_ImplVulkan_AddTexture(
+                Sampler::GetDefaultSample()->GetHandle(),
+                GetGlobalTexture(TextureType::SceneColor, 1)->CreateSRV(),
+                VK_IMAGE_LAYOUT_GENERAL);
     }
 
     void VulkanRayTracingApp::ResizeViewportImages() {
-        ResetFrameNum();
+        if (m_viewportSize == m_currentViewportImageSize) {
+            return;
+        }
 
+        m_currentViewportImageSize = m_viewportSize;
+        m_currentDelayFrames = s_numFramesToDelay;
         vkDeviceWaitIdle(m_device);
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             ImGui_ImplVulkan_RemoveTexture(m_viewportImageDescriptorSets[i]);
-            delete m_viewportImages[i];
         }
+        m_globalTexture->ReleaseGlobalTexture({TextureType::SceneColor,
+                                               TextureType::Diffuse_Radiance_HitDis,
+                                               TextureType::Specular_Radiance_HitDis});
         delete m_lastFrameViewportImage;
+
         CreateViewportImages();
-        m_gBuffer->OnResize(m_viewportSize.x, m_viewportSize.y);
-        m_camera->OnWindowResize(m_viewportSize.x, m_viewportSize.y);
+        m_camera->OnResize(m_viewportSize.x, m_viewportSize.y);
+
+        m_gbufferPass->OnResize(m_viewportSize.x, m_viewportSize.y);
+        m_accumulationPass->OnResize(m_viewportSize.x, m_viewportSize.y);
+        m_accumulationPass->OnResize(m_viewportSize.x, m_viewportSize.y);
+        m_restirResource->OnResize(m_viewportSize.x, m_viewportSize.y);
 
         UpdateRTDescriptorSets();
-        m_toneMappingPass->UpdateDescriptorSets(m_viewportImages);
-        m_restirResource->OnResize(m_viewportSize.x, m_viewportSize.y);
-    }
-
-    void VulkanRayTracingApp::CreateGBuffer() {
-        m_gBuffer = new GBuffer(MAX_FRAMES_IN_FLIGHT, m_viewportSize);
+        m_toneMappingPass->UpdateDescriptorSets();
     }
 
     void VulkanRayTracingApp::OnWindowResize() {
-        VulkanBackendApp::OnWindowResize();
-        UpdateRTDescriptorSets();
+        glfwGetFramebufferSize(m_window, reinterpret_cast<int *>(&m_windowWidth),
+                               reinterpret_cast<int *>(&m_windowHeight));
+        while (m_windowWidth == 0 || m_windowHeight == 0) {
+            glfwGetFramebufferSize(m_window, reinterpret_cast<int *>(&m_windowWidth),
+                                   reinterpret_cast<int *>(&m_windowHeight));
+            glfwWaitEvents();
+        }
+        vkDeviceWaitIdle(m_device);
+
+        CleanUpSwapChain();
+        CreateSwapChain();
+        delete m_msaaBuffers;
+        CreateMSAABuffers();
+        CreateFrameBuffers();
+        m_imguiInfrastructure->RecreateFrameBuffer();
+
+        ResizeViewportImages();
         ResetFrameNum();
     }
 
     void VulkanRayTracingApp::ReloadScene(const std::filesystem::path &Path) {
+        vkDeviceWaitIdle(m_device);
         // Release Resources
-        vkDestroyPipelineLayout(m_device, m_RTPipelineLayout, nullptr);
         vkDestroyDescriptorSetLayout(m_device, m_RTDescriptorSetLayout, nullptr);
         vkFreeDescriptorSets(m_device, m_descriptorPool, m_RTDescriptorSets.size(),
                              m_RTDescriptorSets.data());
+        vkDestroyPipelineLayout(m_device, m_RTPipelineLayout, nullptr);
         vkDestroyPipeline(m_device, m_RTPipeline, nullptr);
         delete m_RTSBTBuffer;
+
+        m_gbufferPass->Release();
+        m_accumulationPass->Release();
 
         m_RTScene->OnRecreate();
         m_RTScene->AddModel(Path);
         m_RTScene->FinalizeScene();
 
         CreateRTDescriptorSets();
-        UpdateRTDescriptorSets();
         CreateRTPipelineLayout();
         CreateRTPipeline();
         CreateRTSBT();
+
+        m_gbufferPass->CreateSets();
+        m_gbufferPass->CreatePipeline();
+        m_accumulationPass->CreateSets();
+        m_accumulationPass->CreatePipeline();
+
+        UpdateRTDescriptorSets();
+        m_gbufferPass->UpdateSets();
+        m_accumulationPass->UpdateSets();
     }
 
     void VulkanRayTracingApp::ReCompileShaders() {
         delete m_RTSBTBuffer;
         vkDestroyPipeline(m_device, m_RTPipeline, nullptr);
+        m_restirResource->DestroyPipeline();
+        m_toneMappingPass->DestroyPipeline();
+
         CreateRTPipeline();
         CreateRTSBT();
+        m_restirResource->CreateTemporalReusePassPipeline();
+        m_restirResource->CreateSpatialReusePassPipeline();
+        m_gbufferPass->OnRecompile();
+        m_accumulationPass->OnRecompile();
+        m_toneMappingPass->CreatePipeline();
     }
 
-    void VulkanRayTracingApp::CreatePostProcessPasses() {
-        m_toneMappingPass = new ToneMappingPass();
-        m_toneMappingPass->UpdateDescriptorSets(m_viewportImages);
+    void VulkanRayTracingApp::UpdateRenderOptions() {
+        m_pathTracingOptions.NumLights = m_RTScene->GetSceneLights().size();
+        m_restirResource->GetTemporalReuseOptions().MaxAccumulatedFrames = m_accumulationPass->GetRenderOptions().MaxAccumulatedFrames;
+        m_restirResource->GetSpatialReuseOptions().MaxAccumulatedFrames = m_accumulationPass->GetRenderOptions().MaxAccumulatedFrames;
+
+        ViewUniformBuffer ViewUniformBuffer_{};
+        ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();
+        ViewUniformBuffer_.ProjTrans = m_camera->GetProjMatrix();
+        ViewUniformBuffer_.CameraPos = m_camera->GetCameraPos();
+        ViewUniformBuffer_.DeltaTime = m_fpsCalculator
+                                       ? static_cast<float>(m_fpsCalculator->GetDeltaTime())
+                                       : 0.f;
+        ViewUniformBuffer_.AccumulatedFrameNum = m_accumulatedFrameNum;
+        ViewUniformBuffer_.FrameNum = m_frameNum;
+        ViewUniformBuffer_.InvView = glm::transpose(m_camera->GetViewMatrix());
+        ViewUniformBuffer_.InvProj = glm::inverse(m_camera->GetProjMatrix());
+        ViewUniformBuffer_.Width = m_viewportSize.x;
+        ViewUniformBuffer_.Height = m_viewportSize.y;
+        m_ViewUniformBuffers[m_imageIndex]->Update(&ViewUniformBuffer_);
     }
 
 } // namespace Shadowy

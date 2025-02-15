@@ -83,6 +83,15 @@ namespace Shadowy {
             VK_CHECK(vkCreateFramebuffer(GetVKDevice(), &FrameBufferCreateInfo, nullptr,
                                          &m_frameBuffers[Index]));
         }
+
+        m_commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+
+        VkCommandBufferAllocateInfo GraphicsAllocateInfo{};
+        GraphicsAllocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        GraphicsAllocateInfo.commandPool = VulkanBackendApp::GetApplication()->GetCommandPool()->GetGraphicsPool();
+        GraphicsAllocateInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        GraphicsAllocateInfo.commandBufferCount = m_commandBuffers.size();
+        VK_CHECK(vkAllocateCommandBuffers(GetVKDevice(), &GraphicsAllocateInfo, m_commandBuffers.data()));
     }
 
     ImGuiInfrastructure::~ImGuiInfrastructure() {

@@ -44,8 +44,9 @@ namespace Shadowy
             " -spirv " +
             " -fspv-extension=SPV_KHR_physical_storage_buffer " +  // Enable Load Data from StorageBuffer
             " -fspv-extension=SPV_EXT_descriptor_indexing " +  // Enable Bindless
+            " -fspv-extension=SPV_KHR_ray_query " +  // Enable Ray Query
             " -D USING_DXC " +
-            // " -fvk-use-dx-layout " +
+//             " -fvk-use-dx-layout " +
             absolute(s_hlslDirectory).string() + "/" + ShaderFile;
 
         //        std::cout << CompileCommand << '\n';

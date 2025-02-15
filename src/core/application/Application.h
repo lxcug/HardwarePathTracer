@@ -13,7 +13,7 @@ namespace Shadowy {
     public:
         virtual void Run() = 0;
 
-        virtual void DrawFrame() = 0;
+        virtual void RenderFrame() = 0;
 
         virtual ~ApplicationBase() = default;
 

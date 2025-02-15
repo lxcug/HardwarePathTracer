@@ -98,12 +98,12 @@ namespace Shadowy {
                        bool Update = false);
 
         [[nodiscard]] auto GetTLAS() const -> VkAccelerationStructureKHR {
-            return m_TLAS.AccelHandle;
+            return m_TLAS->AccelHandle;
         }
 
         [[nodiscard]] auto GetBLASDeviceAddress(uint BLASIndex) const -> VkDeviceAddress;
 
-        static void OnRebuildAccel() {
+        void ResetBLASIndex() {
             s_currentBLASIndex = 0;
         }
 
@@ -124,21 +124,21 @@ namespace Shadowy {
 
         static auto ParallelCreateBLAS(VkCommandBuffer CommandBuffer,
                                        std::vector<ASBuildData> &BuildData,
-                                       std::vector<Accel> &BLAS,
+                                       std::vector<Accel*> &BLAS,
                                        const std::vector<VkDeviceAddress> &ScratchAddresses,
                                        VkDeviceSize MemBudget) -> bool;
 
         static auto BuildAccelerationStructures(VkCommandBuffer CommandBuffer,
                                                 std::vector<ASBuildData> &BuildData,
-                                                std::vector<Accel> &BLAS,
+                                                std::vector<Accel*> &BLAS,
                                                 const std::vector<VkDeviceAddress> &
                                                 ScratchAddresses,
                                                 VkDeviceSize MemBudget,
                                                 VkDeviceSize CurrentBudget) -> VkDeviceSize;
 
     protected:
-        std::vector<Accel> m_BLAS;
-        Accel m_TLAS;
+        std::vector<Accel*> m_BLAS;
+        Accel* m_TLAS = nullptr;
         CommandPool *m_commandPool = nullptr;
         static inline uint s_currentBLASIndex = 0;
 

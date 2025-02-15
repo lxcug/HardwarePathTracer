@@ -22,6 +22,10 @@ namespace Shadowy {
         return VulkanBackendApp::GetApplication()->GetPhysicalDevice();
     }
 
+    auto GetViewUniformBuffers() -> const std::vector<UniformBuffer*>& {
+        return VulkanBackendApp::GetApplication()->GetViewUniformBuffers();
+    }
+
     void VulkanBackendApp::Run() {
         Check(m_contextInited);
 
@@ -33,7 +37,7 @@ namespace Shadowy {
             }
 
             glfwPollEvents();
-            DrawFrame();
+            RenderFrame();
 
             Present();
             m_accumulatedFrameNum++;
@@ -141,7 +145,7 @@ namespace Shadowy {
         delete m_msaaBuffers;
 //        delete m_vikingRoom;
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            delete m_MVPUniformBuffers[i];
+            delete m_ViewUniformBuffers[i];
             delete m_particleStorageBuffers[i];
         }
 
@@ -151,7 +155,7 @@ namespace Shadowy {
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             vkDestroySemaphore(m_device, m_imageAvailableSemaphores[i], nullptr);
             vkDestroySemaphore(m_device, m_renderFinishedSemaphores[i], nullptr);
-            vkDestroyFence(m_device, m_graphicsInFlightFences[i], nullptr);
+            vkDestroyFence(m_device, m_frameInFlightFences[i], nullptr);
             vkDestroyFence(m_device, m_computeInFlightFences[i], nullptr);
             vkDestroySemaphore(m_device, m_computeFinishedSemaphores[i], nullptr);
         }
@@ -174,7 +178,7 @@ namespace Shadowy {
         glfwTerminate();
     }
 
-    void VulkanBackendApp::DrawFrame() {
+    void VulkanBackendApp::RenderFrame() {
         vkWaitForFences(m_device, 1, &m_computeInFlightFences[m_currentFrame], VK_TRUE, UINT64_MAX);
         vkResetFences(m_device, 1, &m_computeInFlightFences[m_currentFrame]);
 
@@ -202,9 +206,9 @@ namespace Shadowy {
                                m_computeInFlightFences[m_currentFrame]));
 
 
-        vkWaitForFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame], VK_TRUE,
+        vkWaitForFences(m_device, 1, &m_frameInFlightFences[m_currentFrame], VK_TRUE,
                         UINT64_MAX);
-        vkResetFences(m_device, 1, &m_graphicsInFlightFences[m_currentFrame]);
+        vkResetFences(m_device, 1, &m_frameInFlightFences[m_currentFrame]);
 
         if (m_frameBufferResized) {
             OnWindowResize();
@@ -249,7 +253,7 @@ namespace Shadowy {
         GraphicsSubmitInfo.signalSemaphoreCount = 1;
         GraphicsSubmitInfo.pSignalSemaphores = &m_renderFinishedSemaphores[m_currentFrame];
         VK_CHECK(vkQueueSubmit(m_queue.GraphicsQueue, 1, &GraphicsSubmitInfo,
-                               m_graphicsInFlightFences[m_currentFrame]));
+                               m_frameInFlightFences[m_currentFrame]));
     }
 
     void VulkanBackendApp::CreateVkInstance() {
@@ -427,16 +431,21 @@ namespace Shadowy {
                 VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR
         };
         ASFeature.accelerationStructure = VK_TRUE;
-        // RunTimeDescriptorArray and BufferDeviceAddress
+        // Ray Query
+        VkPhysicalDeviceRayQueryFeaturesKHR RayQueryFeatures{
+            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR
+        };
+        RayQueryFeatures.rayQuery = VK_TRUE;
+        // RunTimeDescriptorArray(bindless) and BufferDeviceAddress
         VkPhysicalDeviceVulkan12Features Vulkan12Features = {
                 VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES
         };
         Vulkan12Features.runtimeDescriptorArray = VK_TRUE;
         Vulkan12Features.bufferDeviceAddress = VK_TRUE;
-        //        Vulkan12Features.shaderInt
 
         // Link Features
-        ASFeature.pNext = &Vulkan12Features;
+        RayQueryFeatures.pNext = &Vulkan12Features;
+        ASFeature.pNext = &RayQueryFeatures;
         Sync2Feature.pNext = &ASFeature;
         RayTracingPipelineFeatures.pNext = &Sync2Feature;
         CreateInfo.pNext = &RayTracingPipelineFeatures;
@@ -1034,10 +1043,10 @@ namespace Shadowy {
         ViewUniformBuffer_.InvView = glm::transpose(m_camera->GetViewMatrix());
         ViewUniformBuffer_.InvProj = glm::inverse(m_camera->GetProjMatrix());
 
-        m_MVPUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+        m_ViewUniformBuffers.resize(MAX_FRAMES_IN_FLIGHT);
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            m_MVPUniformBuffers[i] = new UniformBuffer(sizeof(ViewUniformBuffer),
-                                                       &ViewUniformBuffer_);
+            m_ViewUniformBuffers[i] = new UniformBuffer(sizeof(ViewUniformBuffer),
+                                                        &ViewUniformBuffer_);
         }
     }
 
@@ -1045,15 +1054,15 @@ namespace Shadowy {
         // TODO: PoolSize
         std::array<VkDescriptorPoolSize, 6> PoolSizes{};
         PoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        PoolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT * 20;
+        PoolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT * 30;
         PoolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        PoolSizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT * 20;
+        PoolSizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT * 30;
         PoolSizes[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        PoolSizes[2].descriptorCount = MAX_FRAMES_IN_FLIGHT * 20;
+        PoolSizes[2].descriptorCount = MAX_FRAMES_IN_FLIGHT * 30;
         PoolSizes[3].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-        PoolSizes[3].descriptorCount = MAX_FRAMES_IN_FLIGHT * 20;
+        PoolSizes[3].descriptorCount = MAX_FRAMES_IN_FLIGHT * 30;
         PoolSizes[4].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-        PoolSizes[4].descriptorCount = MAX_FRAMES_IN_FLIGHT * 20;
+        PoolSizes[4].descriptorCount = MAX_FRAMES_IN_FLIGHT * 30;
         PoolSizes[5].type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
         PoolSizes[5].descriptorCount = MAX_FRAMES_IN_FLIGHT;
 
@@ -1061,8 +1070,8 @@ namespace Shadowy {
         PoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
         PoolInfo.poolSizeCount = PoolSizes.size();
         PoolInfo.pPoolSizes = PoolSizes.data();
-        PoolInfo.maxSets = MAX_FRAMES_IN_FLIGHT * 10;
-        PoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+        PoolInfo.maxSets = MAX_FRAMES_IN_FLIGHT * 40;
+        PoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT | VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT;
         VK_CHECK(vkCreateDescriptorPool(m_device, &PoolInfo, nullptr, &m_descriptorPool));
     }
 
@@ -1082,7 +1091,7 @@ namespace Shadowy {
         std::array<VkWriteDescriptorSet, 2> DescriptorWrites{};
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkDescriptorBufferInfo BufferInfo{};
-            BufferInfo.buffer = m_MVPUniformBuffers[i]->GetHandle();
+            BufferInfo.buffer = m_ViewUniformBuffers[i]->GetHandle();
             BufferInfo.offset = 0;
             BufferInfo.range = VK_WHOLE_SIZE;
             DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1114,7 +1123,7 @@ namespace Shadowy {
     void VulkanBackendApp::CreateSyncObjects() {
         m_imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         m_renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-        m_graphicsInFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+        m_frameInFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
         m_computeInFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
         m_computeFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -1130,7 +1139,7 @@ namespace Shadowy {
                                        &m_imageAvailableSemaphores[i]));
             VK_CHECK(vkCreateSemaphore(m_device, &SemaphoreInfo, nullptr,
                                        &m_renderFinishedSemaphores[i]));
-            VK_CHECK(vkCreateFence(m_device, &FenceInfo, nullptr, &m_graphicsInFlightFences[i]));
+            VK_CHECK(vkCreateFence(m_device, &FenceInfo, nullptr, &m_frameInFlightFences[i]));
             VK_CHECK(vkCreateFence(m_device, &FenceInfo, nullptr, &m_computeInFlightFences[i]));
             VK_CHECK(vkCreateSemaphore(m_device, &SemaphoreInfo, nullptr,
                                        &m_computeFinishedSemaphores[i]));
@@ -1169,7 +1178,7 @@ namespace Shadowy {
         ViewUniformBuffer_.FrameNum = m_frameNum;
         ViewUniformBuffer_.InvView = glm::transpose(m_camera->GetViewMatrix());
         ViewUniformBuffer_.InvProj = glm::inverse(m_camera->GetProjMatrix());
-        m_MVPUniformBuffers[ImageIndex]->Update(&ViewUniformBuffer_);
+        m_ViewUniformBuffers[ImageIndex]->Update(&ViewUniformBuffer_);
 
         vkCmdBindDescriptorSets(CommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                 m_graphicsPipelineLayout,
@@ -1369,7 +1378,7 @@ namespace Shadowy {
         std::array<VkWriteDescriptorSet, 3> DescriptorWrites{};
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkDescriptorBufferInfo BufferInfo{};
-            BufferInfo.buffer = m_MVPUniformBuffers[i]->GetHandle();
+            BufferInfo.buffer = m_ViewUniformBuffers[i]->GetHandle();
             BufferInfo.offset = 0;
             BufferInfo.range = VK_WHOLE_SIZE;
             DescriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

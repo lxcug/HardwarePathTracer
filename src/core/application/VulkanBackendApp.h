@@ -82,7 +82,7 @@ namespace Shadowy
 
         void Init() override;
 
-        void DrawFrame() override;
+        void RenderFrame() override;
 
         virtual void DrawImGuiFrame();
 
@@ -154,6 +154,10 @@ namespace Shadowy
         auto GetCamera() const -> std::shared_ptr<CameraBase>
         {
             return m_camera;
+        }
+
+        auto GetViewUniformBuffers() -> const std::vector<UniformBuffer*>& {
+            return m_ViewUniformBuffers;
         }
 
     protected:
@@ -293,16 +297,15 @@ namespace Shadowy
 
         inline static VulkanBackendApp* s_application = nullptr;
 
-        std::vector<UniformBuffer*> m_MVPUniformBuffers;
+        std::vector<UniformBuffer*> m_ViewUniformBuffers;
 
         std::vector<VkSemaphore> m_imageAvailableSemaphores;
         std::vector<VkSemaphore> m_renderFinishedSemaphores;
-        std::vector<VkFence> m_graphicsInFlightFences;
+        std::vector<VkFence> m_frameInFlightFences;
         std::vector<VkFence> m_computeInFlightFences;
         std::vector<VkSemaphore> m_computeFinishedSemaphores;
 
         ImGuiInfrastructure* m_imguiInfrastructure = nullptr;
-        glm::vec2 m_viewportSize = glm::vec2(0.f, 0.f);
 
         uint m_msaaSamples = 8;
 

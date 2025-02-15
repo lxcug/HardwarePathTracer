@@ -24,12 +24,16 @@ namespace Shadowy {
         VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
 //        VkCommandPool m_commandPool = VK_NULL_HANDLE;
         VkRenderPass m_renderPass = VK_NULL_HANDLE;
-//        std::vector<VkCommandBuffer> m_commandBuffers;
+        std::vector<VkCommandBuffer> m_commandBuffers;
         std::vector<VkFramebuffer> m_frameBuffers;
 
         void BeginImGui();
 
         void EndImGui();
+
+        auto GetCommandBuffer(uint ImageIndex) -> VkCommandBuffer {
+            return m_commandBuffers[ImageIndex];
+        }
 
         void EndImGui(VkCommandBuffer CommandBuffer);
 

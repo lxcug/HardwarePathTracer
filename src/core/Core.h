@@ -24,11 +24,35 @@
 
 #define MAX_FRAMES_IN_FLIGHT (2)
 
+using uint = uint32_t;
+
 // NOTE: Should be implemented in Application
 namespace Shadowy {
     auto GetVKDevice() -> VkDevice;
 
     auto GetVKPhysicalDevice() -> VkPhysicalDevice;
+
+    class UniformBuffer;
+    auto GetViewUniformBuffers() -> const std::vector<UniformBuffer*>&;
+
+    auto GetTLAS() -> VkAccelerationStructureKHR;
+
+    class Scene;
+    auto GetScene() -> Scene*;
+
+    class Texture2D;
+    auto GetViewportImages() -> std::vector<Texture2D*>&;
+
+    enum class TextureType;
+    void CreateGlobalTexture(TextureType Type, uint Width, uint Height, VkFormat Format,
+            VkImageUsageFlags Usage, VkImageLayout InitialLayout);
+
+    auto GetGlobalTexture(TextureType Type, uint ImageIndex) -> Texture2D*;
+
+    class GlobalTexture;
+    auto GetGlobalTextureHandle() -> GlobalTexture*;
+
+    auto GetLastFrameSceneColor() -> Texture2D*;
 }  // namespace Shadowy
 
 #if BUILD_DEVELOP
@@ -43,8 +67,6 @@ namespace Shadowy {
 #define BUILD_DEVELOP 0
 #define BUILD_SHIPPING 0
 #endif
-
-using uint = uint32_t;
 
 #if !BUILD_RELEASE && !BUILD_SHIPPING
 #define Assert(x) assert(x)

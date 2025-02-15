@@ -16,7 +16,8 @@ namespace Shadowy {
         SRGBA,
         RGBA_UNORM,
         RGBA_SNORM,
-        RGBA_SFLOAT,
+        RGBA16_SFLOAT,
+        RGBA32_SFLOAT,
         Depth32,
         Depth32Stencil8,
         Depth24Stencil8

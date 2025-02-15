@@ -94,7 +94,7 @@ namespace Shadowy {
             return m_yaw;
         }
 
-        virtual void OnWindowResize(uint Width, uint Height) {
+        virtual void OnResize(uint Width, uint Height) {
             m_aspectRatio = static_cast<float>(Width) / static_cast<float>(Height);
         }
 
@@ -121,7 +121,7 @@ namespace Shadowy {
         float m_scrollSpeedMultiplier = 1.f;
         static inline float s_moveSpeed = 5.f;
         static inline float s_rotateSpeed = .5f;
-        glm::vec2 m_lastMousePos;
+        glm::vec2 m_lastMousePos = glm::vec2(0.f, 0.f);
         bool m_isFirstTouch = true;
         bool m_isMoving = false;
     };
@@ -140,8 +140,8 @@ namespace Shadowy {
             UpdateProjMatrix();
         }
 
-        void OnWindowResize(uint Width, uint Height) override {
-            CameraBase::OnWindowResize(Width, Height);
+        void OnResize(uint Width, uint Height) override {
+            CameraBase::OnResize(Width, Height);
             UpdateProjMatrix();
         }
 
