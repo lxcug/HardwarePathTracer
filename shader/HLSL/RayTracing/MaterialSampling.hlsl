@@ -38,7 +38,7 @@ MaterialSample SampleMaterial(in float3 ray_direction, in RayPayload payload, in
 
         float3 H = normalize(V + L);
         float HoV = max(dot(H, V), 0.f);
-        float3 F = Fresnel_Schlick(HoV, F0);
+        float3 F = Fresnel_Schlick(HoV, F0, roughness);
 
         float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.albedo);
 
@@ -53,12 +53,13 @@ MaterialSample SampleMaterial(in float3 ray_direction, in RayPayload payload, in
 
         mat_sample.pdf = 0.f;
         mat_sample.weight = 0.f;
-        AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, (1 - metallic) * diffuse_weight, diffuse_pdf, diffuse_lobe_selected_weight);
+        float3 Kd = (1 - F) * (1 - metallic);
+        AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, Kd * diffuse_weight, diffuse_pdf, diffuse_lobe_selected_weight);
         AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, F * max(dot(payload.normal, L), 0.f), 1.f, 1.f - diffuse_lobe_selected_weight);
     } else {
         float3 V = -ray_direction;
         float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.albedo, metallic);
-        float3 F = Fresnel_Schlick(max(dot(payload.normal, V), 0.0), F0);
+        float3 F = Fresnel_Schlick(max(dot(payload.normal, V), 0.0), F0, roughness);
 
         float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.albedo);
 
@@ -87,7 +88,8 @@ MaterialSample SampleMaterial(in float3 ray_direction, in RayPayload payload, in
 
         mat_sample.pdf = 0.f;
         mat_sample.weight = 0.f;
-        AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, (1 - metallic) * diffuse_weight, diffuse_pdf, diffuse_lobe_selected_weight);
+        float3 Kd = (1 - F) * (1 - metallic);
+        AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, Kd * diffuse_weight, diffuse_pdf, diffuse_lobe_selected_weight);
         AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, specular_weight, specular_pdf, 1.f - diffuse_lobe_selected_weight);
     }
 #endif
@@ -123,7 +125,7 @@ MaterialEval EvalMaterial(in float3 V, in float3 L, in RayPayload payload) {
 
             float3 H = normalize(V + L);
             float HoV = max(dot(H, V), 0.f);
-            float3 F = Fresnel_Schlick(HoV, F0);
+            float3 F = Fresnel_Schlick(HoV, F0, roughness);
 
             float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.albedo);
 
@@ -136,7 +138,8 @@ MaterialEval EvalMaterial(in float3 V, in float3 L, in RayPayload payload) {
             float specular_pdf = BRDF_PDF(V, L, payload.normal, roughness, F0);
             float3 specular_weight = CookTorranceBRDF(V, L, payload.normal, roughness, metallic, payload.albedo, F0) * NoL / specular_pdf;
 
-            AddLobeWithMIS(mat_eval.weight, mat_eval.pdf, (1 - metallic) * diffuse_weight, diffuse_pdf, diffuse_lobe_selected_weight);
+            float3 Kd = (1 - F) * (1 - metallic);
+            AddLobeWithMIS(mat_eval.weight, mat_eval.pdf, Kd * diffuse_weight, diffuse_pdf, diffuse_lobe_selected_weight);
             AddLobeWithMIS(mat_eval.weight, mat_eval.pdf, F * max(dot(payload.normal, L), 0.f), 1.f, 1.f - diffuse_lobe_selected_weight);
         }
     } else {
@@ -145,7 +148,7 @@ MaterialEval EvalMaterial(in float3 V, in float3 L, in RayPayload payload) {
 
         float3 H = normalize(V + L);
         float HoV = max(dot(H, V), 0.f);
-        float3 F = Fresnel_Schlick(HoV, F0);
+        float3 F = Fresnel_Schlick(HoV, F0, roughness);
 
         float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.albedo);
 
@@ -160,7 +163,8 @@ MaterialEval EvalMaterial(in float3 V, in float3 L, in RayPayload payload) {
 
         mat_eval.pdf = 0.f;
         mat_eval.weight = 0.f;
-        AddLobeWithMIS(mat_eval.weight, mat_eval.pdf, (1 - metallic) * diffuse_weight, diffuse_pdf, diffuse_lobe_selected_weight);
+        float3 Kd = (1 - F) * (1 - metallic);
+        AddLobeWithMIS(mat_eval.weight, mat_eval.pdf, Kd * diffuse_weight, diffuse_pdf, diffuse_lobe_selected_weight);
         AddLobeWithMIS(mat_eval.weight, mat_eval.pdf, specular_weight, specular_pdf, 1.f - diffuse_lobe_selected_weight);
     }
 #endif

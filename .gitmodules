@@ -26,3 +26,6 @@
 [submodule "vendor/nri"]
 	path = vendor/nri
 	url = https://github.com/NVIDIA-RTX/NRI.git
+[submodule "vendor/assimp"]
+	path = vendor/assimp
+	url = https://github.com/assimp/assimp.git

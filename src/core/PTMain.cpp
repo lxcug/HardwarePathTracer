@@ -10,5 +10,6 @@ auto main(int argc, char* argv[]) -> int {
     App->Run();
 
     delete App;
+
     return 0;
 }

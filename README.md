@@ -41,6 +41,14 @@ Control the scene lights in the UI panel.
 
 ![](imgs/CornellBoxGallery.png)
 
+
+
+![](./imgs/Catedral_Chihuahua_FINAL.png)
+
+
+
+![](imgs/sponza_new.png)
+
 ## Dev Log
 
 > 2025.1.10:

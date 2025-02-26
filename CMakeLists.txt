@@ -37,4 +37,5 @@ target_link_libraries(
         PUBLIC NRI
         PUBLIC NRD
         PUBLIC NRDIntegration
+        PUBLIC assimp
 )

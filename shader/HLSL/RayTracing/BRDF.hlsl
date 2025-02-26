@@ -29,9 +29,9 @@ float GGX_Smith(float3 V, float3 L, float3 N, float roughness)
     return G1_V * G1_L;
 }
 
-float3 Fresnel_Schlick(float cosTheta, float3 F0)
+float3 Fresnel_Schlick(float cosTheta, float3 F0, float Roughness)
 {
-    return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
+    return F0 + (max((1.0 - Roughness).xxx, F0) - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
 float3 CookTorranceBRDF(float3 V, float3 L, float3 N, float roughness, float metallic, float3 albedo, float3 F0)
@@ -40,7 +40,7 @@ float3 CookTorranceBRDF(float3 V, float3 L, float3 N, float roughness, float met
 
     float D = GGX_D(H, N, roughness);
     float G = GGX_Smith(V, L, N, roughness);
-    float3 F = Fresnel_Schlick(max(dot(V, H), 0.0f), F0);
+    float3 F = Fresnel_Schlick(max(dot(V, H), 0.0f), F0, roughness);
 
     float NoV = max(dot(N, V), 0.0f);
     float NoL = max(dot(N, L), 0.0f);
@@ -90,15 +90,10 @@ float BRDF_PDF(float3 V, float3 L, float3 N, float roughness, float3 F0) {
 // [Burley 2012, "Physically-Based Shading at Disney"]
 float3 Diffuse_Burley_Disney(float3 DiffuseColor, float3 F0, float Roughness, float NoV, float NoL, float HoL)
 {
-    float3 FL = Fresnel_Schlick(NoL, F0), FV = Fresnel_Schlick(NoV, F0);
+    float3 FL = Fresnel_Schlick(NoL, F0, Roughness), FV = Fresnel_Schlick(NoV, F0, Roughness);
 
     float Fd90 = 0.5 + 2 * HoL * HoL * Roughness;
     float3 Fd = lerp(1.0, Fd90, FL) * lerp(1.0, Fd90, FV);
 
     return Fd * DiffuseColor / PI;
-
-// 	float FD90 = 0.5 + 2 * HoV * HoV * Roughness;
-// 	float FdV = 1 + (FD90 - 1) * pow( 1 - NoV, 5);
-// 	float FdL = 1 + (FD90 - 1) * pow( 1 - NoL, 5);
-// 	return DiffuseColor * ( (1 / PI) * FdV * FdL );
 }

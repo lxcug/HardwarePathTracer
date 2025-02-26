@@ -25,8 +25,6 @@ void main()
     PathTracingPayload payload;
     PathTracingKernel(origin, dir, seed, payload);
 
-    float3 color = payload.radiance;
-
     if (payload.is_hit() || payload.hit_sky) {
         DiffuseHitDis[index] = float4(payload.diffuse_radiance, payload.hit_t);
         SpecularHitDis[index] = float4(payload.diffuse_radiance, payload.hit_t);

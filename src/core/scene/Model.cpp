@@ -7,206 +7,118 @@
 #include <tiny_obj_loader.h>
 #include "core/scene/Model.h"
 #include <unordered_map>
+#include "assimp/postprocess.h"
 #include "core/application/VulkanBackendApp.h"
 #include "core/RHI.h"
 #include "core/Utils.h"
+#include "Scene.h"
+#include "assimp/pbrmaterial.h"
 
 
 namespace Shadowy {
-    Model::Model(const std::filesystem::path &ModelPath,
-                 const std::filesystem::path &TexturePath, bool GenerateMips)
-            : m_generateMips(GenerateMips) {
-        LoadModel(ModelPath);
-        m_texture = new Texture2D(TexturePath, 1, m_generateMips);
+    Mesh::Mesh(aiMesh* AIMesh, const aiScene* Scene, const aiMatrix4x4& Transform)
+    {
+        Init(AIMesh, Scene, Transform);
     }
 
-    Model::Model(const std::filesystem::path &ModelPath) {
-        LoadModel(ModelPath);
-    }
+    void Mesh::Init(aiMesh* AIMesh, const aiScene* Scene, const aiMatrix4x4& Transform)
+    {
+        m_instanceID = Scene::s_instanceIDCounter++;
+        std::vector<Vertex> Vertices(AIMesh->mNumVertices);
+        std::vector<uint> Indices(AIMesh->mNumFaces * 3);
+        std::vector<int> MaterialIndices(AIMesh->mNumFaces);
 
-    void Model::LoadModel(const std::filesystem::path &ModelPath) {
-        tinyobj::attrib_t Attrib;
-        std::vector<tinyobj::shape_t> Shapes;
-        std::vector<tinyobj::material_t> Materials;
-        std::string Warn, Err;
+        m_transform = {
+            Transform.a1, Transform.a2, Transform.a3, Transform.a4,
+            Transform.b1, Transform.b2, Transform.b3, Transform.b4,
+            Transform.c1, Transform.c2, Transform.c3, Transform.c4,
+            Transform.d1, Transform.d2, Transform.d3, Transform.d4
+        };
 
-        std::string MtlPath = ModelPath.parent_path().string();
-        bool LoadSuccess = tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Err,
-                                            ModelPath.string().c_str(),
-                                            MtlPath.c_str());
-        Check(LoadSuccess);
+        m_name = AIMesh->mName.data;
 
-        // Load Vertices Indices and Per Triangle Material Indices
+        // Process Vertices
+        for (uint i = 0; i < AIMesh->mNumVertices; i++)
         {
-            std::vector<Vertex> Vertices;
-            std::vector<uint> Indices;
-            std::unordered_map<Vertex, uint> UniqueVertices;
+            Vertex Vertex_{};
+            Check(AIMesh->HasPositions());
 
-            Check(!Shapes.empty());
-            for (const auto &Shape: Shapes) {
-                Check(!Shape.mesh.indices.empty());
-                m_materialIndex.insert(m_materialIndex.end(), Shape.mesh.material_ids.begin(),
-                                       Shape.mesh.material_ids.end());
-                for (const auto &Index: Shape.mesh.indices) {
-                    Vertex Vertex_{};
-                    if (!Attrib.vertices.empty()) {
-                        Vertex_.Pos = {
-                                Attrib.vertices[3 * Index.vertex_index + 0],
-                                Attrib.vertices[3 * Index.vertex_index + 1],
-                                Attrib.vertices[3 * Index.vertex_index + 2]
-                        };
-                    }
-                    if (!Attrib.normals.empty()) {
-                        Vertex_.Normal = {
-                                Attrib.normals[3 * Index.normal_index + 0],
-                                Attrib.normals[3 * Index.normal_index + 1],
-                                Attrib.normals[3 * Index.normal_index + 2]
-                        };
-                    }
-                    if (!Attrib.texcoords.empty() && (2 * Index.texcoord_index + 1) < Attrib.texcoords.size()) {
-                        Vertex_.TexCoord = {
-                                Attrib.texcoords[2 * Index.texcoord_index + 0],
-                                1.f - Attrib.texcoords[2 * Index.texcoord_index + 1]
-                        };
-                    }
-                    if (!Attrib.colors.empty()) {
-                        Vertex_.Color = {
-                                Attrib.colors[3 * Index.vertex_index + 0],
-                                Attrib.colors[3 * Index.vertex_index + 1],
-                                Attrib.colors[3 * Index.vertex_index + 2]
-                        };
-                    }
-
-                    if (UniqueVertices.find(Vertex_) == UniqueVertices.end()) {
-                        UniqueVertices[Vertex_] = Vertices.size();
-                        Vertices.push_back(Vertex_);
-                    }
-
-                    Indices.push_back(UniqueVertices[Vertex_]);
-                }
+            Vertex_.Pos = {
+                AIMesh->mVertices[i].x, AIMesh->mVertices[i].y, AIMesh->mVertices[i].z
+            };
+            Vertex_.Normal = {
+                AIMesh->mNormals[i].x, AIMesh->mNormals[i].y, AIMesh->mNormals[i].z
+            };
+            if (AIMesh->HasTangentsAndBitangents())
+            {
+                Vertex_.Tangent = {
+                    AIMesh->mTangents[i].x, AIMesh->mTangents[i].y, AIMesh->mTangents[i].z
+                };
+                Vertex_.Bitangent = {
+                    AIMesh->mBitangents[i].x, AIMesh->mBitangents[i].y, AIMesh->mBitangents[i].z
+                };
+            }
+            if (AIMesh->HasTextureCoords(0))
+            {
+                Vertex_.TexCoord = {
+                    AIMesh->mTextureCoords[0][i].x, AIMesh->mTextureCoords[0][i].y
+                };
+            }
+            if (AIMesh->HasVertexColors(0))
+            {
+                Vertex_.Color = {
+                    AIMesh->mColors[0][i].r, AIMesh->mColors[0][i].g, AIMesh->mColors[0][i].b
+                };
             }
 
-            m_vertexBuffer = new VertexBuffer(sizeof(Vertex) * Vertices.size(), Vertices.data());
-            m_vertexBuffer->SetLayout({
-                                              {VertexAttributeDataType::Float3, "Pos"},
-                                              {VertexAttributeDataType::Float3, "Normal"},
-                                              {VertexAttributeDataType::Float3, "Color"},
-                                              {VertexAttributeDataType::Float2, "TexCoord"}
-                                      });
-            m_indexBuffer = new IndexBuffer(Indices.size(), Indices.data());
+            Vertices[i] = Vertex_;
         }
 
-        // Load Materials
+        // Process Indices
+        for (uint i = 0; i < AIMesh->mNumFaces; i++)
         {
-            for (const auto &Material: Materials) {
-                struct Material Mat{};
-                if (Material.diffuse) {
-                    Mat.Albedo = {
-                            Material.diffuse[0], Material.diffuse[1], Material.diffuse[2]
-                    };
-                }
-                if (!Material.diffuse_texname.empty()) {
-                    m_textureNames.push_back(MtlPath + '/' + Material.diffuse_texname);
-                    Mat.AlbedoTextureID = static_cast<int>(m_textureNames.size()) - 1;
-                }
-                if (Material.specular) {
-                    Mat.Specular = {
-                            Material.specular[0], Material.specular[1], Material.specular[2]
-                    };
-                }
-                if (!Material.specular_texname.empty()) {
-                    m_textureNames.push_back(MtlPath + '/' + Material.specular_texname);
-                    Mat.SpecularTextureID = static_cast<int>(m_textureNames.size()) - 1;
-                }
-                if (Material.emission) {
-                    Mat.Emissive = {
-                            Material.emission[0], Material.emission[1], Material.emission[2]
-                    };
-                }
-                if (!Material.emissive_texname.empty()) {
-                    m_textureNames.push_back(MtlPath + '/' + Material.emissive_texname);
-                    Mat.EmissiveTextureID = static_cast<int>(m_textureNames.size()) - 1;
-                }
-                if (Material.transmittance) {
-                    Mat.Transmittance = {
-                            Material.transmittance[0], Material.transmittance[1],
-                            Material.transmittance[2]
-                    };
-                }
-                Mat.Opacity = Material.dissolve;
-                Mat.Roughness = Material.roughness;
-                Mat.Metallic = Material.metallic;
-                if (!Material.roughness_texname.empty()) {
-                    m_textureNames.push_back(MtlPath + '/' + Material.roughness_texname);
-                    Mat.RoughnessTextureID = static_cast<int>(m_textureNames.size()) - 1;
-                }
-                if (!Material.metallic_texname.empty()) {
-                    m_textureNames.push_back(MtlPath + '/' + Material.metallic_texname);
-                    Mat.MetallicTextureID = static_cast<int>(m_textureNames.size()) - 1;
-                }
-
-                m_materials.push_back(Mat);
+            const aiFace& Face = AIMesh->mFaces[i];
+            for (uint j = 0; j < Face.mNumIndices; j++)
+            {
+                Indices[i * 3 + j] = Face.mIndices[j];
             }
-
-            // Add Default Material
-            if (m_materials.empty()) {
-                m_materials.emplace_back();
-            }
-
-            // Fixing Material Indices
-            for (auto &MatIndex: m_materialIndex) {
-                if (MatIndex < 0 || MatIndex >= m_materials.size()) {
-                    MatIndex = 0;
-                }
-            }
-            m_materialBuffer = new ArbitraryBuffer(sizeof(Material) * m_materials.size(),
-                                                   m_materials.data(),
-                                                   VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                                                   VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                                                   VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-            m_materialIndexBuffer = new ArbitraryBuffer(sizeof(int) * m_materialIndex.size(),
-                                                        m_materialIndex.data(),
-                                                        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                                                        VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-                                                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+            MaterialIndices[i] = AIMesh->mMaterialIndex;
         }
 
-        m_modelDesc.VertexBufferAddress = RHI::GetBufferDeviceAddress(m_vertexBuffer->GetHandle());
-        m_modelDesc.IndexBufferAddress = RHI::GetBufferDeviceAddress(m_indexBuffer->GetHandle());
-        m_modelDesc.MaterialBufferAddress = RHI::GetBufferDeviceAddress(
-                m_materialBuffer->GetHandle());
-        m_modelDesc.MaterialIndexBufferAddress = RHI::GetBufferDeviceAddress(
-                m_materialIndexBuffer->GetHandle());
+        m_vertexBuffer = new VertexBuffer(
+            sizeof(Vertex) * Vertices.size(),
+            Vertices.data()
+        );
+        m_vertexBuffer->SetLayout({
+            {VertexAttributeDataType::Float3, "Pos"},
+            {VertexAttributeDataType::Float3, "Normal"},
+            {VertexAttributeDataType::Float3, "Color"},
+            {VertexAttributeDataType::Float2, "TexCoord"}
+        });
+        m_indexBuffer = new IndexBuffer(
+            Indices.size(),
+            Indices.data()
+        );
+
+        m_meshDesc.VertexBufferAddress = RHI::GetBufferDeviceAddress(m_vertexBuffer->GetHandle());
+        m_meshDesc.IndexBufferAddress = RHI::GetBufferDeviceAddress(m_indexBuffer->GetHandle());
+        m_materialIndexBuffer = new ArbitraryBuffer(
+            sizeof(int) * MaterialIndices.size(),
+            MaterialIndices.data(),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
+        );
+        m_meshDesc.MaterialIndexBufferAddress = RHI::GetBufferDeviceAddress(m_materialIndexBuffer->GetHandle());
     }
 
-    Model::~Model() {
-        delete m_texture;
-
-        delete m_vertexBuffer;
-        delete m_indexBuffer;
-        delete m_materialBuffer;
-        delete m_materialIndexBuffer;
-    }
-
-    void Model::Bind(VkCommandBuffer CommandBuffer) {
-        m_vertexBuffer->Bind(CommandBuffer);
-        m_indexBuffer->Bind(CommandBuffer);
-    }
-
-    void Model::DrawIndexed(VkCommandBuffer CommandBuffer) {
-        this->Bind(CommandBuffer);
-        vkCmdDrawIndexed(CommandBuffer, GetIndexCount(), 1, 0, 0, 0);
-    }
-
-    auto Model::GetBLASBuildInput() const -> BLASBuildInput {
-        // Get Vertex/Index Buffer Device Address
+    auto Mesh::GetBLASBuildInput() const -> BLASBuildInput
+    {
         VkDeviceAddress VertexBufferAddress = RHI::GetBufferDeviceAddress(
                 m_vertexBuffer->GetHandle());
         VkDeviceAddress IndexBufferAddress = RHI::GetBufferDeviceAddress(
                 m_indexBuffer->GetHandle());
 
         VkAccelerationStructureGeometryTrianglesDataKHR Triangles{
-                VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR
+            VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR
         };
         Triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
         Triangles.vertexData.deviceAddress = VertexBufferAddress;
@@ -214,11 +126,11 @@ namespace Shadowy {
         Triangles.maxVertex = m_vertexBuffer->GetVertexCount() - 1;
         Triangles.indexType = VK_INDEX_TYPE_UINT32;
         Triangles.indexData.deviceAddress = IndexBufferAddress;
-        Triangles.transformData = {}; // Indicate Identity Transform
+        Triangles.transformData = {};
 
         // Create AS Geometry
         VkAccelerationStructureGeometryKHR ASGeometry{
-                VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR
+            VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR
         };
         ASGeometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
         ASGeometry.geometry.triangles = Triangles;
@@ -238,8 +150,9 @@ namespace Shadowy {
         return Input;
     }
 
-    auto
-    Model::GetTLASBuildInput(ASBuilder *AccelBuilder) const -> VkAccelerationStructureInstanceKHR {
+    auto Mesh::GetTLASBuildInput(
+        const ASBuilder* AccelBuilder) const -> VkAccelerationStructureInstanceKHR
+    {
         VkAccelerationStructureInstanceKHR Instance{};
         Instance.transform = Utils::GLMToVulkanMatrix(m_transform);
         Instance.instanceCustomIndex = m_instanceID;
@@ -250,4 +163,376 @@ namespace Shadowy {
 
         return Instance;
     }
+
+    Model::Model(const std::filesystem::path& ModelPath) : m_path(ModelPath.parent_path())
+    {
+        Init(ModelPath);
+    }
+
+    void Model::Init(const std::filesystem::path& ModelPath)
+    {
+        m_aiScene = Importer.ReadFile(
+            ModelPath.string(),
+            aiProcess_Triangulate  | aiProcess_GenNormals | aiProcess_FlipUVs | aiProcess_GenUVCoords
+        );
+
+        if (!m_aiScene || m_aiScene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !m_aiScene->mRootNode)
+        {
+            Check(false);
+            return;
+        }
+
+        int UpAxis = -1, FrontAxis = -1, RightAxis = -1;
+        int UpSign = 0, FrontSign = 0, RightSign = 0;
+        m_aiScene->mMetaData->Get("UpAxis", UpAxis);
+        m_aiScene->mMetaData->Get("FrontAxis", FrontAxis);
+        m_aiScene->mMetaData->Get("CoordAxis", RightAxis);
+        m_aiScene->mMetaData->Get("UpAxisSign", UpSign);
+        m_aiScene->mMetaData->Get("FrontAxisSign", FrontSign);
+        m_aiScene->mMetaData->Get("CoordAxisSign", RightSign);
+
+        ProcessNode(m_aiScene->mRootNode, m_aiScene);
+
+        m_materialBuffer = new ArbitraryBuffer(
+            sizeof(Material) * m_materials.size(),
+            m_materials.data(),
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
+        );
+
+        auto MaterialBufferAddress = RHI::GetBufferDeviceAddress(m_materialBuffer->GetHandle());
+        for (auto& Mesh : m_meshes)
+        {
+            Mesh->m_meshDesc.MaterialBufferAddress = MaterialBufferAddress;
+        }
+    }
+
+    void Model::ProcessNode(aiNode* Node, const aiScene* Scene)
+    {
+        for (uint i = 0; i < Node->mNumMeshes; i++)
+        {
+            aiMesh* AIMesh = Scene->mMeshes[Node->mMeshes[i]];
+            // Row Major to Col Major
+            Mesh* ShadowyMesh = new Mesh(AIMesh, Scene, Node->mTransformation.Transpose());
+            m_meshes.push_back(ShadowyMesh);
+
+            // NOTE: Each AIMesh use only one material, otherwise the mesh will be splitted
+            const uint MaterialIndex = AIMesh->mMaterialIndex;
+            // Insert NumFaces Material Index for Query Material using Triangle ID(Primitive ID)
+            m_materials.emplace_back(ProcessMeshMaterial(Scene->mMaterials[MaterialIndex], m_aiScene));
+        }
+
+        for (uint i = 0; i < Node->mNumChildren; i++)
+        {
+            ProcessNode(Node->mChildren[i], Scene);
+        }
+    }
+
+    auto Model::ProcessMeshMaterial(aiMaterial* AIMaterial, const aiScene* Scene) -> Material
+    {
+        // for (unsigned int i = 0; i < AIMaterial->mNumProperties; ++i) {
+        //     const aiMaterialProperty* property = AIMaterial->mProperties[i];
+        //     std::cout << "Property Key: " << property->mKey.C_Str() << std::endl;
+        //     std::cout << "Semantic: " << property->mSemantic << std::endl;
+        //     std::cout << "Index: " << property->mIndex << std::endl;
+        //     std::cout << "Data Length: " << property->mDataLength << std::endl;
+        //     std::cout << "---------------------" << std::endl;
+        // }
+
+        aiReturn AIRet{};
+        Material Mat;
+        aiColor3D Albedo, Emissive, Transmittance;
+        AIRet = AIMaterial->Get(AI_MATKEY_COLOR_DIFFUSE, Albedo);
+        if (AIRet == aiReturn_SUCCESS)
+        {
+            Mat.Albedo = {Albedo.r, Albedo.g, Albedo.b};
+        }
+        AIRet = AIMaterial->Get(AI_MATKEY_COLOR_EMISSIVE, Emissive);
+        if (AIRet == aiReturn_SUCCESS)
+        {
+            Mat.Emissive = {Emissive.r, Emissive.g, Emissive.b};
+        }
+        AIRet = AIMaterial->Get(AI_MATKEY_COLOR_TRANSPARENT, Transmittance);
+        if (AIRet == aiReturn_SUCCESS)
+        {
+            Mat.Transmittance = {Transmittance.r, Transmittance.g, Transmittance.b};
+        }
+        ai_real Roughness, Metallic, Opacity;
+        AIRet = AIMaterial->Get(AI_MATKEY_ROUGHNESS_FACTOR, Roughness);
+        if (AIRet == aiReturn_SUCCESS)
+        {
+            Mat.Roughness = Roughness;
+        }
+        AIRet = AIMaterial->Get(AI_MATKEY_METALLIC_FACTOR, Metallic);
+        if (AIRet == aiReturn_SUCCESS)
+        {
+            Mat.Metallic = Metallic;
+        }
+        AIRet = AIMaterial->Get(AI_MATKEY_OPACITY, Opacity);
+        if (AIRet == aiReturn_SUCCESS)
+        {
+            Mat.Opacity = Opacity;
+        }
+
+        // Process Texture
+        if (AIMaterial->GetTextureCount(aiTextureType_DIFFUSE) == 1)
+        {
+            aiString TexturePath;
+            AIMaterial->GetTexture(aiTextureType_DIFFUSE, 0, &TexturePath);
+            m_textureNames.emplace_back(TexturePath.C_Str());
+            Mat.AlbedoTextureID = m_textureNames.size() - 1;
+        }
+        if (AIMaterial->GetTextureCount(aiTextureType_SHININESS) == 1)
+        {
+            aiString TexturePath;
+            AIMaterial->GetTexture(aiTextureType_SHININESS, 0, &TexturePath);
+            m_textureNames.emplace_back(TexturePath.C_Str());
+            Mat.RoughnessTextureID = m_textureNames.size() - 1;
+        }
+        if (AIMaterial->GetTextureCount(aiTextureType_NORMALS) == 1)
+        {
+            aiString TexturePath;
+            AIMaterial->GetTexture(aiTextureType_NORMALS, 0, &TexturePath);
+            m_textureNames.emplace_back(TexturePath.C_Str());
+            Mat.NormalTextureID = m_textureNames.size() - 1;
+        }
+        if (AIMaterial->GetTextureCount(aiTextureType_EMISSION_COLOR) == 1)
+        {
+            aiString TexturePath;
+            AIMaterial->GetTexture(aiTextureType_EMISSION_COLOR, 0, &TexturePath);
+            m_textureNames.emplace_back(TexturePath.C_Str());
+            Mat.EmissiveTextureID = m_textureNames.size() - 1;
+        }
+        if (AIMaterial->GetTextureCount(aiTextureType_METALNESS) == 1)
+        {
+            aiString TexturePath;
+            AIMaterial->GetTexture(aiTextureType_METALNESS, 0, &TexturePath);
+            m_textureNames.emplace_back(TexturePath.C_Str());
+            Mat.MetallicTextureID = m_textureNames.size() - 1;
+        }
+
+        return Mat;
+    }
+
+    // ObjModel::ObjModel(const std::filesystem::path &ModelPath) {
+    //     LoadModel(ModelPath);
+    // }
+    //
+    // void ObjModel::LoadModel(const std::filesystem::path &ModelPath) {
+    //     tinyobj::attrib_t Attrib;
+    //     std::vector<tinyobj::shape_t> Shapes;
+    //     std::vector<tinyobj::material_t> Materials;
+    //     std::string Warn, Err;
+    //
+    //     std::string MtlPath = ModelPath.parent_path().string();
+    //     bool LoadSuccess = tinyobj::LoadObj(&Attrib, &Shapes, &Materials, &Warn, &Err,
+    //                                         ModelPath.string().c_str(),
+    //                                         MtlPath.c_str());
+    //     Check(LoadSuccess);
+    //
+    //     // Load Vertices Indices and Per Triangle Material Indices
+    //     {
+    //         std::vector<Vertex> Vertices;
+    //         std::vector<uint> Indices;
+    //         std::unordered_map<Vertex, uint> UniqueVertices;
+    //
+    //         Check(!Shapes.empty());
+    //         for (const auto &Shape: Shapes) {
+    //             Check(!Shape.mesh.indices.empty());
+    //             m_materialIndex.insert(m_materialIndex.end(), Shape.mesh.material_ids.begin(),
+    //                                    Shape.mesh.material_ids.end());
+    //             for (const auto &Index: Shape.mesh.indices) {
+    //                 Vertex Vertex_{};
+    //                 if (!Attrib.vertices.empty()) {
+    //                     Vertex_.Pos = {
+    //                             Attrib.vertices[3 * Index.vertex_index + 0],
+    //                             Attrib.vertices[3 * Index.vertex_index + 1],
+    //                             Attrib.vertices[3 * Index.vertex_index + 2]
+    //                     };
+    //                 }
+    //                 if (!Attrib.normals.empty()) {
+    //                     Vertex_.Normal = {
+    //                             Attrib.normals[3 * Index.normal_index + 0],
+    //                             Attrib.normals[3 * Index.normal_index + 1],
+    //                             Attrib.normals[3 * Index.normal_index + 2]
+    //                     };
+    //                 }
+    //                 if (!Attrib.texcoords.empty() && (2 * Index.texcoord_index + 1) < Attrib.texcoords.size()) {
+    //                     Vertex_.TexCoord = {
+    //                             Attrib.texcoords[2 * Index.texcoord_index + 0],
+    //                             1.f - Attrib.texcoords[2 * Index.texcoord_index + 1]
+    //                     };
+    //                 }
+    //                 if (!Attrib.colors.empty()) {
+    //                     Vertex_.Color = {
+    //                             Attrib.colors[3 * Index.vertex_index + 0],
+    //                             Attrib.colors[3 * Index.vertex_index + 1],
+    //                             Attrib.colors[3 * Index.vertex_index + 2]
+    //                     };
+    //                 }
+    //
+    //                 if (UniqueVertices.find(Vertex_) == UniqueVertices.end()) {
+    //                     UniqueVertices[Vertex_] = Vertices.size();
+    //                     Vertices.push_back(Vertex_);
+    //                 }
+    //
+    //                 Indices.push_back(UniqueVertices[Vertex_]);
+    //             }
+    //         }
+    //
+    //         m_vertexBuffer = new VertexBuffer(sizeof(Vertex) * Vertices.size(), Vertices.data());
+    //         m_vertexBuffer->SetLayout({
+    //                                           {VertexAttributeDataType::Float3, "Pos"},
+    //                                           {VertexAttributeDataType::Float3, "Normal"},
+    //                                           {VertexAttributeDataType::Float3, "Color"},
+    //                                           {VertexAttributeDataType::Float2, "TexCoord"},
+    //                                           {VertexAttributeDataType::Float3, "Tangent"},
+    //                                           {VertexAttributeDataType::Float3, "Bitangent"}
+    //                                   });
+    //         m_indexBuffer = new IndexBuffer(Indices.size(), Indices.data());
+    //     }
+    //
+    //     // Load Materials
+    //     {
+    //         for (const auto &Material: Materials) {
+    //             struct Material Mat{};
+    //             if (Material.diffuse) {
+    //                 Mat.Albedo = {
+    //                         Material.diffuse[0], Material.diffuse[1], Material.diffuse[2]
+    //                 };
+    //             }
+    //             if (!Material.diffuse_texname.empty()) {
+    //                 m_textureNames.push_back(MtlPath + '/' + Material.diffuse_texname);
+    //                 Mat.AlbedoTextureID = static_cast<int>(m_textureNames.size()) - 1;
+    //             }
+    //             if (Material.emission) {
+    //                 Mat.Emissive = {
+    //                         Material.emission[0], Material.emission[1], Material.emission[2]
+    //                 };
+    //             }
+    //             if (!Material.emissive_texname.empty()) {
+    //                 m_textureNames.push_back(MtlPath + '/' + Material.emissive_texname);
+    //                 Mat.EmissiveTextureID = static_cast<int>(m_textureNames.size()) - 1;
+    //             }
+    //             if (Material.transmittance) {
+    //                 Mat.Transmittance = {
+    //                         Material.transmittance[0], Material.transmittance[1],
+    //                         Material.transmittance[2]
+    //                 };
+    //             }
+    //             Mat.Opacity = Material.dissolve;
+    //             Mat.Roughness = Material.roughness;
+    //             Mat.Metallic = Material.metallic;
+    //             if (!Material.roughness_texname.empty()) {
+    //                 m_textureNames.push_back(MtlPath + '/' + Material.roughness_texname);
+    //                 Mat.RoughnessTextureID = static_cast<int>(m_textureNames.size()) - 1;
+    //             }
+    //             if (!Material.metallic_texname.empty()) {
+    //                 m_textureNames.push_back(MtlPath + '/' + Material.metallic_texname);
+    //                 Mat.MetallicTextureID = static_cast<int>(m_textureNames.size()) - 1;
+    //             }
+    //
+    //             m_materials.push_back(Mat);
+    //         }
+    //
+    //         // Add Default Material
+    //         if (m_materials.empty()) {
+    //             m_materials.emplace_back();
+    //         }
+    //
+    //         // Fixing Material Indices
+    //         for (auto &MatIndex: m_materialIndex) {
+    //             if (MatIndex < 0 || MatIndex >= m_materials.size()) {
+    //                 MatIndex = 0;
+    //             }
+    //         }
+    //         m_materialBuffer = new ArbitraryBuffer(sizeof(Material) * m_materials.size(),
+    //                                                m_materials.data(),
+    //                                                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+    //                                                VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+    //                                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    //         m_materialIndexBuffer = new ArbitraryBuffer(sizeof(int) * m_materialIndex.size(),
+    //                                                     m_materialIndex.data(),
+    //                                                     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+    //                                                     VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+    //                                                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    //     }
+    //
+    //     m_modelDesc.VertexBufferAddress = RHI::GetBufferDeviceAddress(m_vertexBuffer->GetHandle());
+    //     m_modelDesc.IndexBufferAddress = RHI::GetBufferDeviceAddress(m_indexBuffer->GetHandle());
+    //     m_modelDesc.MaterialBufferAddress = RHI::GetBufferDeviceAddress(
+    //             m_materialBuffer->GetHandle());
+    //     m_modelDesc.MaterialIndexBufferAddress = RHI::GetBufferDeviceAddress(
+    //             m_materialIndexBuffer->GetHandle());
+    // }
+    //
+    // ObjModel::~ObjModel() {
+    //     delete m_vertexBuffer;
+    //     delete m_indexBuffer;
+    //     delete m_materialBuffer;
+    //     delete m_materialIndexBuffer;
+    // }
+    //
+    // void ObjModel::Bind(VkCommandBuffer CommandBuffer) {
+    //     m_vertexBuffer->Bind(CommandBuffer);
+    //     m_indexBuffer->Bind(CommandBuffer);
+    // }
+    //
+    // void ObjModel::DrawIndexed(VkCommandBuffer CommandBuffer) {
+    //     this->Bind(CommandBuffer);
+    //     vkCmdDrawIndexed(CommandBuffer, GetIndexCount(), 1, 0, 0, 0);
+    // }
+    //
+    // auto ObjModel::GetBLASBuildInput() const -> BLASBuildInput {
+    //     // Get Vertex/Index Buffer Device Address
+    //     VkDeviceAddress VertexBufferAddress = RHI::GetBufferDeviceAddress(
+    //             m_vertexBuffer->GetHandle());
+    //     VkDeviceAddress IndexBufferAddress = RHI::GetBufferDeviceAddress(
+    //             m_indexBuffer->GetHandle());
+    //
+    //     VkAccelerationStructureGeometryTrianglesDataKHR Triangles{
+    //             VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR
+    //     };
+    //     Triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+    //     Triangles.vertexData.deviceAddress = VertexBufferAddress;
+    //     Triangles.vertexStride = sizeof(Vertex);
+    //     Triangles.maxVertex = m_vertexBuffer->GetVertexCount() - 1;
+    //     Triangles.indexType = VK_INDEX_TYPE_UINT32;
+    //     Triangles.indexData.deviceAddress = IndexBufferAddress;
+    //     Triangles.transformData = {};  // Indicate Identity Transform
+    //
+    //     // Create AS Geometry
+    //     VkAccelerationStructureGeometryKHR ASGeometry{
+    //             VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR
+    //     };
+    //     ASGeometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+    //     ASGeometry.geometry.triangles = Triangles;
+    //     ASGeometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+    //
+    //     // Create AS Build Range
+    //     VkAccelerationStructureBuildRangeInfoKHR BuildRange;
+    //     BuildRange.primitiveCount = m_indexBuffer->GetIndexCount() / 3;
+    //     BuildRange.primitiveOffset = 0;
+    //     BuildRange.firstVertex = 0;
+    //     BuildRange.transformOffset = 0;
+    //
+    //     BLASBuildInput Input;
+    //     Input.ASGeometries.emplace_back(ASGeometry);
+    //     Input.ASBuildRangeInfos.emplace_back(BuildRange);
+    //
+    //     return Input;
+    // }
+    //
+    // auto
+    // ObjModel::GetTLASBuildInput(const ASBuilder *AccelBuilder) const -> VkAccelerationStructureInstanceKHR {
+    //     VkAccelerationStructureInstanceKHR Instance{};
+    //     Instance.transform = Utils::GLMToVulkanMatrix(m_transform);
+    //     Instance.instanceCustomIndex = m_instanceID;
+    //     Instance.accelerationStructureReference = AccelBuilder->GetBLASDeviceAddress(m_instanceID);
+    //     Instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+    //     Instance.mask = 0xff; //  Only be hit if rayMask & instance.mask != 0
+    //     Instance.instanceShaderBindingTableRecordOffset = 0;
+    //
+    //     return Instance;
+    // }
+
 } // namespace Shadowy

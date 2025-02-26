@@ -24,6 +24,11 @@ struct Vertex
     float3 Color;
     uint ColorPadding;
     float2 TexCoord;
+    float2 TexCoordPadding;
+    float3 Tangent;
+    uint TangentPadding;
+    float3 Bitangent;
+    uint BitangentPadding;
 
 
 #if IS_COMPILING_CPP
@@ -35,7 +40,7 @@ struct Vertex
 
     static auto GetBindingDescription() -> VkVertexInputBindingDescription;
 
-    static auto GetAttributeDescriptions() -> std::array<VkVertexInputAttributeDescription, 4>;
+    static auto GetAttributeDescriptions() -> std::array<VkVertexInputAttributeDescription, 6>;
 #endif
 };
 

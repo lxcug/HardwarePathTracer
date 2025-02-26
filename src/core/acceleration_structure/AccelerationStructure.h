@@ -14,7 +14,7 @@
 
 
 #if !BUILD_RELEASE && !BUILD_SHIPPING
-#define PROFILE_AS_BUILD 1
+#define PROFILE_AS_BUILD 0
 #else
 #define PROFILE_AS_BUILD 0
 #endif

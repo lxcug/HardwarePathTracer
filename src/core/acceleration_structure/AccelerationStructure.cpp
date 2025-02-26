@@ -93,7 +93,10 @@ namespace Shadowy {
                               VkBuildAccelerationStructureFlagsKHR BuildFlags) {
         uint NumBLAS = BuildInput.size();
         std::vector<ASBuildData> BuildData(NumBLAS);
-        m_BLAS.resize(NumBLAS, new Accel());
+        for (int i = 0; i < NumBLAS; i++)
+        {
+            m_BLAS.push_back(new Accel());
+        }
 
         VkDeviceSize MaxBuildScratchSize{0};
 
@@ -107,7 +110,7 @@ namespace Shadowy {
             MaxBuildScratchSize = std::max(MaxBuildScratchSize, SizeInfo.buildScratchSize);
         }
 
-        VkDeviceSize MemBudget(256'000'000);  // 256MB
+        VkDeviceSize MemBudget(1024'000'000);  // 1GB
         uint MinAlignment = 128;
         VkDeviceSize ScratchSize = GetScratchSize(MemBudget, BuildData, MinAlignment);
 
@@ -376,7 +379,6 @@ namespace Shadowy {
         } else {
             VkAccelerationStructureCreateInfoKHR CreateInfo{
                     VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR};
-
 
             CreateInfo.type = BuildData.ASType;
             CreateInfo.size = BuildData.SizeInfo.accelerationStructureSize;

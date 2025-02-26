@@ -76,8 +76,8 @@ namespace Shadowy {
         InitRayTracing();
 
         // ¸©ÊÓÍ¼Î»ÖÃ
-        m_camera->SetCameraPosition(glm::vec3(-2.29f, 118.09f, 21.67f));
-        m_camera->SetCameraRotation(-1.21311, -0.000476454);
+        // m_camera->SetCameraPosition(glm::vec3(-2.29f, 118.09f, 21.67f));
+        // m_camera->SetCameraRotation(-1.21311, -0.000476454);
 //        m_camera->SetCameraPosition(glm::vec3(-0.66f, 19.46f, 70.f));
 //        m_camera->SetCameraPosition(glm::vec3(0, 0, 20));
 //        m_camera->SetCameraPosition(glm::vec3(-600, 510, 40));
@@ -141,7 +141,7 @@ namespace Shadowy {
         delete m_accumulationPass;
 
         Sampler::ReleaseSamplers();
-        delete m_restirResource;
+        // delete m_restirResource;
         delete m_toneMappingPass;
         delete m_lastFrameViewportImage;
         delete m_RTScene;
@@ -428,11 +428,11 @@ namespace Shadowy {
 
         InitScene();
 
-        m_restirResource = new ReSTIRResource(m_viewportSize.x, m_viewportSize.y);
-        m_restirResource->CreateTemporalReusePassSets();
-        m_restirResource->CreateTemporalReusePassPipeline();
-        m_restirResource->CreateSpatialReusePassSets();
-        m_restirResource->CreateSpatialReusePassPipeline();
+        // m_restirResource = new ReSTIRResource(m_viewportSize.x, m_viewportSize.y);
+        // m_restirResource->CreateTemporalReusePassSets();
+        // m_restirResource->CreateTemporalReusePassPipeline();
+        // m_restirResource->CreateSpatialReusePassSets();
+        // m_restirResource->CreateSpatialReusePassPipeline();
 
         CreateRTDescriptorSets();
         CreateRTPipelineLayout();
@@ -454,8 +454,8 @@ namespace Shadowy {
         UpdateRTDescriptorSets();
         m_gbufferPass->UpdateSets();
         m_accumulationPass->UpdateSets();
-        m_restirResource->UpdateTemporalReusePassSets();
-        m_restirResource->UpdateSpatialReusePassSets();
+        // m_restirResource->UpdateTemporalReusePassSets();
+        // m_restirResource->UpdateSpatialReusePassSets();
         m_toneMappingPass->UpdateDescriptorSets();
     }
 
@@ -550,11 +550,11 @@ namespace Shadowy {
             ImGui::Text("Path Tracing Options");
             ShouldReAccumulate |= ImGui::Checkbox("Enable ReSTIRGI",
                                                   reinterpret_cast<bool *>(&m_pathTracingOptions.EnableReSTIRGI));
-            ShouldReAccumulate |= ImGui::Checkbox("Enable SpatialReuse",
-                                                  reinterpret_cast<bool *>(&m_restirResource->GetSpatialReuseOptions().EnableSpatialReuse));
-            ShouldReAccumulate |= ImGui::InputInt("Reuse Radius",
-                                                  &m_restirResource->GetSpatialReuseOptions().ReuseRadius,
-                                                  1);
+            // ShouldReAccumulate |= ImGui::Checkbox("Enable SpatialReuse",
+                                                  // reinterpret_cast<bool *>(&m_restirResource->GetSpatialReuseOptions().EnableSpatialReuse));
+            // ShouldReAccumulate |= ImGui::InputInt("Reuse Radius",
+                                                  // &m_restirResource->GetSpatialReuseOptions().ReuseRadius,
+                                                  // 1);
             ShouldReAccumulate |= ImGui::Checkbox("Show Indirect Only",
                                                   reinterpret_cast<bool *>(&m_pathTracingOptions.ShowIndirectOnly));
             ShouldReAccumulate |= ImGui::Checkbox("Enable Accumulation",
@@ -591,12 +591,12 @@ namespace Shadowy {
                                                   reinterpret_cast<bool *>(&m_pathTracingOptions.EnableSkyLight));
 
             // TODO: Choose Obj
-            if (ImGui::Button("Open Obj")) {
+            if (ImGui::Button("Open Scene")) {
                 IGFD::FileDialogConfig Config;
                 Config.path = "../../asset";
                 Config.flags = ImGuiFileDialogFlags_Modal;
                 ImGuiFileDialog::Instance()->OpenDialog("ChooseObj", "Choose File",
-                                                        ".obj", Config);
+                                                        ".glb, .gltf, .fbx, .obj", Config);
             }
             if (ImGui::Button("Open Sky Texture")) {
                 IGFD::FileDialogConfig Config;
@@ -716,27 +716,28 @@ namespace Shadowy {
         GBufferBinding.stageFlags =
                 VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
-        VkDescriptorSetLayoutBinding InitialSampleBufferBinding{};
-        InitialSampleBufferBinding.binding = 5;
-        InitialSampleBufferBinding.descriptorCount = 1;
-        InitialSampleBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        InitialSampleBufferBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+        // VkDescriptorSetLayoutBinding InitialSampleBufferBinding{};
+        // InitialSampleBufferBinding.binding = 5;
+        // InitialSampleBufferBinding.descriptorCount = 1;
+        // InitialSampleBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        // InitialSampleBufferBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
         VkDescriptorSetLayoutBinding DiffuseHitDisBinding{};
-        DiffuseHitDisBinding.binding = 6;
+        DiffuseHitDisBinding.binding = 5;
         DiffuseHitDisBinding.descriptorCount = 1;
         DiffuseHitDisBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         DiffuseHitDisBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
         VkDescriptorSetLayoutBinding SpecularHitDisBinding{};
-        SpecularHitDisBinding.binding = 7;
+        SpecularHitDisBinding.binding = 6;
         SpecularHitDisBinding.descriptorCount = 1;
         SpecularHitDisBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         SpecularHitDisBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 
-        std::array<VkDescriptorSetLayoutBinding, 8> Bindings = {
+        std::array<VkDescriptorSetLayoutBinding, 7> Bindings = {
                 ViewUniformBufferBinding, TLASBinding, OutImageBinding,
-                InImageBinding, GBufferBinding, InitialSampleBufferBinding,
+                InImageBinding, GBufferBinding,
+                // InitialSampleBufferBinding,
                 DiffuseHitDisBinding, SpecularHitDisBinding
         };
 
@@ -762,7 +763,7 @@ namespace Shadowy {
     }
 
     void VulkanRayTracingApp::UpdateRTDescriptorSets() {
-        std::array<VkWriteDescriptorSet, 8> DescriptorWrites{};
+        std::array<VkWriteDescriptorSet, 7> DescriptorWrites{};
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             VkDescriptorBufferInfo BufferInfo{};
             BufferInfo.buffer = m_ViewUniformBuffers[i]->GetHandle();
@@ -828,40 +829,40 @@ namespace Shadowy {
             DescriptorWrites[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
             DescriptorWrites[4].pImageInfo = GBufferInfos.data();
 
-            VkDescriptorBufferInfo InitialSampleBufferInfo{};
-            InitialSampleBufferInfo.buffer = m_restirResource->GetInitialSampleBuffer(
-                    i)->GetHandle();
-            InitialSampleBufferInfo.offset = 0;
-            InitialSampleBufferInfo.range = VK_WHOLE_SIZE;
-            DescriptorWrites[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescriptorWrites[5].dstSet = m_RTDescriptorSets[i];
-            DescriptorWrites[5].dstBinding = 5;
-            DescriptorWrites[5].dstArrayElement = 0;
-            DescriptorWrites[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-            DescriptorWrites[5].descriptorCount = 1;
-            DescriptorWrites[5].pBufferInfo = &InitialSampleBufferInfo;
+            // VkDescriptorBufferInfo InitialSampleBufferInfo{};
+            // InitialSampleBufferInfo.buffer = m_restirResource->GetInitialSampleBuffer(
+                    // i)->GetHandle();
+            // InitialSampleBufferInfo.offset = 0;
+            // InitialSampleBufferInfo.range = VK_WHOLE_SIZE;
+            // DescriptorWrites[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            // DescriptorWrites[5].dstSet = m_RTDescriptorSets[i];
+            // DescriptorWrites[5].dstBinding = 5;
+            // DescriptorWrites[5].dstArrayElement = 0;
+            // DescriptorWrites[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+            // DescriptorWrites[5].descriptorCount = 1;
+            // DescriptorWrites[5].pBufferInfo = &InitialSampleBufferInfo;
 
             VkDescriptorImageInfo DiffuseHitDisBinding{};
             DiffuseHitDisBinding.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
             DiffuseHitDisBinding.imageView = m_globalTexture->GetGlobalTexture(TextureType::Diffuse_Radiance_HitDis, i)->CreateSRV();
+            DescriptorWrites[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            DescriptorWrites[5].dstSet = m_RTDescriptorSets[i];
+            DescriptorWrites[5].dstBinding = 5;
+            DescriptorWrites[5].dstArrayElement = 0;
+            DescriptorWrites[5].descriptorCount = 1;
+            DescriptorWrites[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            DescriptorWrites[5].pImageInfo = &DiffuseHitDisBinding;
+
+            VkDescriptorImageInfo SpecularHitDisBinding{};
+            SpecularHitDisBinding.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            SpecularHitDisBinding.imageView = m_globalTexture->GetGlobalTexture(TextureType::Specular_Radiance_HitDis, i)->CreateSRV();
             DescriptorWrites[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             DescriptorWrites[6].dstSet = m_RTDescriptorSets[i];
             DescriptorWrites[6].dstBinding = 6;
             DescriptorWrites[6].dstArrayElement = 0;
             DescriptorWrites[6].descriptorCount = 1;
             DescriptorWrites[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            DescriptorWrites[6].pImageInfo = &DiffuseHitDisBinding;
-
-            VkDescriptorImageInfo SpecularHitDisBinding{};
-            SpecularHitDisBinding.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-            SpecularHitDisBinding.imageView = m_globalTexture->GetGlobalTexture(TextureType::Specular_Radiance_HitDis, i)->CreateSRV();
-            DescriptorWrites[7].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            DescriptorWrites[7].dstSet = m_RTDescriptorSets[i];
-            DescriptorWrites[7].dstBinding = 7;
-            DescriptorWrites[7].dstArrayElement = 0;
-            DescriptorWrites[7].descriptorCount = 1;
-            DescriptorWrites[7].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            DescriptorWrites[7].pImageInfo = &SpecularHitDisBinding;
+            DescriptorWrites[6].pImageInfo = &SpecularHitDisBinding;
 
             vkUpdateDescriptorSets(m_device, DescriptorWrites.size(), DescriptorWrites.data(),
                                    0, nullptr);
@@ -1030,7 +1031,12 @@ namespace Shadowy {
 
         // TODO: Choose a default sky texture
         m_RTScene->CreateSkyTexture("../../asset/env/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
-        m_RTScene->AddModel("../../asset/test_material/test_material.obj");
+
+        // m_RTScene->AddModel("../../asset/cornell_box_glossy/cornell_box.fbx");
+        // m_RTScene->AddModel("../../asset/bistro/BistroInterior.fbx");
+        // m_RTScene->AddModel("../../asset/catedral-de-chihuahua/source/Catedral_Chihuahua_FINAL.fbx");
+        // m_RTScene->AddModel("../../asset/sponza_fbx/sponza.fbx");
+        m_RTScene->AddModel("../../asset/test_material/test_material.glb");
 //        m_RTScene->AddModel("../../asset/dragon/Dragon_Baked_Actions.obj");
 //        m_RTScene->AddModel("../../asset/house_with_tree/house_with_tree.obj");
 //        m_RTScene->AddModel("../../asset/house_with_tree/house_with_tree_glossy.obj");
@@ -1104,8 +1110,11 @@ namespace Shadowy {
         RHI::TextureTransitionInput SrcInput{}, DstInput{};
         m_lastFrameViewportImage = new Texture2D(m_viewportSize.x,
                                                  m_viewportSize.y,
-                                                 TextureFormat::RGBA32_SFLOAT,
-                                                 TextureUsage::UAV);
+                                                 VK_FORMAT_R32G32B32A32_SFLOAT,
+                                                 VK_IMAGE_USAGE_STORAGE_BIT |
+                                                 VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                                                 VK_IMAGE_USAGE_SAMPLED_BIT,
+                                                 VK_IMAGE_LAYOUT_UNDEFINED);
         SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
         SrcInput.AccessMask = 0;
         SrcInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
@@ -1148,7 +1157,7 @@ namespace Shadowy {
         m_gbufferPass->OnResize(m_viewportSize.x, m_viewportSize.y);
         m_accumulationPass->OnResize(m_viewportSize.x, m_viewportSize.y);
         m_accumulationPass->OnResize(m_viewportSize.x, m_viewportSize.y);
-        m_restirResource->OnResize(m_viewportSize.x, m_viewportSize.y);
+        // m_restirResource->OnResize(m_viewportSize.x, m_viewportSize.y);
 
         UpdateRTDescriptorSets();
         m_toneMappingPass->UpdateDescriptorSets();
@@ -1210,13 +1219,13 @@ namespace Shadowy {
     void VulkanRayTracingApp::ReCompileShaders() {
         delete m_RTSBTBuffer;
         vkDestroyPipeline(m_device, m_RTPipeline, nullptr);
-        m_restirResource->DestroyPipeline();
+        // m_restirResource->DestroyPipeline();
         m_toneMappingPass->DestroyPipeline();
 
         CreateRTPipeline();
         CreateRTSBT();
-        m_restirResource->CreateTemporalReusePassPipeline();
-        m_restirResource->CreateSpatialReusePassPipeline();
+        // m_restirResource->CreateTemporalReusePassPipeline();
+        // m_restirResource->CreateSpatialReusePassPipeline();
         m_gbufferPass->OnRecompile();
         m_accumulationPass->OnRecompile();
         m_toneMappingPass->CreatePipeline();
@@ -1224,8 +1233,8 @@ namespace Shadowy {
 
     void VulkanRayTracingApp::UpdateRenderOptions() {
         m_pathTracingOptions.NumLights = m_RTScene->GetSceneLights().size();
-        m_restirResource->GetTemporalReuseOptions().MaxAccumulatedFrames = m_accumulationPass->GetRenderOptions().MaxAccumulatedFrames;
-        m_restirResource->GetSpatialReuseOptions().MaxAccumulatedFrames = m_accumulationPass->GetRenderOptions().MaxAccumulatedFrames;
+        // m_restirResource->GetTemporalReuseOptions().MaxAccumulatedFrames = m_accumulationPass->GetRenderOptions().MaxAccumulatedFrames;
+        // m_restirResource->GetSpatialReuseOptions().MaxAccumulatedFrames = m_accumulationPass->GetRenderOptions().MaxAccumulatedFrames;
 
         ViewUniformBuffer ViewUniformBuffer_{};
         ViewUniformBuffer_.ViewTrans = m_camera->GetViewMatrix();

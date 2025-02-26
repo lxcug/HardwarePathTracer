@@ -20,32 +20,46 @@ namespace Shadowy {
 
         ~Scene();
 
-        void AddModel(Model *ModelPtr) {
-            std::shared_ptr<Model> SharedModel(ModelPtr);
-            AddModel(SharedModel);
-        }
+        // void AddModel(ObjModel *ModelPtr) {
+        //     std::shared_ptr<ObjModel> SharedModel(ModelPtr);
+        //     AddModel(SharedModel);
+        // }
+        //
+        // template<typename... Args>
+        // void AddModel(const std::string &ModelName, Args &&... Args_) {
+        //     auto SharedModel = std::make_shared<ObjModel>(Args_...);
+        //     SharedModel->SetModelName(ModelName);
+        //     AddModel(SharedModel);
+        // }
+        //
+        // template<typename... Args>
+        // void AddModel(Args &&... Args_) {
+        //     auto SharedModel = std::make_shared<ObjModel>(Args_...);
+        //     AddModel(SharedModel);
+        // }
+        //
+        // void AddModel(std::shared_ptr<ObjModel> &SharedModel) {
+        //     SharedModel->SetInstanceID(s_instanceIDCounter++);
+        //     // NOTE: Set Global Texture Offset for each ModelDesc
+        //     SharedModel->SetModelDescTextureOffset(static_cast<int>(m_sceneModelTextures.size()));
+        //     CreateModelTextures(SharedModel->GetModelTexturePaths());
+        //
+        //     m_models.emplace_back(SharedModel);
+        //     m_modelDescs.emplace_back(SharedModel->GetModelDesc());
+        // }
 
-        template<typename... Args>
-        void AddModel(const std::string &ModelName, Args &&... Args_) {
-            auto SharedModel = std::make_shared<Model>(Args_...);
-            SharedModel->SetModelName(ModelName);
-            AddModel(SharedModel);
-        }
+        void AddModel(const std::filesystem::path& Path) {
+            auto SharedModel = std::make_shared<Model>(Path);
 
-        template<typename... Args>
-        void AddModel(Args &&... Args_) {
-            auto SharedModel = std::make_shared<Model>(Args_...);
-            AddModel(SharedModel);
-        }
+            for (auto& Mesh : SharedModel->m_meshes)
+            {
+                Mesh->m_meshDesc.TextureIndexOffset = m_sceneModelTextures.size();
+                m_modelDescs.emplace_back(Mesh->m_meshDesc);
+            }
+            CreateModelTextures(SharedModel.get());
 
-        void AddModel(std::shared_ptr<Model> &SharedModel) {
-            SharedModel->SetInstanceID(s_instanceIDCounter++);
-            // NOTE: Set Global Texture Offset for each ModelDesc
-            SharedModel->SetModelDescTextureOffset(static_cast<int>(m_sceneModelTextures.size()));
-            CreateModelTextures(SharedModel->GetModelTexturePaths());
-
-            m_models.emplace_back(SharedModel);
-            m_modelDescs.emplace_back(SharedModel->GetModelDesc());
+            m_models.push_back(SharedModel);
+            SharedModel->Importer.FreeScene();
         }
 
         template<typename... Args>
@@ -78,7 +92,7 @@ namespace Shadowy {
             return m_sceneModelDescBuffer;
         }
 
-        void CreateModelTextures(const std::vector<std::string> &TexturePaths);
+        void CreateModelTextures(Model* Model);
 
         void CreateSceneDescriptorSet();
 
@@ -108,15 +122,17 @@ namespace Shadowy {
 
         void CreateSkyTexture(const std::filesystem::path &Path) {
             // NOTE: SRGB
-            m_skyTexture = std::make_shared<Texture2D>(Path, 1, false, true);
+            m_skyTexture = std::make_shared<Texture2D>(Path, false, true);
         }
+
+        static inline uint s_instanceIDCounter = 0; // TODO: dispatch instance index to models
 
     private:
         std::shared_ptr<ASBuilder> m_accelBuilder;
+        // std::vector<std::shared_ptr<ObjModel>> m_models;
         std::vector<std::shared_ptr<Model>> m_models;
         std::vector<ModelDesc> m_modelDescs;
         std::shared_ptr<ArbitraryBuffer> m_sceneModelDescBuffer;
-        static inline uint s_instanceIDCounter = 0; // TODO: dispatch instance index to models
         std::vector<std::shared_ptr<Texture2D>> m_sceneModelTextures;
 
         VkDescriptorSetLayout m_sceneDescDescriptorSetLayout = VK_NULL_HANDLE;
