@@ -13,7 +13,7 @@ namespace Shadowy {
     public:
         ArbitraryBuffer(VkDeviceSize Size, VkBufferUsageFlags Usage, VkMemoryPropertyFlags MemProps = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-        ArbitraryBuffer(VkDeviceSize Size, void* Data, VkBufferUsageFlags Usage, VkMemoryPropertyFlags MemProps);
+        ArbitraryBuffer(VkDeviceSize Size, void* Data, VkBufferUsageFlags Usage, VkMemoryPropertyFlags MemProps = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
         ~ArbitraryBuffer();
 

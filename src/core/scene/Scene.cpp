@@ -20,16 +20,22 @@ namespace Shadowy {
 
         std::vector<BLASBuildInput> BLASBuildVector;
         std::vector<VkAccelerationStructureInstanceKHR> TLASBuildVector;
-        BLASBuildVector.reserve(m_models.size());
-        TLASBuildVector.reserve(m_models.size());
 
-        for (const auto &Model_: m_models) {
-            BLASBuildVector.emplace_back(Model_->GetBLASBuildInput());
+        for (auto& Model : m_models)
+        {
+            for (auto& Mesh : Model->m_meshes)
+            {
+                BLASBuildVector.emplace_back(Mesh->GetBLASBuildInput());
+            }
         }
         m_accelBuilder->BuildBLAS(BLASBuildVector);
 
-        for (const auto &Model_: m_models) {
-            TLASBuildVector.emplace_back(Model_->GetTLASBuildInput(m_accelBuilder.get()));
+        for (auto& Model : m_models)
+        {
+            for (auto& Mesh : Model->m_meshes)
+            {
+                TLASBuildVector.emplace_back(Mesh->GetTLASBuildInput(m_accelBuilder.get()));
+            }
         }
         m_accelBuilder->BuildTLAS(TLASBuildVector);
     }
@@ -49,10 +55,23 @@ namespace Shadowy {
         }
     }
 
-    void Scene::CreateModelTextures(const std::vector<std::string> &TexturePaths) {
+    void Scene::CreateModelTextures(Model* Model) {
         auto CommandBuffer = RHI::BeginIntermediateCommandBuffer();
-        for (auto &TexturePath: TexturePaths) {
-            auto SharedTexture = std::make_shared<Texture2D>(TexturePath, 1, true);
+
+        for (auto &TexturePath : Model->m_textureNames) {
+            // Handle Embedded Texture
+            const aiTexture* TextureData = Model->m_aiScene->GetEmbeddedTexture(TexturePath.c_str());
+            std::shared_ptr<Texture2D> SharedTexture;
+            if (TextureData)
+            {
+                SharedTexture = std::make_shared<Texture2D>(TextureData, false, false);
+            }
+            else
+            {
+                std::string FullPath = Model->m_path.string() + '/' + TexturePath;
+                SharedTexture = std::make_shared<Texture2D>(FullPath, false, false);
+            }
+
             RHI::TextureTransitionInput SrcInput{}, DstInput{};
             SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
             SrcInput.AccessMask = 0;
@@ -210,12 +229,13 @@ namespace Shadowy {
     void Scene::FinalizeScene() {
         CreateAccel();
         CreateModelDescBuffer();
-        AppendSkyLightToSceneLights();  // TODO: Reload Scene will create two SkyLight in Buffer
+        AppendSkyLightToSceneLights();
         CreateSceneLightsBuffer();
         if (m_sceneModelTextures.empty()) {
             m_sceneModelTextures.emplace_back(
-                    std::make_shared<Texture2D>(1, 1, TextureFormat::RGBA_UNORM,
-                                                TextureUsage::SRV));
+                    std::make_shared<Texture2D>(1, 1,
+                        VK_FORMAT_R8G8B8A8_UNORM,
+                        VK_IMAGE_USAGE_SAMPLED_BIT));
             RHI::TextureTransitionInput SrcInput{}, DstInput{};
             SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
             SrcInput.AccessMask = 0;

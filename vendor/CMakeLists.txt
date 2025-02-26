@@ -34,3 +34,7 @@ if (NOT TARGET NRD AND NOT TARGET NRDIntegration)
     set(NRD_STATIC_LIBRARY ON)
     add_subdirectory(NRD)
 endif ()
+
+if (NOT TARGET assimp)
+    add_subdirectory(assimp)
+endif ()

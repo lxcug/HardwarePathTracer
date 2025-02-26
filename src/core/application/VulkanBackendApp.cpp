@@ -143,7 +143,6 @@ namespace Shadowy {
     void VulkanBackendApp::CleanUp() {
         Sampler::ReleaseSamplers();
         delete m_msaaBuffers;
-//        delete m_vikingRoom;
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             delete m_ViewUniformBuffers[i];
             delete m_particleStorageBuffers[i];
@@ -555,7 +554,7 @@ namespace Shadowy {
         // For resolve MSAA buffer
 
         VkAttachmentDescription DepthAttachment{};
-        DepthAttachment.format = GetVKFormat(TextureFormat::Depth32);
+        DepthAttachment.format = VK_FORMAT_D32_SFLOAT;
         DepthAttachment.samples = GetVKSampleCount(m_msaaSamples);
         DepthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
         DepthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1322,14 +1321,17 @@ namespace Shadowy {
 
         m_msaaBuffers->MSAAColorBuffer = new Texture2D(m_swapChain.Extent.width,
                                                        m_swapChain.Extent.height,
-                                                       TextureFormat::RGBA_UNORM,
-                                                       TextureUsage::ColorAttachmentMSAA,
-                                                       GetVKSampleCount(m_msaaSamples));
+                                                       VK_FORMAT_R8G8B8A8_UNORM,
+                                                       VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                                                       VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+                                                       VK_IMAGE_LAYOUT_UNDEFINED,
+                                                       m_msaaSamples);
         m_msaaBuffers->MSAADepthBuffer = new Texture2D(m_swapChain.Extent.width,
                                                        m_swapChain.Extent.height,
-                                                       TextureFormat::Depth32,
-                                                       TextureUsage::DepthStencilAttachmentMSAA,
-                                                       GetVKSampleCount(m_msaaSamples));
+                                                       VK_FORMAT_D32_SFLOAT,
+                                                       VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                                                       VK_IMAGE_LAYOUT_UNDEFINED,
+                                                       m_msaaSamples);
     }
 
     void VulkanBackendApp::CreateParticleStorageBuffers() {

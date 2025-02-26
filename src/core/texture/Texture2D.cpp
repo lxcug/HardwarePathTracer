@@ -12,16 +12,37 @@
 
 namespace Shadowy {
     // TextureUsage is ShaderResourceView when giving a TexturePath
-    Texture2D::Texture2D(const std::filesystem::path &TexturePath, uint MSAASamples,
+    Texture2D::Texture2D(const std::filesystem::path &TexturePath,
                          bool GenerateMips, bool SRGB)
-            : m_msaaSamples(MSAASamples), m_generateMips(GenerateMips),
-              m_textureUsage(TextureUsage::SRV), m_isSRGB(SRGB) {
+            : m_generateMips(GenerateMips), m_isSRGB(SRGB) {
         CreateTexture(TexturePath);
     }
 
+    Texture2D::Texture2D(const aiTexture* AITexture, bool GenerateMips, bool SRGB)
+        :  m_generateMips(GenerateMips), m_isSRGB(SRGB)
+    {
+        if (AITexture->mHeight == 0)  // Texture is compressed
+        {
+            unsigned char* Data =
+                stbi_load_from_memory(reinterpret_cast<const unsigned char*>(AITexture->pcData),
+                    AITexture->mWidth,
+                    &m_width,
+                    &m_height,
+                    &m_channels,
+                    STBI_rgb_alpha);
+            CreateTexture(Data);
+        }
+        else
+        {
+            m_channels = 4;
+            CreateTexture(reinterpret_cast<stbi_uc*>(AITexture->pcData));
+        }
+    }
+
     Texture2D::Texture2D(uint Width, uint Height, VkFormat Format, VkImageUsageFlags Usage,
-                         VkImageLayout InitialLayout)
-    : m_width(Width), m_height(Height), m_useNativeVkFormat(true), m_vkFormat(Format) {
+                         VkImageLayout InitialLayout, uint MSAASamples)
+    : m_width(Width), m_height(Height), m_useNativeVkFormat(true), m_vkFormat(Format),
+    m_msaaSamples(MSAASamples) {
         VkImageCreateInfo CreateInfo{};
         CreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         CreateInfo.imageType = VK_IMAGE_TYPE_2D;
@@ -36,6 +57,7 @@ namespace Shadowy {
         CreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         CreateInfo.usage = Usage;
         CreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        CreateInfo.samples = GetVKSampleCount(m_msaaSamples);
 
         VK_CHECK(vkCreateImage(GetVKDevice(), &CreateInfo, nullptr, &m_texture));
 
@@ -49,75 +71,48 @@ namespace Shadowy {
         vkAllocateMemory(GetVKDevice(), &AllocateInfo, nullptr, &m_textureMemory);
         vkBindImageMemory(GetVKDevice(), m_texture, m_textureMemory, 0);
 
-        RHI::TextureTransitionInput SrcInput{}, DstInput{};
-        SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
-        SrcInput.AccessMask = 0;
-        SrcInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
-        DstInput.Layout = InitialLayout;
-        DstInput.AccessMask = 0;
-        DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
-        RHI::TransitionTextureLayout(m_texture, 1, SrcInput, DstInput);
-    }
-
-    Texture2D::Texture2D(uint Width, uint Height, TextureFormat Format, TextureUsage Usage,
-                         uint MSAASamples, bool GenerateMips)
-            : m_width(Width), m_height(Height), m_format(Format),
-              m_textureUsage(Usage), m_msaaSamples(MSAASamples), m_generateMips(GenerateMips) {
-        switch (m_textureUsage) {
-            case TextureUsage::ColorAttachment:
-                RHI::CreateTexture2D(Width, Height, m_numMips, GetVKSampleCount(m_msaaSamples),
-                                     GetVKFormat(m_format),
-                                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                                     VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
-                break;
-            case TextureUsage::DepthStencilAttachment:
-                RHI::CreateTexture2D(Width, Height, m_numMips, GetVKSampleCount(m_msaaSamples),
-                                     GetVKFormat(m_format),
-                                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                                     VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
-                break;
-            case TextureUsage::ColorAttachmentMSAA:
-                RHI::CreateTexture2D(Width, Height, m_numMips, GetVKSampleCount(m_msaaSamples),
-                                     GetVKFormat(m_format),
-                                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                                     VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
-                                     VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
-                break;
-            case TextureUsage::DepthStencilAttachmentMSAA:
-                RHI::CreateTexture2D(Width, Height, m_numMips, GetVKSampleCount(m_msaaSamples),
-                                     GetVKFormat(m_format),
-                                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                                     VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
-                break;
-            case TextureUsage::SRV:
-                RHI::CreateTexture2D(Width, Height, m_numMips, GetVKSampleCount(m_msaaSamples),
-                                     GetVKFormat(m_format),
-                                     VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-                                     VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
-                break;
-            case TextureUsage::UAV:
-                RHI::CreateTexture2D(Width, Height, m_numMips, VK_SAMPLE_COUNT_1_BIT,
-                                     GetVKFormat(m_format),
-                                     VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
-                                     VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-                                     VK_IMAGE_TILING_LINEAR, m_texture, m_textureMemory);
-                break;
-            default:
-                throw std::runtime_error("Unsupported TextureUsage");
+        if (InitialLayout != VK_IMAGE_LAYOUT_UNDEFINED)
+        {
+            RHI::TextureTransitionInput SrcInput{}, DstInput{};
+            SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
+            SrcInput.AccessMask = 0;
+            SrcInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
+            DstInput.Layout = InitialLayout;
+            DstInput.AccessMask = 0;
+            DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
+            RHI::TransitionTextureLayout(m_texture, 1, SrcInput, DstInput);
         }
     }
 
     void Texture2D::CreateTexture(const std::filesystem::path &TexturePath) {
-        Check(m_textureUsage != TextureUsage::None);
-
-        int Channels;
         stbi_set_flip_vertically_on_load(false);
         stbi_uc *Pixels = stbi_load(TexturePath.string().c_str(),
-                                    reinterpret_cast<int *>(&m_width),
-                                    reinterpret_cast<int *>(&m_height),
-                                    &Channels, STBI_rgb_alpha);
-        Check(Pixels);
-        m_format = GetTextureFormat(Channels, m_isSRGB);
+                                    &m_width,
+                                    &m_height,
+                                    &m_channels, STBI_rgb_alpha);
+        CreateTexture(Pixels);
+    }
+
+    void Texture2D::CreateTexture(stbi_uc* Data)
+    {
+        if (m_channels == 3 || m_channels == 4)
+        {
+            if (m_isSRGB)
+            {
+                m_vkFormat = VK_FORMAT_R8G8B8A8_UNORM;
+            }
+            else
+            {
+                m_vkFormat = VK_FORMAT_R8G8B8A8_SRGB;
+            }
+        }
+        // Roughness/Metallic Map as RGBA for Bindless
+        if (m_channels == 1)
+        {
+            m_vkFormat = VK_FORMAT_R8G8B8A8_UNORM;
+        }
+
+        Check(Data);
 
         if (m_generateMips) {
             m_numMips = CalculateNumMips(m_width, m_height);
@@ -128,12 +123,12 @@ namespace Shadowy {
 
         void *MappedData = nullptr;
         vkMapMemory(GetVKDevice(), StagingBufferMemory, 0, MemorySize, 0, &MappedData);
-        memcpy(MappedData, Pixels, MemorySize);
+        memcpy(MappedData, Data, MemorySize);
         vkUnmapMemory(GetVKDevice(), StagingBufferMemory);
-        stbi_image_free(Pixels);
+        stbi_image_free(Data);
 
         RHI::CreateTexture2D(m_width, m_height, m_numMips, GetVKSampleCount(m_msaaSamples),
-                             GetVKFormat(m_format),
+                             m_vkFormat,
                              VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
                              VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
         RHI::TransitionTextureLayout(m_texture, m_numMips,
@@ -169,10 +164,12 @@ namespace Shadowy {
         VkImageViewCreateInfo CreateInfo{};
         CreateInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         CreateInfo.image = m_texture;
-        CreateInfo.format = m_useNativeVkFormat ? m_vkFormat : GetVKFormat(m_format);
+        CreateInfo.format = m_vkFormat;
         CreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+
+
         VkImageAspectFlags AspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
-        if (IsDepthStencilTexture(m_format)) {
+        if (m_vkFormat == VK_FORMAT_D32_SFLOAT) {
             AspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
         }
         CreateInfo.subresourceRange.aspectMask = AspectFlags;

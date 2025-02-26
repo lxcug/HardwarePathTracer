@@ -307,7 +307,7 @@ namespace Shadowy
 
         ImGuiInfrastructure* m_imguiInfrastructure = nullptr;
 
-        uint m_msaaSamples = 8;
+        uint m_msaaSamples = 4;
 
         MSAABuffer* m_msaaBuffers = nullptr;
 
