@@ -16,7 +16,7 @@ BEGIN_SHADOWY_NAMESPACE
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, NumLights, 0);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, Bounce, 4);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, RayMinBias, 1e-3f);
-        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, MaxTraceDistance, 1e4f);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, MaxTraceDistance, 1e5f);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableSkyLight, 1);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableEmissive, 0);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, MISMode, 2);  // 0 for NEE 1 for sample material 2 for MIS

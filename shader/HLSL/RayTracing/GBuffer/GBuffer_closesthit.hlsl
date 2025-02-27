@@ -58,7 +58,7 @@ void main(inout GBufferPayload payload, in GBufferHitAttribute attrib)
 
     payload.pos = hit_pos;
     payload.albedo = albedo;
-    payload.normal = float3(hit_uv, 0.f);
+    payload.normal = hit_normal;
     payload.roughness = roughness;
     payload.metallic = metallic;
     payload.hit_t = RayTCurrent();

@@ -43,5 +43,5 @@ void main()
         Translucency[index] = float4(0.f, 0.f, 0.f, 0.f);
     }
 
-     // SceneColor[index] = float4(GBuffer[0][index]);
+    // SceneColor[index] = float4(GBuffer[1][index]);
 }

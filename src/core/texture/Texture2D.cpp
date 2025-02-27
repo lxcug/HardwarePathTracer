@@ -8,6 +8,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 
 #include "stb_image.h"
+#include "dds.hpp"
+#include "core/Utils.h"
 
 
 namespace Shadowy {
@@ -23,14 +25,32 @@ namespace Shadowy {
     {
         if (AITexture->mHeight == 0)  // Texture is compressed
         {
-            unsigned char* Data =
-                stbi_load_from_memory(reinterpret_cast<const unsigned char*>(AITexture->pcData),
-                    AITexture->mWidth,
-                    &m_width,
-                    &m_height,
-                    &m_channels,
-                    STBI_rgb_alpha);
-            CreateTexture(Data);
+            std::string TexturePath = AITexture->mFilename.C_Str();
+            size_t DotPos = TexturePath.find_last_of('.');
+            std::string Extension =TexturePath.substr(DotPos);
+
+            unsigned char* Data = nullptr;
+            if (Extension == ".dds")
+            {
+                dds::Image Image;
+                auto Result = dds::readFile(TexturePath, &Image);
+                m_width = Image.width;
+                m_height = Image.height;
+                m_channels = Image.depth;
+                Data = reinterpret_cast<unsigned char*>(Image.data.data());
+                CreateTexture(Data, Image.data.size());
+            }
+            else
+            {
+                Data =
+                    stbi_load_from_memory(reinterpret_cast<const unsigned char*>(AITexture->pcData),
+                        AITexture->mWidth,
+                        &m_width,
+                        &m_height,
+                        &m_channels,
+                        STBI_rgb_alpha);
+                CreateTexture(Data);
+            }
         }
         else
         {
@@ -85,25 +105,75 @@ namespace Shadowy {
     }
 
     void Texture2D::CreateTexture(const std::filesystem::path &TexturePath) {
-        stbi_set_flip_vertically_on_load(false);
-        stbi_uc *Pixels = stbi_load(TexturePath.string().c_str(),
-                                    &m_width,
-                                    &m_height,
-                                    &m_channels, STBI_rgb_alpha);
-        CreateTexture(Pixels);
+        if (TexturePath.extension().string() == ".dds")
+        {
+            dds::Image Image;
+            auto Result = dds::readFile(TexturePath.string(), &Image);
+            m_width = Image.width;
+            m_height = Image.height;
+            m_channels = 4;
+
+            m_vkFormat = dds::getVulkanFormat(Image.format, Image.supportsAlpha);
+            // Will automatically fill VkImageCreateInfo::format with a separate call to dds::getVulkanFormat.
+            VkImageCreateInfo ImageCreateInfo = dds::getVulkanImageCreateInfo(&Image);
+            ImageCreateInfo.imageType = VK_IMAGE_TYPE_2D;
+            ImageCreateInfo.mipLevels = 1;
+            ImageCreateInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+            ImageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+            VK_CHECK(vkCreateImage(GetVKDevice(), &ImageCreateInfo, nullptr, &m_texture));
+
+            VkMemoryRequirements MemRequirements;
+            vkGetImageMemoryRequirements(GetVKDevice(), m_texture, &MemRequirements);
+            VkMemoryAllocateInfo AllocateInfo{};
+            AllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            AllocateInfo.allocationSize = MemRequirements.size;
+            AllocateInfo.memoryTypeIndex = RHI::FindMemoryType(MemRequirements.memoryTypeBits,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+            auto Res = vkAllocateMemory(GetVKDevice(), &AllocateInfo, nullptr, &m_textureMemory);
+            vkBindImageMemory(GetVKDevice(), m_texture, m_textureMemory, 0);
+
+            // NOTE: Memory Size is not width * height * channel since texture is compressed
+            auto [StagingBuffer, StagingBufferMemory] = RHI::CreateStagingBuffer(MemRequirements.size);
+
+            void *MappedData = nullptr;
+            vkMapMemory(GetVKDevice(), StagingBufferMemory, 0, MemRequirements.size, 0, &MappedData);
+            memcpy(MappedData, Image.mipmaps[0].data(), MemRequirements.size);
+            vkUnmapMemory(GetVKDevice(), StagingBufferMemory);
+
+            RHI::TransitionTextureLayout(m_texture, m_numMips,
+                                         VK_IMAGE_LAYOUT_UNDEFINED,
+                                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+            RHI::CopyBufferToTexture(m_texture, StagingBuffer, m_width, m_height);
+
+            vkDestroyBuffer(GetVKDevice(), StagingBuffer, nullptr);
+            vkFreeMemory(GetVKDevice(), StagingBufferMemory, nullptr);
+
+            RHI::TransitionTextureLayout(m_texture, m_numMips,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
+        else
+        {
+            stbi_set_flip_vertically_on_load(false);
+            stbi_uc *Pixels = stbi_load(TexturePath.string().c_str(),
+                                        &m_width,
+                                        &m_height,
+                                        &m_channels, STBI_rgb_alpha);
+            CreateTexture(Pixels);
+        }
     }
 
-    void Texture2D::CreateTexture(stbi_uc* Data)
+    void Texture2D::CreateTexture(stbi_uc* Data, int DataSize)
     {
         if (m_channels == 3 || m_channels == 4)
         {
             if (m_isSRGB)
             {
-                m_vkFormat = VK_FORMAT_R8G8B8A8_UNORM;
+                m_vkFormat = VK_FORMAT_R8G8B8A8_SRGB;
             }
             else
             {
-                m_vkFormat = VK_FORMAT_R8G8B8A8_SRGB;
+                m_vkFormat = VK_FORMAT_R8G8B8A8_UNORM;
             }
         }
         // Roughness/Metallic Map as RGBA for Bindless
@@ -118,7 +188,7 @@ namespace Shadowy {
             m_numMips = CalculateNumMips(m_width, m_height);
         }
 
-        VkDeviceSize MemorySize = m_width * m_height * 4;
+        VkDeviceSize MemorySize = DataSize > 0 ? DataSize : m_width * m_height * 4;
         auto [StagingBuffer, StagingBufferMemory] = RHI::CreateStagingBuffer(MemorySize);
 
         void *MappedData = nullptr;
@@ -166,7 +236,6 @@ namespace Shadowy {
         CreateInfo.image = m_texture;
         CreateInfo.format = m_vkFormat;
         CreateInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-
 
         VkImageAspectFlags AspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
         if (m_vkFormat == VK_FORMAT_D32_SFLOAT) {

@@ -29,3 +29,6 @@
 [submodule "vendor/assimp"]
 	path = vendor/assimp
 	url = https://github.com/assimp/assimp.git
+[submodule "vendor/dds_image"]
+	path = vendor/dds_image
+	url = https://github.com/spnda/dds_image.git

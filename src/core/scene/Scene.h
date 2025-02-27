@@ -9,6 +9,7 @@
 #include <vector>
 #include "Model.h"
 #include "host_device_shared/Light.h"
+#include "core/texture/TextureManager.h"
 
 
 namespace Shadowy {
@@ -16,7 +17,10 @@ namespace Shadowy {
 
     class Scene {
     public:
-        Scene() = default;
+        Scene()
+        {
+            m_textureManager = std::make_shared<TextureManager>();
+        }
 
         ~Scene();
 
@@ -53,10 +57,10 @@ namespace Shadowy {
 
             for (auto& Mesh : SharedModel->m_meshes)
             {
-                Mesh->m_meshDesc.TextureIndexOffset = m_sceneModelTextures.size();
+                Mesh->m_meshDesc.TextureIndexOffset = 0;  // Deprecated, Set to 0
                 m_modelDescs.emplace_back(Mesh->m_meshDesc);
             }
-            CreateModelTextures(SharedModel.get());
+            // CreateModelTextures(SharedModel.get());
 
             m_models.push_back(SharedModel);
             SharedModel->Importer.FreeScene();
@@ -83,7 +87,7 @@ namespace Shadowy {
 
         [[nodiscard]] auto
         GetSceneModelTextures() const -> const std::vector<std::shared_ptr<Texture2D>> & {
-            return m_sceneModelTextures;
+            return m_textureManager->m_uniqueTextures;
         }
 
         void CreateModelDescBuffer();
@@ -92,7 +96,7 @@ namespace Shadowy {
             return m_sceneModelDescBuffer;
         }
 
-        void CreateModelTextures(Model* Model);
+        // void CreateModelTextures(Model* Model);
 
         void CreateSceneDescriptorSet();
 
@@ -127,13 +131,29 @@ namespace Shadowy {
 
         static inline uint s_instanceIDCounter = 0; // TODO: dispatch instance index to models
 
+        auto CreateOrRetrieveTexture(const std::filesystem::path& Path) const -> const std::tuple<Texture2D*, uint>&
+        {
+            return m_textureManager->CreateOrRetrieveTexture(Path);
+        }
+
+        auto CreateOrRetrieveTexture(const aiTexture* AITexture) -> const std::tuple<Texture2D*, uint>&
+        {
+            return m_textureManager->CreateOrRetrieveTexture(AITexture);
+        }
+
+        [[nodiscard]] auto IsTextureExist(const std::filesystem::path& Path) const -> bool
+        {
+            return m_textureManager->IsTextureExist(Path);
+        }
+
     private:
         std::shared_ptr<ASBuilder> m_accelBuilder;
         // std::vector<std::shared_ptr<ObjModel>> m_models;
         std::vector<std::shared_ptr<Model>> m_models;
         std::vector<ModelDesc> m_modelDescs;
         std::shared_ptr<ArbitraryBuffer> m_sceneModelDescBuffer;
-        std::vector<std::shared_ptr<Texture2D>> m_sceneModelTextures;
+        std::shared_ptr<TextureManager> m_textureManager;
+        // std::vector<std::shared_ptr<Texture2D>> m_sceneModelTextures;
 
         VkDescriptorSetLayout m_sceneDescDescriptorSetLayout = VK_NULL_HANDLE;
         std::vector<VkDescriptorSet> m_sceneDescDescriptorSets;
@@ -143,7 +163,6 @@ namespace Shadowy {
 
         std::shared_ptr<Texture2D> m_skyTexture;
 
-    private:
         Light m_dummyLight;
         ModelDesc m_dummyDesc;
         // Used when m_models.empty()
