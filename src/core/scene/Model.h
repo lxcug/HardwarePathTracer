@@ -22,7 +22,7 @@ namespace Shadowy {
     class Mesh
     {
     public:
-        Mesh(aiMesh* AIMesh, const aiScene* Scene, const aiMatrix4x4& Transform);
+        Mesh(aiMesh* AIMesh, const aiScene* Scene, const glm::mat4& Transform);
 
         ~Mesh()
         {
@@ -31,7 +31,7 @@ namespace Shadowy {
             delete m_materialIndexBuffer;
         }
 
-        void Init(aiMesh* AIMesh, const aiScene* Scene, const aiMatrix4x4& Transform);
+        void Init(aiMesh* AIMesh, const aiScene* Scene, const glm::mat4& Transform);
 
         [[nodiscard]] auto GetBLASBuildInput() const -> BLASBuildInput;
 
@@ -66,7 +66,7 @@ namespace Shadowy {
 
         void Init(const std::filesystem::path& ModelPath);
 
-        void ProcessNode(aiNode* Node, const aiScene* Scene);
+        void ProcessNode(aiNode* Node, const aiScene* Scene, const glm::mat4& ParentTransform);
 
         auto ProcessMeshMaterial(aiMaterial* AIMaterial, const aiScene* Scene) -> Material;
 
@@ -76,12 +76,14 @@ namespace Shadowy {
 
         std::filesystem::path m_path;
         std::vector<Mesh*> m_meshes;
-        std::vector<std::string> m_textureNames;
         std::vector<Material> m_materials;
         ArbitraryBuffer *m_materialBuffer = nullptr;  // Store All Materials for Meshes
 
         Assimp::Importer Importer;
         const aiScene* m_aiScene = nullptr;
+
+    private:
+        static auto AIMatrix4x4ToGlm(const aiMatrix4x4& Mat) -> glm::mat4;
     };
 
     // class ObjModel {

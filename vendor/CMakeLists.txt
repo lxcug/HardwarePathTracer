@@ -13,6 +13,10 @@ if (NOT TARGET stb)
     include(stb.cmake)
 endif ()
 
+if (NOT TARGET dds_image)
+    add_subdirectory(dds_image)
+endif ()
+
 if (NOT TARGET tinyobjloader)
     add_subdirectory(tinyobjloader)
 endif ()

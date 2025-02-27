@@ -5,12 +5,12 @@
 #include "NRDDenoiser.h"
 
 // IMPORTANT: these files must be included beforehand:
-//    NRD.h
-//    NRI.h
-//    Extensions/NRIHelper.h
-//    Extensions/NRIWrapperD3D11.h
-//    Extensions/NRIWrapperD3D12.h
-//    Extensions/NRIWrapperVK.h
+#include "NRD.h"
+#include "NRI.h"
+#include "Extensions/NRIHelper.h"
+#include "Extensions/NRIWrapperD3D11.h"
+#include "Extensions/NRIWrapperD3D12.h"
+#include "Extensions/NRIWrapperVK.h"
 
 
 namespace Shadowy {

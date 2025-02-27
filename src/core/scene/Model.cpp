@@ -16,24 +16,19 @@
 
 
 namespace Shadowy {
-    Mesh::Mesh(aiMesh* AIMesh, const aiScene* Scene, const aiMatrix4x4& Transform)
+    Mesh::Mesh(aiMesh* AIMesh, const aiScene* Scene, const glm::mat4& Transform)
     {
         Init(AIMesh, Scene, Transform);
     }
 
-    void Mesh::Init(aiMesh* AIMesh, const aiScene* Scene, const aiMatrix4x4& Transform)
+    void Mesh::Init(aiMesh* AIMesh, const aiScene* Scene, const glm::mat4& Transform)
     {
         m_instanceID = Scene::s_instanceIDCounter++;
         std::vector<Vertex> Vertices(AIMesh->mNumVertices);
         std::vector<uint> Indices(AIMesh->mNumFaces * 3);
         std::vector<int> MaterialIndices(AIMesh->mNumFaces);
 
-        m_transform = {
-            Transform.a1, Transform.a2, Transform.a3, Transform.a4,
-            Transform.b1, Transform.b2, Transform.b3, Transform.b4,
-            Transform.c1, Transform.c2, Transform.c3, Transform.c4,
-            Transform.d1, Transform.d2, Transform.d3, Transform.d4
-        };
+        m_transform = Transform;
 
         m_name = AIMesh->mName.data;
 
@@ -173,7 +168,8 @@ namespace Shadowy {
     {
         m_aiScene = Importer.ReadFile(
             ModelPath.string(),
-            aiProcess_Triangulate  | aiProcess_GenNormals | aiProcess_FlipUVs | aiProcess_GenUVCoords
+            aiProcess_Triangulate  | aiProcess_GenNormals | aiProcess_FlipUVs
+            | aiProcess_GenUVCoords | aiProcess_CalcTangentSpace
         );
 
         if (!m_aiScene || m_aiScene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !m_aiScene->mRootNode)
@@ -181,6 +177,8 @@ namespace Shadowy {
             Check(false);
             return;
         }
+
+        m_materials.resize(m_aiScene->mNumMaterials);
 
         int UpAxis = -1, FrontAxis = -1, RightAxis = -1;
         int UpSign = 0, FrontSign = 0, RightSign = 0;
@@ -191,7 +189,8 @@ namespace Shadowy {
         m_aiScene->mMetaData->Get("FrontAxisSign", FrontSign);
         m_aiScene->mMetaData->Get("CoordAxisSign", RightSign);
 
-        ProcessNode(m_aiScene->mRootNode, m_aiScene);
+        auto IdentityTransform = glm::identity<glm::mat4>();
+        ProcessNode(m_aiScene->mRootNode, m_aiScene, IdentityTransform);
 
         m_materialBuffer = new ArbitraryBuffer(
             sizeof(Material) * m_materials.size(),
@@ -206,24 +205,26 @@ namespace Shadowy {
         }
     }
 
-    void Model::ProcessNode(aiNode* Node, const aiScene* Scene)
+    void Model::ProcessNode(aiNode* Node, const aiScene* Scene, const glm::mat4& ParentTransform)
     {
+        glm::mat4 CurrentNodeTransform = ParentTransform * AIMatrix4x4ToGlm(Node->mTransformation);
         for (uint i = 0; i < Node->mNumMeshes; i++)
         {
             aiMesh* AIMesh = Scene->mMeshes[Node->mMeshes[i]];
             // Row Major to Col Major
-            Mesh* ShadowyMesh = new Mesh(AIMesh, Scene, Node->mTransformation.Transpose());
+            Mesh* ShadowyMesh = new Mesh(AIMesh, Scene, CurrentNodeTransform);
             m_meshes.push_back(ShadowyMesh);
 
-            // NOTE: Each AIMesh use only one material, otherwise the mesh will be splitted
+            /* NOTE: Each AIMesh use only one material, otherwise the mesh will be splitted,
+             *  use the original MaterialIndex loaded from file, since the materials are already deduplicated
+             */
             const uint MaterialIndex = AIMesh->mMaterialIndex;
-            // Insert NumFaces Material Index for Query Material using Triangle ID(Primitive ID)
-            m_materials.emplace_back(ProcessMeshMaterial(Scene->mMaterials[MaterialIndex], m_aiScene));
+            m_materials[MaterialIndex] = ProcessMeshMaterial(Scene->mMaterials[MaterialIndex], m_aiScene);
         }
 
         for (uint i = 0; i < Node->mNumChildren; i++)
         {
-            ProcessNode(Node->mChildren[i], Scene);
+            ProcessNode(Node->mChildren[i], Scene, CurrentNodeTransform);
         }
     }
 
@@ -273,44 +274,111 @@ namespace Shadowy {
             Mat.Opacity = Opacity;
         }
 
+        auto RTScene = GetScene();
         // Process Texture
         if (AIMaterial->GetTextureCount(aiTextureType_DIFFUSE) == 1)
         {
             aiString TexturePath;
             AIMaterial->GetTexture(aiTextureType_DIFFUSE, 0, &TexturePath);
-            m_textureNames.emplace_back(TexturePath.C_Str());
-            Mat.AlbedoTextureID = m_textureNames.size() - 1;
+            std::filesystem::path Path = TexturePath.C_Str();
+            const aiTexture* TextureData = m_aiScene->GetEmbeddedTexture(TexturePath.C_Str());
+            std::tuple<Texture2D*, uint> Ret;
+            if (TextureData)
+            {
+                Ret = RTScene->CreateOrRetrieveTexture(TextureData);
+            }
+            else
+            {
+                std::string FullPath = m_path.string() + '/' + TexturePath.C_Str();
+                Ret = RTScene->CreateOrRetrieveTexture(FullPath);
+            }
+            Mat.AlbedoTextureID = std::get<1>(Ret);
         }
         if (AIMaterial->GetTextureCount(aiTextureType_SHININESS) == 1)
         {
             aiString TexturePath;
             AIMaterial->GetTexture(aiTextureType_SHININESS, 0, &TexturePath);
-            m_textureNames.emplace_back(TexturePath.C_Str());
-            Mat.RoughnessTextureID = m_textureNames.size() - 1;
+            std::filesystem::path Path = TexturePath.C_Str();
+            const aiTexture* TextureData = m_aiScene->GetEmbeddedTexture(TexturePath.C_Str());
+            std::tuple<Texture2D*, uint> Ret;
+            if (TextureData)
+            {
+                Ret = RTScene->CreateOrRetrieveTexture(TextureData);
+            }
+            else
+            {
+                std::string FullPath = m_path.string() + '/' + TexturePath.C_Str();
+                Ret = RTScene->CreateOrRetrieveTexture(FullPath);
+            }
+            Mat.RoughnessTextureID = std::get<1>(Ret);
         }
-        if (AIMaterial->GetTextureCount(aiTextureType_NORMALS) == 1)
-        {
-            aiString TexturePath;
-            AIMaterial->GetTexture(aiTextureType_NORMALS, 0, &TexturePath);
-            m_textureNames.emplace_back(TexturePath.C_Str());
-            Mat.NormalTextureID = m_textureNames.size() - 1;
-        }
+        // if (AIMaterial->GetTextureCount(aiTextureType_NORMALS) == 1)
+        // {
+        //     aiString TexturePath;
+        //     AIMaterial->GetTexture(aiTextureType_NORMALS, 0, &TexturePath);
+        //     std::filesystem::path Path = TexturePath.C_Str();
+        //     const aiTexture* TextureData = m_aiScene->GetEmbeddedTexture(TexturePath.C_Str());
+        //     std::tuple<Texture2D*, uint> Ret;
+        //     if (TextureData)
+        //     {
+        //         Ret = RTScene->CreateOrRetrieveTexture(TextureData);
+        //     }
+        //     else
+        //     {
+        //         std::string FullPath = m_path.string() + '/' + TexturePath.C_Str();
+        //         Ret = RTScene->CreateOrRetrieveTexture(FullPath);
+        //     }
+        //     Mat.NormalTextureID = std::get<1>(Ret);
+        // }
         if (AIMaterial->GetTextureCount(aiTextureType_EMISSION_COLOR) == 1)
         {
             aiString TexturePath;
             AIMaterial->GetTexture(aiTextureType_EMISSION_COLOR, 0, &TexturePath);
-            m_textureNames.emplace_back(TexturePath.C_Str());
-            Mat.EmissiveTextureID = m_textureNames.size() - 1;
+            const aiTexture* TextureData = m_aiScene->GetEmbeddedTexture(TexturePath.C_Str());
+            std::tuple<Texture2D*, uint> Ret;
+            if (TextureData)
+            {
+                Ret = RTScene->CreateOrRetrieveTexture(TextureData);
+            }
+            else
+            {
+                std::string FullPath = m_path.string() + '/' + TexturePath.C_Str();
+                Ret = RTScene->CreateOrRetrieveTexture(FullPath);
+            }
+            Mat.EmissiveTextureID = std::get<1>(Ret);
         }
         if (AIMaterial->GetTextureCount(aiTextureType_METALNESS) == 1)
         {
             aiString TexturePath;
             AIMaterial->GetTexture(aiTextureType_METALNESS, 0, &TexturePath);
-            m_textureNames.emplace_back(TexturePath.C_Str());
-            Mat.MetallicTextureID = m_textureNames.size() - 1;
+            std::filesystem::path Path = TexturePath.C_Str();
+            const aiTexture* TextureData = m_aiScene->GetEmbeddedTexture(TexturePath.C_Str());
+            std::tuple<Texture2D*, uint> Ret;
+            if (TextureData)
+            {
+                Ret = RTScene->CreateOrRetrieveTexture(TextureData);
+            }
+            else
+            {
+                std::string FullPath = m_path.string() + '/' + TexturePath.C_Str();
+                Ret = RTScene->CreateOrRetrieveTexture(FullPath);
+            }
+            Mat.MetallicTextureID = std::get<1>(Ret);
         }
 
         return Mat;
+    }
+
+    auto Model::AIMatrix4x4ToGlm(const aiMatrix4x4& Mat) -> glm::mat4
+    {
+        // Row Major to Col Major
+        const glm::mat4 Ret = {
+            Mat.a1, Mat.b1, Mat.c1, Mat.d1,
+            Mat.a2, Mat.b2, Mat.c2, Mat.d2,
+            Mat.a3, Mat.b3, Mat.c3, Mat.d3,
+            Mat.a4, Mat.b4, Mat.c4, Mat.d4
+        };
+        return Ret;
     }
 
     // ObjModel::ObjModel(const std::filesystem::path &ModelPath) {

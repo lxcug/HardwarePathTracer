@@ -55,36 +55,38 @@ namespace Shadowy {
         }
     }
 
-    void Scene::CreateModelTextures(Model* Model) {
-        auto CommandBuffer = RHI::BeginIntermediateCommandBuffer();
-
-        for (auto &TexturePath : Model->m_textureNames) {
-            // Handle Embedded Texture
-            const aiTexture* TextureData = Model->m_aiScene->GetEmbeddedTexture(TexturePath.c_str());
-            std::shared_ptr<Texture2D> SharedTexture;
-            if (TextureData)
-            {
-                SharedTexture = std::make_shared<Texture2D>(TextureData, false, false);
-            }
-            else
-            {
-                std::string FullPath = Model->m_path.string() + '/' + TexturePath;
-                SharedTexture = std::make_shared<Texture2D>(FullPath, false, false);
-            }
-
-            RHI::TextureTransitionInput SrcInput{}, DstInput{};
-            SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
-            SrcInput.AccessMask = 0;
-            DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
-            DstInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            DstInput.AccessMask = 0;
-            DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
-            RHI::TransitionTextureLayout(CommandBuffer, SharedTexture->GetHandle(), 1, SrcInput,
-                                         DstInput);
-            m_sceneModelTextures.emplace_back(SharedTexture);
-        }
-        RHI::SubmitIntermediateCommandBuffer(CommandBuffer);
-    }
+    // void Scene::CreateModelTextures(Model* Model) {
+    //     auto CommandBuffer = RHI::BeginIntermediateCommandBuffer();
+    //
+    //     for (auto &TexturePath : Model->m_textureNames) {
+    //         // Handle Embedded Texture
+    //         const aiTexture* TextureData = Model->m_aiScene->GetEmbeddedTexture(TexturePath.c_str());
+    //         std::shared_ptr<Texture2D> SharedTexture;
+    //         if (TextureData)
+    //         {
+    //             SharedTexture = std::make_shared<Texture2D>(TextureData, false, false);
+    //         }
+    //         else
+    //         {
+    //             std::string FullPath = Model->m_path.string() + '/' + TexturePath;
+    //             // SharedTexture = std::make_shared<Texture2D>(FullPath, false, false);
+    //
+    //             auto [TexPtr, TexIndex] = m_textureManager->CreateOrRetrieveTexture(FullPath);
+    //         }
+    //
+    //         RHI::TextureTransitionInput SrcInput{}, DstInput{};
+    //         SrcInput.Layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    //         SrcInput.AccessMask = 0;
+    //         DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
+    //         DstInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    //         DstInput.AccessMask = 0;
+    //         DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
+    //         RHI::TransitionTextureLayout(CommandBuffer, SharedTexture->GetHandle(), 1, SrcInput,
+    //                                      DstInput);
+    //         m_sceneModelTextures.emplace_back(SharedTexture);
+    //     }
+    //     RHI::SubmitIntermediateCommandBuffer(CommandBuffer);
+    // }
 
     void Scene::CreateSceneDescriptorSet() {
         VkDescriptorSetLayoutBinding ModelInfoBinding{};
@@ -95,7 +97,7 @@ namespace Shadowy {
 
         VkDescriptorSetLayoutBinding TexturesBinding{};
         TexturesBinding.binding = 1;
-        TexturesBinding.descriptorCount = m_sceneModelTextures.size();
+        TexturesBinding.descriptorCount = m_textureManager->m_uniqueTextures.size();
         TexturesBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         TexturesBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR |
                                      VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
@@ -159,15 +161,14 @@ namespace Shadowy {
             DescriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
             DescriptorWrites[0].pBufferInfo = &ModelDescBufferInfo;
 
-            auto SceneModelTextures = m_sceneModelTextures;
-            std::vector<VkDescriptorImageInfo> TexturesInfos;
-            TexturesInfos.reserve(SceneModelTextures.size());
+            auto& SceneModelTextures = m_textureManager->m_uniqueTextures;
+            std::vector<VkDescriptorImageInfo> TexturesInfos(SceneModelTextures.size());
             for (int index = 0; index < SceneModelTextures.size(); index++) {
                 VkDescriptorImageInfo TextureInfo{};
                 TextureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 TextureInfo.imageView = SceneModelTextures[index]->CreateSRV();
                 TextureInfo.sampler = Sampler::GetDefaultSample()->GetHandle();
-                TexturesInfos.emplace_back(TextureInfo);
+                TexturesInfos[index] = TextureInfo;
             }
             DescriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             DescriptorWrites[1].dstSet = m_sceneDescDescriptorSets[i];
@@ -231,9 +232,9 @@ namespace Shadowy {
         CreateModelDescBuffer();
         AppendSkyLightToSceneLights();
         CreateSceneLightsBuffer();
-        if (m_sceneModelTextures.empty()) {
-            m_sceneModelTextures.emplace_back(
-                    std::make_shared<Texture2D>(1, 1,
+        if (m_textureManager->m_uniqueTextures.empty()) {
+            m_textureManager->m_uniqueTextures.emplace_back(
+                    new Texture2D(1, 1,
                         VK_FORMAT_R8G8B8A8_UNORM,
                         VK_IMAGE_USAGE_SAMPLED_BIT));
             RHI::TextureTransitionInput SrcInput{}, DstInput{};
@@ -243,7 +244,7 @@ namespace Shadowy {
             DstInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             DstInput.AccessMask = 0;
             DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
-            RHI::TransitionTextureLayout(m_sceneModelTextures[0]->GetHandle(), 1, SrcInput,
+            RHI::TransitionTextureLayout(m_textureManager->m_uniqueTextures[0]->GetHandle(), 1, SrcInput,
                                          DstInput);
         }
         CreateSceneDescriptorSet();
@@ -258,7 +259,8 @@ namespace Shadowy {
         m_models.clear();
         m_modelDescs.clear();
         m_sceneModelDescBuffer.reset();
-        m_sceneModelTextures.clear();
+        m_textureManager->m_uniqueTextures.clear();
+        m_textureManager->m_storedTextures.clear();
         s_instanceIDCounter = 0;
         m_sceneLights.erase(m_sceneLights.end() - 1);
     }

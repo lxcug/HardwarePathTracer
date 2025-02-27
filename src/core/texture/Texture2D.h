@@ -36,7 +36,7 @@ namespace Shadowy {
 
         void CreateTexture(const std::filesystem::path &TexturePath);
 
-        void CreateTexture(stbi_uc* Data);
+        void CreateTexture(stbi_uc* Data, int DataSize = -1);
 
         auto CreateSRV() -> VkImageView;
 

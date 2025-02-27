@@ -5,12 +5,6 @@
 #ifndef SHADOWY_NRDDENOISER_H
 #define SHADOWY_NRDDENOISER_H
 
-#include "NRD.h"
-#include "NRI.h"
-#include "Extensions/NRIHelper.h"
-#include "Extensions/NRIWrapperD3D11.h"
-#include "Extensions/NRIWrapperD3D12.h"
-#include "Extensions/NRIWrapperVK.h"
 #include "NRDIntegration.h"
 
 
