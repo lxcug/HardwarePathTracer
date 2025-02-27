@@ -28,14 +28,12 @@ void main(inout RayPayload payload, in HitAttribute attrib)
     Material material = GetMaterial(InstanceID(), PrimitiveIndex());
     int TextureIndexOffset = ModelInfo[InstanceID()].TextureIndexOffset;
     float3 albedo = material.Albedo;
+    float opacity = material.Opacity;
     if (material.AlbedoTextureID >= 0) {
         int TextureIndex = material.AlbedoTextureID + TextureIndexOffset;
-        albedo = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0).rgb;
-    }
-    float3 specular = albedo;
-    if (material.SpecularTextureID >= 0) {
-        int TextureIndex = material.SpecularTextureID + TextureIndexOffset;
-        specular = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0).rgb;
+        float4 Value = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0);
+        albedo = Value.rgb;
+        opacity = Value.a;
     }
     float roughness = material.Roughness;
     if (material.RoughnessTextureID >= 0) {
@@ -63,14 +61,19 @@ void main(inout RayPayload payload, in HitAttribute attrib)
             hit_normal *= -1;
         }
     }
-
+    if (material.SpecularTextureID >= 0) {
+        int TextureIndex = material.SpecularTextureID + TextureIndexOffset;
+        float4 Value = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0);
+        float occlusion = Value.r;
+        roughness = Value.g;
+        metallic = Value.b;
+    }
 
     payload.pos = hit_pos;
     payload.albedo = albedo;
-    payload.specular = specular;
     payload.normal = hit_normal;
     payload.emissive = emissive;
-    payload.opacity = material.Opacity;
+    payload.opacity = opacity;
     payload.roughness = roughness;
     payload.metallic = metallic;
     payload.is_hit = true;

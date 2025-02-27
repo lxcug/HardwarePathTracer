@@ -33,14 +33,14 @@ MaterialSample SampleMaterial(in float3 ray_direction, in RayPayload payload, in
         float3 L = reflect(ray_direction, payload.normal);
         mat_sample.direction = L;
 
-        float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.specular, metallic);
+        float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.albedo, metallic);
         float NoL = max(dot(payload.normal, L), 0.f);
 
         float3 H = normalize(V + L);
         float HoV = max(dot(H, V), 0.f);
         float3 F = Fresnel_Schlick(HoV, F0, roughness);
 
-        float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.specular);
+        float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.albedo);
 
         float NoV = max(dot(payload.normal, V), 0.f);
         float HoL = max(dot(H, L), 0.f);
@@ -58,10 +58,10 @@ MaterialSample SampleMaterial(in float3 ray_direction, in RayPayload payload, in
         AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, F * max(dot(payload.normal, L), 0.f), 1.f, 1.f - diffuse_lobe_selected_weight);
     } else {
         float3 V = -ray_direction;
-        float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.specular, metallic);
+        float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.albedo, metallic);
         float3 F = Fresnel_Schlick(max(dot(payload.normal, V), 0.0), F0, roughness);
 
-        float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.specular);
+        float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.albedo);
 
         float4 sample;
         if (rnd.w < diffuse_lobe_selected_weight) {
@@ -120,14 +120,14 @@ MaterialEval EvalMaterial(in float3 V, in float3 L, in RayPayload payload) {
         mat_eval.pdf = 1.f;
         mat_eval.weight = 0.f;
         if (dot(H, payload.normal) < SHADOWY_SMALL_NUMBER) {
-            float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.specular, metallic);
+            float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.albedo, metallic);
             float NoL = max(dot(payload.normal, L), 0.f);
 
             float3 H = normalize(V + L);
             float HoV = max(dot(H, V), 0.f);
             float3 F = Fresnel_Schlick(HoV, F0, roughness);
 
-            float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.specular);
+            float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.albedo);
 
             float NoV = max(dot(payload.normal, V), 0.f);
             float HoL = max(dot(H, L), 0.f);
@@ -143,14 +143,14 @@ MaterialEval EvalMaterial(in float3 V, in float3 L, in RayPayload payload) {
             AddLobeWithMIS(mat_eval.weight, mat_eval.pdf, F * max(dot(payload.normal, L), 0.f), 1.f, 1.f - diffuse_lobe_selected_weight);
         }
     } else {
-        float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.specular, metallic);
+        float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.albedo, metallic);
         float NoL = max(dot(payload.normal, L), 0.f);
 
         float3 H = normalize(V + L);
         float HoV = max(dot(H, V), 0.f);
         float3 F = Fresnel_Schlick(HoV, F0, roughness);
 
-        float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.specular);
+        float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.albedo);
 
         float NoV = max(dot(payload.normal, V), 0.f);
         float HoL = max(dot(H, L), 0.f);

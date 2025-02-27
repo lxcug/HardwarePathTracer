@@ -41,8 +41,6 @@ Control the scene lights in the UI panel.
 
 ## Gallery
 
-![](imgs/bistro_exterior2.png)
-
 ![](imgs/bistro_exterior1.png)
 
 ![](imgs/bistro_interior1.png)
