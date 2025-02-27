@@ -18,9 +18,9 @@ BEGIN_SHADOWY_NAMESPACE
         return BindingDescription;
     }
 
-    auto Vertex::GetAttributeDescriptions() -> std::array<VkVertexInputAttributeDescription, 6>
+    auto Vertex::GetAttributeDescriptions() -> std::array<VkVertexInputAttributeDescription, 5>
     {
-        std::array<VkVertexInputAttributeDescription, 6> AttributeDescriptions{};
+        std::array<VkVertexInputAttributeDescription, 5> AttributeDescriptions{};
         AttributeDescriptions[0].binding = 0;
         AttributeDescriptions[0].location = 0;
         AttributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -43,13 +43,8 @@ BEGIN_SHADOWY_NAMESPACE
 
         AttributeDescriptions[4].binding = 0;
         AttributeDescriptions[4].location = 4;
-        AttributeDescriptions[4].format = VK_FORMAT_R32G32B32_SFLOAT;
+        AttributeDescriptions[4].format = VK_FORMAT_R32G32B32A32_SFLOAT;
         AttributeDescriptions[4].offset = offsetof(Vertex, Tangent);
-
-        AttributeDescriptions[5].binding = 0;
-        AttributeDescriptions[5].location = 3;
-        AttributeDescriptions[5].format = VK_FORMAT_R32G32B32_SFLOAT;
-        AttributeDescriptions[5].offset = offsetof(Vertex, Bitangent);
 
         return AttributeDescriptions;
     }

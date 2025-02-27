@@ -152,7 +152,7 @@ namespace Shadowy {
         }
 
     protected:
-        float m_fov = 60.f;
+        float m_fov = 45.f;
     };
 } // namespace Shadowy
 

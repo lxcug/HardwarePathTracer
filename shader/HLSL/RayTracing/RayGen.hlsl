@@ -15,8 +15,9 @@ void main()
 
     uint seed = tea(index.x * dim.y + index.y, view_uniform_buffer.FrameNum);
 
-    float2 jitter = float2(rnd(seed), rnd(seed));
-    float2 uv = (index + .5) / dim;
+    float2 jitter = rnd2(seed) / 2.f;
+	// TODO: Remove jitter when using denoiser
+    float2 uv = (index + .5 + jitter) / dim;
     float3 origin = view_uniform_buffer.CameraPos;
     float2 screen_coord = uv * 2.f - 1.f;
     float4 target_view_space = mul(view_uniform_buffer.InvProj, float4(screen_coord, 1.f, 1.f));

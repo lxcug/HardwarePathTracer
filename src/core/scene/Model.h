@@ -74,6 +74,8 @@ namespace Shadowy {
         GetTLASBuildInput(const ASBuilder *AccelBuilder) const -> VkAccelerationStructureInstanceKHR;
 
 
+        // TODO
+        glm::mat4 m_transform = glm::identity<glm::mat4>();
         std::filesystem::path m_path;
         std::vector<Mesh*> m_meshes;
         std::vector<Material> m_materials;

@@ -32,12 +32,14 @@ BEGIN_SHADOWY_NAMESPACE
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, Opacity, 1.f);
 
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, Roughness, 1.f);
-        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, Metallic, 0.f);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, RoughnessTextureID, -1);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, Metallic, 0.f);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, MetallicTextureID, -1);
 
-        // DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, NormalTextureID, -1);
-        // DECLARE_MEMBER_WITH_DEFAULT_VALUE(float3, Padding, float3(0.f, 0.f, 0.f));
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, NormalTextureID, -1);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, SpecularTextureID, -1);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, IsDDSNormalTexture, 0);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, Padding, 0.f);
     };
 
 #if IS_COMPILING_SHADER

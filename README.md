@@ -36,6 +36,8 @@ Control the scene lights in the UI panel.
 * Path Tracing Microfacet Material
 * Next Event Estimation
 * PostProcess: ToneMapping
+* Multi Asset Format(fbx, gltf, ...)
+* Large Scene Load
 
 ## Gallery
 
@@ -175,3 +177,10 @@ Control the scene lights in the UI panel.
 > 2025.2.4
 >
 > * Handle Mix Microfacet + DiffuseLambert Material
+
+
+
+> 2025.2.27
+>
+> * Load Multi Format Asset(tinyobjloader -> assimp)
+> * Texture De-duplicate

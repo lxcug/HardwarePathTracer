@@ -46,15 +46,17 @@ void main(inout GBufferPayload payload, in GBufferHitAttribute attrib)
         int TextureIndex = material.EmissiveTextureID + TextureIndexOffset;
         emissive = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0).rgb;
     }
-    // TODO
-    // if (material.NormalTextureID >= 0) {
-    //     int TextureIndex = material.NormalTextureID + TextureIndexOffset;
-    //     float3 local_normal = normalize(MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0).rgb * 2.f - 1.f);
-    //     float3 tangent = v0.Tangent;
-    //     float3 bitangent = v0.Bitangent;
-    //     float3x3 TBN = float3x3(tangent, bitangent, hit_normal);
-    //     hit_normal = mul(TBN, local_normal);
-    // }
+    if (material.NormalTextureID >= 0) {
+        int TextureIndex = material.NormalTextureID + TextureIndexOffset;
+        float3 local_normal = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0).rgb * 2.f - 1.f;
+        float3 tangent = v0.Tangent.xyz;
+        float3 bitangent = cross(hit_normal, tangent) * v0.Tangent.w;
+        float3x3 TBN = transpose(float3x3(tangent, bitangent, hit_normal));
+        hit_normal = normalize(mul(TBN, local_normal));
+        if (material.IsDDSNormalTexture) {  // NOTE: Flip normal when using dds format texture
+            hit_normal *= -1;
+        }
+    }
 
     payload.pos = hit_pos;
     payload.albedo = albedo;

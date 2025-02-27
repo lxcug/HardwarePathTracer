@@ -46,12 +46,12 @@ namespace Shadowy {
             };
             if (AIMesh->HasTangentsAndBitangents())
             {
-                Vertex_.Tangent = {
-                    AIMesh->mTangents[i].x, AIMesh->mTangents[i].y, AIMesh->mTangents[i].z
-                };
-                Vertex_.Bitangent = {
-                    AIMesh->mBitangents[i].x, AIMesh->mBitangents[i].y, AIMesh->mBitangents[i].z
-                };
+                glm::vec3 Tangent = {AIMesh->mTangents[i].x, AIMesh->mTangents[i].y, AIMesh->mTangents[i].z};
+                glm::vec3 Bitangent = {AIMesh->mBitangents[i].x, AIMesh->mBitangents[i].y, AIMesh->mBitangents[i].z};
+                glm::vec3 CalBitangent = glm::normalize(glm::cross(Vertex_.Normal, Tangent));
+                float Dot = glm::dot(CalBitangent, Bitangent);
+                float Handedness = Dot >= 0.f ? 1.f : -1.f;
+                Vertex_.Tangent = {Tangent, Handedness};
             }
             if (AIMesh->HasTextureCoords(0))
             {
@@ -312,24 +312,43 @@ namespace Shadowy {
             }
             Mat.RoughnessTextureID = std::get<1>(Ret);
         }
-        // if (AIMaterial->GetTextureCount(aiTextureType_NORMALS) == 1)
-        // {
-        //     aiString TexturePath;
-        //     AIMaterial->GetTexture(aiTextureType_NORMALS, 0, &TexturePath);
-        //     std::filesystem::path Path = TexturePath.C_Str();
-        //     const aiTexture* TextureData = m_aiScene->GetEmbeddedTexture(TexturePath.C_Str());
-        //     std::tuple<Texture2D*, uint> Ret;
-        //     if (TextureData)
-        //     {
-        //         Ret = RTScene->CreateOrRetrieveTexture(TextureData);
-        //     }
-        //     else
-        //     {
-        //         std::string FullPath = m_path.string() + '/' + TexturePath.C_Str();
-        //         Ret = RTScene->CreateOrRetrieveTexture(FullPath);
-        //     }
-        //     Mat.NormalTextureID = std::get<1>(Ret);
-        // }
+        if (AIMaterial->GetTextureCount(aiTextureType_NORMALS) == 1)
+        {
+            aiString TexturePath;
+            AIMaterial->GetTexture(aiTextureType_NORMALS, 0, &TexturePath);
+            std::filesystem::path Path = TexturePath.C_Str();
+            const aiTexture* TextureData = m_aiScene->GetEmbeddedTexture(TexturePath.C_Str());
+            std::tuple<Texture2D*, uint> Ret;
+            if (TextureData)
+            {
+                Ret = RTScene->CreateOrRetrieveTexture(TextureData);
+            }
+            else
+            {
+                std::string FullPath = m_path.string() + '/' + TexturePath.C_Str();
+                Ret = RTScene->CreateOrRetrieveTexture(FullPath);
+            }
+            Mat.NormalTextureID = std::get<1>(Ret);
+            Mat.IsDDSNormalTexture = Path.extension().string() == ".dds";
+        }
+        if (AIMaterial->GetTextureCount(aiTextureType_SPECULAR) == 1)
+        {
+            aiString TexturePath;
+            AIMaterial->GetTexture(aiTextureType_SPECULAR, 0, &TexturePath);
+            std::filesystem::path Path = TexturePath.C_Str();
+            const aiTexture* TextureData = m_aiScene->GetEmbeddedTexture(TexturePath.C_Str());
+            std::tuple<Texture2D*, uint> Ret;
+            if (TextureData)
+            {
+                Ret = RTScene->CreateOrRetrieveTexture(TextureData);
+            }
+            else
+            {
+                std::string FullPath = m_path.string() + '/' + TexturePath.C_Str();
+                Ret = RTScene->CreateOrRetrieveTexture(FullPath);
+            }
+            Mat.SpecularTextureID = std::get<1>(Ret);
+        }
         if (AIMaterial->GetTextureCount(aiTextureType_EMISSION_COLOR) == 1)
         {
             aiString TexturePath;

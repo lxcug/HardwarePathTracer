@@ -14,6 +14,7 @@ struct RayPayload
     float3 emissive;
     bool is_hit;
 
+    float3 specular;
     float opacity;
     float roughness;
     float metallic;
