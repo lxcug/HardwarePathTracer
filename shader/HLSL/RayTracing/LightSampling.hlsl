@@ -90,6 +90,7 @@ LightSample SamplePointLight(in Light light, in float2 rnd, in float3 pos, in fl
 
     light_sample.distance = length(to_light) * (cos_theta - sqrt(max(sin_theta_max2 - sin_theta2, 0.f)));
 
+    // Actually / (4 * PI * radius2), 4 is missing for some reason(align with ue)
     float3 radiance = light.Color * light.Intensity / (PI * radius2);
     light_sample.radiance_over_pdf = radiance * attenuation / light_sample.pdf;
 
@@ -98,12 +99,11 @@ LightSample SamplePointLight(in Light light, in float2 rnd, in float3 pos, in fl
 
 LightSample SampleSkyLight(in Light light, in float2 rnd, in float3 pos, in float3 normal) {
     LightSample light_sample;
-//     float4 sample_value = UniformSampleSphere(rnd);
-    float4 sample_value = UniformSampleHemisphere(rnd, normal);
+    float4 sample_value = UniformSampleSphere(rnd);
     light_sample.direction = sample_value.xyz;
     light_sample.pdf = sample_value.w;
     light_sample.radiance_over_pdf = light.Intensity *
-                                     SkyTexture.SampleLevel(SkyTextureSampler, uint_vector_to_hdri_uv(-light_sample.direction), 0).rgb /
+                                     min(SkyTexture.SampleLevel(SkyTextureSampler, uint_vector_to_hdri_uv(-light_sample.direction), 0).rgb, 1e2f) /
                                      light_sample.pdf;
     light_sample.distance = render_options.MaxTraceDistance;
     return light_sample;

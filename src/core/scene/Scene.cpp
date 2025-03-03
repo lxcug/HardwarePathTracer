@@ -268,15 +268,15 @@ namespace Shadowy {
     void Scene::AppendSkyLightToSceneLights() {
         if (m_skyTexture) {
             Light SkyLight{
-                    glm::vec3(0.f, 0.f, 0.f),
-                    LightType::Sky,
-                    glm::vec3(0.f, 0.f, 0.f),
-                    0.f,
-                    float3(1.f, 1.f, 1.f),
-                    1.f,
-                    0.f,
-                    0.f,
-                    0.f
+                LightType::Sky,
+                glm::vec3(0.f, 0.f, 0.f),
+                glm::vec3(0.f, 0.f, 0.f),
+                0.f,
+                float3(1.f, 1.f, 1.f),
+                1.f,
+                0.f,
+                0.f,
+                0.f
             };
             m_sceneLights.push_back(SkyLight);
         }

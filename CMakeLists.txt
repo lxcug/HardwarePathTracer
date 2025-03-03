@@ -16,6 +16,8 @@ MESSAGE(STATUS ${SOURCES})
 add_executable(Shadowy
         ${SOURCES}
         ${stb_SOURCES}
+        src/core/post_processing/BloomPass.cpp
+        src/core/post_processing/BloomPass.h
 )
 
 target_include_directories(

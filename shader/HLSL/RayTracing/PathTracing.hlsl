@@ -82,7 +82,7 @@ void PathTracingKernel(in float3 origin,
             // For Displaying SkyTexture
             if (render_options.EnableSkyLight && is_camera_ray) {
                 pt_payload.hit_sky = true;
-                radiance += path_throughput * SkyTexture.SampleLevel(SkyTextureSampler, uint_vector_to_hdri_uv(-ray.Direction), 0).rgb;
+                radiance += path_throughput * min(SkyTexture.SampleLevel(SkyTextureSampler, uint_vector_to_hdri_uv(-ray.Direction), 0).rgb, 1e2f);  // TODO: Value as Marco
             }
             break;
         }
@@ -132,7 +132,7 @@ void PathTracingKernel(in float3 origin,
                 }
 
                 if (any(light_sample.radiance_over_pdf) > 0.f && should_accumulate_radiance) {
-                    MaterialEval material_eval = EvalMaterial(-ray.Direction, light_sample.direction, payload);
+                    MaterialEval material_eval = EvalMaterial(-ray.Direction, light_sample.direction, payload, seed);
                     float3 light_contrib = path_throughput * light_sample.radiance_over_pdf * material_eval.weight * material_eval.pdf;
                     if (use_MIS) {
                         light_contrib *= MISWeightRobust(light_sample.pdf, material_eval.pdf);
@@ -151,7 +151,6 @@ void PathTracingKernel(in float3 origin,
 
         // Update PathThroughput and Russian Roulette
         float3 next_path_throughput = path_throughput * material_sample.weight;
-        // Russian Roulette reference UnrealEngine, TODO: Use EARS or MARS to further improve quality
         float continue_prob = sqrt(max(next_path_throughput) / max(path_throughput));
         if (continue_prob < 1.f) {
             if (rnd(seed) >= continue_prob) {
@@ -214,6 +213,14 @@ void PathTracingKernel(in float3 origin,
             ao += TraceVisibilityRay(ao_ray);
         }
         ao /= render_options.NumAORays;
+    }
+
+    // Remove fireflies
+    float lum = Luminance(radiance);
+    const float fire_fly_clamp_threshold = 4.f;
+    if(lum > fire_fly_clamp_threshold)
+    {
+        radiance *= fire_fly_clamp_threshold / lum;
     }
 
     pt_payload.radiance = radiance;
@@ -347,7 +354,7 @@ void PathTracingKernelReSTIR(in float3 origin,
                 }
 
                 if (any(light_sample.radiance_over_pdf) > 0.f && should_accumulate_radiance) {
-                    MaterialEval material_eval = EvalMaterial(-ray.Direction, light_sample.direction, payload);
+                    MaterialEval material_eval = EvalMaterial(-ray.Direction, light_sample.direction, payload, seed);
                     float3 light_contrib = light_sample.radiance_over_pdf * material_eval.weight * material_eval.pdf;
                     if (use_MIS) {
                         light_contrib *= MISWeightRobust(light_sample.pdf, material_eval.pdf);

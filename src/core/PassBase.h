@@ -73,9 +73,9 @@ namespace Shadowy {
                               uint Count,
                               VkAccelerationStructureKHR TLAS);
 
-        void DestroySets();
+        virtual void DestroySets();
 
-        void DestroyPipeline();
+        virtual void DestroyPipeline();
 
         virtual void OnRecompile() {
             DestroyPipeline();

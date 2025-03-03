@@ -16,6 +16,7 @@
 #include "core/restir/ReSTIRResource.h"
 #include "GlobalTexture.h"
 #include "core/post_processing/AccumulationPass.h"
+#include "core/post_processing/BloomPass.h"
 
 
 namespace Shadowy {
@@ -45,11 +46,11 @@ namespace Shadowy {
 
         void UpdateRenderOptions();
 
-        auto GetScene() -> Scene* {
+        auto GetScene() const -> Scene* {
             return m_RTScene;
         };
 
-        auto GetLastFrameSceneColor() -> Texture2D* {
+        auto GetLastFrameSceneColor() const -> Texture2D* {
             return m_lastFrameViewportImage;
         }
 
@@ -114,6 +115,7 @@ namespace Shadowy {
         // NOTE: Store Last Frame Operations and Execute before RenderPipeline Begins
         std::vector<std::function<void()>> m_deferredOperations;
 
+        bool m_enableBloom = false;
         ToneMappingPass *m_toneMappingPass = nullptr;
 
         // ReSTIRResource* m_restirResource = nullptr;
@@ -124,6 +126,7 @@ namespace Shadowy {
         // Post Processing
         GBufferPass* m_gbufferPass = nullptr;
         AccumulationPass* m_accumulationPass = nullptr;
+        BloomPass* m_bloomPass = nullptr;
 
     public:
         GlobalTexture* m_globalTexture = nullptr;

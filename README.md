@@ -51,6 +51,10 @@ Control the scene lights in the UI panel.
 
 
 
+![](imgs/CornellBox_Dielectric.png)
+
+
+
 ![](./imgs/Catedral_Chihuahua_FINAL.png)
 
 

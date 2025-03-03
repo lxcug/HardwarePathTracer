@@ -3,6 +3,8 @@
 #include "Payload.hlsl"
 #include "../../../src/host_device_shared/Light.h"
 
+#define MAX_SKY_LIGHT_INTENSITY 1e2f
+
 
 float TraceVisibilityRay(in RayDesc ray) {
     RayPayload payload;
@@ -70,6 +72,7 @@ LightHitSample TracePointLight(in RayDesc ray, in Light light) {
         if (t > ray.TMin && t < ray.TMax) {
             LightHitSample hit_sample;
             float dis2 = dot(oc, oc);
+            // Actually / (4 * PI * radius2), 4 is missing for some reason(align with ue)
             float3 power = light.Color * light.Intensity / (PI * radius2);
             float attenuation = PointLightAttenuation(light, dis2);
             hit_sample.radiance = power * attenuation;
@@ -94,7 +97,7 @@ LightHitSample TraceSkyLight(in RayDesc ray, in Light light) {
 
     LightHitSample hit_sample;
     hit_sample.pdf = 1 / (4 * PI);
-    hit_sample.radiance = light.Intensity * SkyTexture.SampleLevel(SkyTextureSampler, uint_vector_to_hdri_uv(-ray.Direction), 0).rgb;
+    hit_sample.radiance = light.Intensity * min(SkyTexture.SampleLevel(SkyTextureSampler, uint_vector_to_hdri_uv(-ray.Direction), 0).rgb, 1e2f);
     hit_sample.hit_t = render_options.MaxTraceDistance;
 
     return hit_sample;

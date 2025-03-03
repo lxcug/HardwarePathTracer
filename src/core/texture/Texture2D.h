@@ -38,6 +38,8 @@ namespace Shadowy {
 
         void CreateTexture(stbi_uc* Data, int DataSize = -1);
 
+        void CreateTexture(float* Data);
+
         auto CreateSRV() -> VkImageView;
 
         auto GetHandle() -> VkImage & {

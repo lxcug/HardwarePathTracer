@@ -68,10 +68,12 @@ namespace Shadowy {
 
         void ProcessNode(aiNode* Node, const aiScene* Scene, const glm::mat4& ParentTransform);
 
-        auto ProcessMeshMaterial(aiMaterial* AIMaterial, const aiScene* Scene) -> Material;
+        auto ProcessMaterial(aiMaterial* AIMaterial, const aiScene* Scene) -> Material;
 
         [[nodiscard]] auto
         GetTLASBuildInput(const ASBuilder *AccelBuilder) const -> VkAccelerationStructureInstanceKHR;
+
+        auto ProcessLight() -> std::vector<Light>;
 
 
         // TODO
@@ -85,7 +87,15 @@ namespace Shadowy {
         const aiScene* m_aiScene = nullptr;
 
     private:
+        static auto GetAbsoluteNodeTransform(const aiNode* Node) -> glm::mat4;
+
         static auto AIMatrix4x4ToGlm(const aiMatrix4x4& Mat) -> glm::mat4;
+
+        static auto AIVec3ToGlm(const aiVector3f& Vec) -> glm::vec3;
+
+        static auto AIColorToGlm(const aiColor3D& Color) -> glm::vec3;
+
+        static auto AILightTypeToShadowy(aiLightSourceType Type) -> LightType;
     };
 
     // class ObjModel {

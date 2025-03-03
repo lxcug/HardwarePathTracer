@@ -6,7 +6,6 @@
 #define SHADOWY_TONEMAPPING_H
 
 #include "core/Core.h"
-#include "core/texture/Texture2D.h"
 #include "host_device_shared/RenderOptions.h"
 
 

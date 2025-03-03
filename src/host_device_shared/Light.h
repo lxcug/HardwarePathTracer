@@ -22,18 +22,18 @@ BEGIN_SHADOWY_NAMESPACE
 
     struct Light
     {
-        float3 Direction;
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(LightType, Type, LightType::LightTypeMax);
+        float3 Direction;
 
         float3 Position;
-        float Radius;
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, Radius, .1f);
 
         // Set Default Color to Red for Debug
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float3, Color, float3(1.f, 0.f, 0.f));
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, Intensity, 1.f);
 
-        // For directional light, half angle is 2\degree
-        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, HalfSinAngleOrRange, 0.0349);
+        // For directional light, half angle is 2\degree, Range for point light
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, HalfSinAngleOrRange, 0.035);
         float InnerAngle;
         float OuterAngle;
         int Padding;

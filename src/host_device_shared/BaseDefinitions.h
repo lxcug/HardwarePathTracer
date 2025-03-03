@@ -20,6 +20,7 @@ using uint = uint32_t;
 #else
 #define PI 3.1415926
 #endif
+#define M_E 2.71828182846
 
 #ifdef __cplusplus
 #define IS_COMPILING_CPP 1

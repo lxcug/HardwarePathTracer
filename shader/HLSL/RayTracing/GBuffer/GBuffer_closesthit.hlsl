@@ -73,5 +73,6 @@ float opacity = material.Opacity;
     payload.normal = hit_normal;
     payload.roughness = roughness;
     payload.metallic = metallic;
+    payload.opacity = opacity;
     payload.hit_t = RayTCurrent();
 }

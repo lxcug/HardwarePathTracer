@@ -20,6 +20,8 @@ struct GBufferPayload
 
     float3 albedo;
     float metallic;
+
+    float opacity;
 };
 
 ConstantBuffer<ViewUniformBuffer> view_uniform_buffer : register(b0, space0);

@@ -76,6 +76,9 @@ void main(inout RayPayload payload, in HitAttribute attrib)
     payload.opacity = opacity;
     payload.roughness = roughness;
     payload.metallic = metallic;
+    payload.ior = material.IOR;
+    payload.is_front_face = dot(payload.normal, -WorldRayDirection()) > 0.f;
+    payload.transmittance = material.Transmittance;
     payload.is_hit = true;
     payload.hit_t = RayTCurrent();
     payload.instance_id = InstanceID();

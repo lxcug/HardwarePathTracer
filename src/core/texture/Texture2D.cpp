@@ -152,10 +152,19 @@ namespace Shadowy {
                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
+        else if (TexturePath.extension().string() == ".hdr" || TexturePath.extension().string() == ".exr")
+        {
+            stbi_set_flip_vertically_on_load(false);
+            float* Pixels = stbi_loadf(TexturePath.string().c_str(),
+                                        &m_width,
+                                        &m_height,
+                                        &m_channels, STBI_rgb_alpha);
+            CreateTexture(Pixels);
+        }
         else
         {
             stbi_set_flip_vertically_on_load(false);
-            stbi_uc *Pixels = stbi_load(TexturePath.string().c_str(),
+            stbi_uc* Pixels = stbi_load(TexturePath.string().c_str(),
                                         &m_width,
                                         &m_height,
                                         &m_channels, STBI_rgb_alpha);
@@ -189,6 +198,45 @@ namespace Shadowy {
         }
 
         VkDeviceSize MemorySize = DataSize > 0 ? DataSize : m_width * m_height * 4;
+        auto [StagingBuffer, StagingBufferMemory] = RHI::CreateStagingBuffer(MemorySize);
+
+        void *MappedData = nullptr;
+        vkMapMemory(GetVKDevice(), StagingBufferMemory, 0, MemorySize, 0, &MappedData);
+        memcpy(MappedData, Data, MemorySize);
+        vkUnmapMemory(GetVKDevice(), StagingBufferMemory);
+        stbi_image_free(Data);
+
+        RHI::CreateTexture2D(m_width, m_height, m_numMips, GetVKSampleCount(m_msaaSamples),
+                             m_vkFormat,
+                             VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                             VK_IMAGE_TILING_OPTIMAL, m_texture, m_textureMemory);
+        RHI::TransitionTextureLayout(m_texture, m_numMips,
+                                     VK_IMAGE_LAYOUT_UNDEFINED,
+                                     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        RHI::CopyBufferToTexture(m_texture, StagingBuffer, m_width, m_height);
+
+        if (m_generateMips) {
+            RHI::GenerateMips(m_texture, m_width, m_height, m_numMips);
+        } else {
+            RHI::TransitionTextureLayout(m_texture, m_numMips,
+                                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                         VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        }
+
+        vkDestroyBuffer(GetVKDevice(), StagingBuffer, nullptr);
+        vkFreeMemory(GetVKDevice(), StagingBufferMemory, nullptr);
+    }
+
+    void Texture2D::CreateTexture(float* Data)
+    {
+        m_vkFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+        Check(Data);
+
+        if (m_generateMips) {
+            m_numMips = CalculateNumMips(m_width, m_height);
+        }
+
+        VkDeviceSize MemorySize = m_width * m_height * 16;
         auto [StagingBuffer, StagingBufferMemory] = RHI::CreateStagingBuffer(MemorySize);
 
         void *MappedData = nullptr;

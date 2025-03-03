@@ -48,13 +48,11 @@ namespace Shadowy {
         PushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
         PushConstant.offset = 0;
         PushConstant.size = sizeof(AccumulationOptions);
-
         VkPipelineLayoutCreateInfo CreateInfo{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
         CreateInfo.setLayoutCount = 1;
         CreateInfo.pSetLayouts = &m_setLayout;
         CreateInfo.pushConstantRangeCount = 1;
         CreateInfo.pPushConstantRanges = &PushConstant;
-
         VK_CHECK(vkCreatePipelineLayout(GetVKDevice(), &CreateInfo, nullptr, &m_pipelineLayout));
 
         HLSLCompiler::CompileShader("PostProcess/Accumulation.hlsl", "Accumulation",

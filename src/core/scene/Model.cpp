@@ -219,7 +219,7 @@ namespace Shadowy {
              *  use the original MaterialIndex loaded from file, since the materials are already deduplicated
              */
             const uint MaterialIndex = AIMesh->mMaterialIndex;
-            m_materials[MaterialIndex] = ProcessMeshMaterial(Scene->mMaterials[MaterialIndex], m_aiScene);
+            m_materials[MaterialIndex] = ProcessMaterial(Scene->mMaterials[MaterialIndex], m_aiScene);
         }
 
         for (uint i = 0; i < Node->mNumChildren; i++)
@@ -228,7 +228,7 @@ namespace Shadowy {
         }
     }
 
-    auto Model::ProcessMeshMaterial(aiMaterial* AIMaterial, const aiScene* Scene) -> Material
+    auto Model::ProcessMaterial(aiMaterial* AIMaterial, const aiScene* Scene) -> Material
     {
         // for (unsigned int i = 0; i < AIMaterial->mNumProperties; ++i) {
         //     const aiMaterialProperty* property = AIMaterial->mProperties[i];
@@ -257,11 +257,16 @@ namespace Shadowy {
         {
             Mat.Transmittance = {Transmittance.r, Transmittance.g, Transmittance.b};
         }
-        ai_real Roughness, Metallic, Opacity;
+        ai_real Roughness, Metallic, Opacity, IOR;
         AIRet = AIMaterial->Get(AI_MATKEY_ROUGHNESS_FACTOR, Roughness);
         if (AIRet == aiReturn_SUCCESS)
         {
             Mat.Roughness = Roughness;
+        }
+        AIRet = AIMaterial->Get(AI_MATKEY_REFRACTI, IOR);
+        if (AIRet == aiReturn_SUCCESS)
+        {
+            Mat.IOR = IOR;
         }
         AIRet = AIMaterial->Get(AI_MATKEY_METALLIC_FACTOR, Metallic);
         if (AIRet == aiReturn_SUCCESS)
@@ -388,6 +393,65 @@ namespace Shadowy {
         return Mat;
     }
 
+    auto Model::ProcessLight() -> std::vector<Light>
+    {
+        Check(m_aiScene);
+        if (m_aiScene->mNumLights == 0)
+        {
+            std::cout << "No light exists in the scene";
+        }
+
+        glm::mat4 ParentNodeTransform = AIMatrix4x4ToGlm(m_aiScene->mRootNode->mTransformation);
+        std::vector<Light> SceneLights(m_aiScene->mNumLights);
+        for (int i = 0; i < m_aiScene->mNumLights; i++)
+        {
+            aiLight* AILight = m_aiScene->mLights[i];
+            Check(AILight->mType != aiLightSource_UNDEFINED);
+            Light& ShadowyLight = SceneLights[i];
+            ShadowyLight.Type = AILightTypeToShadowy(AILight->mType);
+            glm::vec3 AILightColor = AIColorToGlm(AILight->mColorDiffuse);
+            glm::mat4 Transform = GetAbsoluteNodeTransform(m_aiScene->mRootNode->FindNode(AILight->mName));
+            glm::vec4 LocalPos = {AIVec3ToGlm(AILight->mPosition), 1.f};
+            glm::vec4 WorldPos = Transform * LocalPos;
+            ShadowyLight.Position = {WorldPos.x, WorldPos.y, WorldPos.z};
+            glm::vec4 WorldDir = Transform * glm::vec4(AIVec3ToGlm(AILight->mDirection), 0.f);
+            ShadowyLight.Direction = {WorldDir.x, WorldDir.y, WorldDir.z};
+
+            const float Intensity = std::max(AILightColor.x, glm::max(AILightColor.y, AILightColor.z));
+            ShadowyLight.Color = AILightColor / Intensity;
+            ShadowyLight.Intensity = Intensity;
+            if (ShadowyLight.Type == LightType::Point)
+            {
+                const float Constant = AILight->mAttenuationConstant;
+                const float Linear = AILight->mAttenuationLinear;
+                const float Quadratic = AILight->mAttenuationQuadratic;
+                constexpr float AttenuationThreshold = 1e-2f;
+                const float Range = (-Linear + std::sqrt(Linear * Linear - 4 * (Constant - 1.f / AttenuationThreshold) * Quadratic)) / (2 * Quadratic);
+                ShadowyLight.HalfSinAngleOrRange = Range;
+                ShadowyLight.Intensity = Intensity / (Range * Range);
+            }
+            else if (ShadowyLight.Type ==LightType::Directional)
+            {
+                ShadowyLight.HalfSinAngleOrRange = 0.035f;
+                ShadowyLight.Intensity /= 1e1f;  // TODO
+            }
+            ShadowyLight.InnerAngle = AILight->mAngleInnerCone;
+            ShadowyLight.OuterAngle = AILight->mAngleOuterCone;
+            ShadowyLight.Radius = .1f;
+        }
+
+        return SceneLights;
+    }
+
+    auto Model::GetAbsoluteNodeTransform(const aiNode* Node) -> glm::mat4
+    {
+        if (Node->mParent == nullptr)
+        {
+            return AIMatrix4x4ToGlm(Node->mTransformation);
+        }
+        return GetAbsoluteNodeTransform(Node->mParent) * AIMatrix4x4ToGlm(Node->mTransformation);
+    }
+
     auto Model::AIMatrix4x4ToGlm(const aiMatrix4x4& Mat) -> glm::mat4
     {
         // Row Major to Col Major
@@ -398,6 +462,38 @@ namespace Shadowy {
             Mat.a4, Mat.b4, Mat.c4, Mat.d4
         };
         return Ret;
+    }
+
+    auto Model::AIVec3ToGlm(const aiVector3f& Vec) -> glm::vec3
+    {
+        return {
+            Vec.x, Vec.y, Vec.z
+        };
+    }
+
+    auto Model::AIColorToGlm(const aiColor3D& Color) -> glm::vec3
+    {
+        return {
+            Color.r, Color.g, Color.b
+        };
+    }
+
+    auto Model::AILightTypeToShadowy(aiLightSourceType Type) -> LightType
+    {
+        switch (Type)
+        {
+        case aiLightSource_DIRECTIONAL:
+            return LightType::Directional;
+        case aiLightSource_POINT:
+            return LightType::Point;
+        case aiLightSource_SPOT:
+            return LightType::Spot;
+        case aiLightSource_AREA:
+            return LightType::Rect;
+        default:
+            Check(false);
+            return LightType::LightTypeMax;
+        }
     }
 
     // ObjModel::ObjModel(const std::filesystem::path &ModelPath) {

@@ -87,7 +87,7 @@ float4 CosineSampleHemisphere(in float2 rnd) {
         cos_theta
     };
 
-    float pdf = cos_theta / PI;
+    float pdf = max(cos_theta / PI, SHADOWY_SMALL_NUMBER);
 
     return float4(dir_local, pdf);
 }

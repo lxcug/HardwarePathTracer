@@ -60,7 +60,8 @@ namespace Shadowy {
                 Mesh->m_meshDesc.TextureIndexOffset = 0;  // Deprecated, Set to 0
                 m_modelDescs.emplace_back(Mesh->m_meshDesc);
             }
-            // CreateModelTextures(SharedModel.get());
+            auto ModelLights = SharedModel->ProcessLight();
+            m_sceneLights.insert(m_sceneLights.end(), ModelLights.begin(), ModelLights.end());
 
             m_models.push_back(SharedModel);
             SharedModel->Importer.FreeScene();
@@ -125,8 +126,7 @@ namespace Shadowy {
         }
 
         void CreateSkyTexture(const std::filesystem::path &Path) {
-            // NOTE: SRGB
-            m_skyTexture = std::make_shared<Texture2D>(Path, false, true);
+            m_skyTexture = std::make_shared<Texture2D>(Path, false, false);
         }
 
         static inline uint s_instanceIDCounter = 0; // TODO: dispatch instance index to models
@@ -148,12 +148,10 @@ namespace Shadowy {
 
     private:
         std::shared_ptr<ASBuilder> m_accelBuilder;
-        // std::vector<std::shared_ptr<ObjModel>> m_models;
         std::vector<std::shared_ptr<Model>> m_models;
         std::vector<ModelDesc> m_modelDescs;
         std::shared_ptr<ArbitraryBuffer> m_sceneModelDescBuffer;
         std::shared_ptr<TextureManager> m_textureManager;
-        // std::vector<std::shared_ptr<Texture2D>> m_sceneModelTextures;
 
         VkDescriptorSetLayout m_sceneDescDescriptorSetLayout = VK_NULL_HANDLE;
         std::vector<VkDescriptorSet> m_sceneDescDescriptorSets;

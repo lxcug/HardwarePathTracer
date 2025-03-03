@@ -139,6 +139,8 @@ namespace Shadowy {
         delete m_gbufferPass;
         m_accumulationPass->Release();
         delete m_accumulationPass;
+        m_bloomPass->Release();
+        delete m_bloomPass;
 
         Sampler::ReleaseSamplers();
         // delete m_restirResource;
@@ -243,65 +245,6 @@ namespace Shadowy {
 //        }
 
         RHI::TextureTransitionInput SrcInput{}, DstInput{};
-//        SrcInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
-//        SrcInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-//        SrcInput.PipelineStage = m_pathTracingOptions.EnableReSTIRGI
-//                                 ? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
-//                                 : VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
-//        DstInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-//        DstInput.AccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-//        DstInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-//        RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameViewportImage->GetHandle(), 1,
-//                                     SrcInput, DstInput);
-//        SrcInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-//        SrcInput.AccessMask = 0;
-//        SrcInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
-//        DstInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-//        DstInput.AccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-//        DstInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-//        RHI::TransitionTextureLayout(CommandBuffer, m_lastFrameViewportImage->GetHandle(), 1,
-//                                     SrcInput,
-//                                     DstInput);
-//
-//        VkImageCopy ImageCopy{};
-//        ImageCopy.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-//        ImageCopy.srcSubresource.baseArrayLayer = 0;
-//        ImageCopy.srcSubresource.layerCount = 1;
-//        ImageCopy.srcSubresource.mipLevel = 0;
-//        ImageCopy.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-//        ImageCopy.dstSubresource.baseArrayLayer = 0;
-//        ImageCopy.dstSubresource.layerCount = 1;
-//        ImageCopy.dstSubresource.mipLevel = 0;
-//        VkOffset3D Offset{0, 0, 0};
-//        ImageCopy.srcOffset = Offset;
-//        ImageCopy.dstOffset = Offset;
-//        VkExtent3D Extent3D{
-//                static_cast<uint>(m_currentViewportImageSize.x), static_cast<uint>(m_currentViewportImageSize.y), 1
-//        };
-//        ImageCopy.extent = Extent3D;
-//        vkCmdCopyImage(
-//                CommandBuffer,
-//                CurrentFrameViewportImage->GetHandle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-//                m_lastFrameViewportImage->GetHandle(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-//                1, &ImageCopy
-//        );
-//        SrcInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-//        SrcInput.AccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-//        SrcInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-//        DstInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
-//        DstInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-//        DstInput.PipelineStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-//        RHI::TransitionTextureLayout(CommandBuffer, CurrentFrameViewportImage->GetHandle(),
-//                                     1, SrcInput, DstInput);
-//        SrcInput.Layout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-//        SrcInput.AccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-//        SrcInput.PipelineStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-//        DstInput.Layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-//        DstInput.AccessMask = 0;
-//        DstInput.PipelineStage = VK_PIPELINE_STAGE_NONE;
-//        RHI::TransitionTextureLayout(CommandBuffer, m_lastFrameViewportImage->GetHandle(),
-//                                     1, SrcInput, DstInput);
-
         SrcInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
         SrcInput.PipelineStage = VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR;
         SrcInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
@@ -311,29 +254,27 @@ namespace Shadowy {
         RHI::TransitionTextureLayout(CommandBuffer,
                                      m_globalTexture->GetGlobalTexture(TextureType::SceneColor, m_imageIndex)->GetHandle(),
                                      1, SrcInput, DstInput);
-        RHI::TransitionTextureLayout(CommandBuffer,
-                                     m_lastFrameViewportImage->GetHandle(),
-                                     1, SrcInput, DstInput);
-
-
         m_accumulationPass->Dispatch(CommandBuffer, m_imageIndex);
 
-        SrcInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-        SrcInput.PipelineStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-        SrcInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
-        DstInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-        DstInput.PipelineStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-        DstInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
-        RHI::TransitionTextureLayout(CommandBuffer,
-                                     m_globalTexture->GetGlobalTexture(TextureType::SceneColor, m_imageIndex)->GetHandle(),
-                                     1, SrcInput, DstInput);
-        RHI::TransitionTextureLayout(CommandBuffer,
-                                     m_lastFrameViewportImage->GetHandle(),
-                                     1, SrcInput, DstInput);
+        if (m_enableBloom)
+        {
+            SrcInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+            SrcInput.PipelineStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+            SrcInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
+            DstInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+            DstInput.PipelineStage = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+            DstInput.Layout = VK_IMAGE_LAYOUT_GENERAL;
+            RHI::TransitionTextureLayout(CommandBuffer,
+                                         m_globalTexture->GetGlobalTexture(TextureType::SceneColor, m_imageIndex)->GetHandle(),
+                                         1, SrcInput, DstInput);
+            m_bloomPass->Dispatch(CommandBuffer, m_imageIndex);
+        }
 
+        RHI::TransitionTextureLayout(CommandBuffer,
+                             m_globalTexture->GetGlobalTexture(TextureType::SceneColor, m_imageIndex)->GetHandle(),
+                             1, SrcInput, DstInput);
         bool ShouldToneMapping = m_toneMappingPass->GetPassRenderOptions().EnableToneMapping |
                                  m_toneMappingPass->GetPassRenderOptions().EnableGammaCorrection;
-
         VkImageMemoryBarrier Barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
         Barrier.image = CurrentFrameViewportImage->GetHandle();
         Barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -448,12 +389,16 @@ namespace Shadowy {
         m_accumulationPass->Init(m_viewportSize.x, m_viewportSize.y);
         m_accumulationPass->CreateSets();
         m_accumulationPass->CreatePipeline();
-
-        m_toneMappingPass = new ToneMappingPass();
+        m_bloomPass = new BloomPass();
+        m_bloomPass->Init(m_viewportSize.x, m_viewportSize.y);
+        m_bloomPass->CreateSets();
+        m_bloomPass->CreatePipeline();
+        m_toneMappingPass = new ToneMappingPass();  // TODO: inherit PassBase
 
         UpdateRTDescriptorSets();
         m_gbufferPass->UpdateSets();
         m_accumulationPass->UpdateSets();
+        m_bloomPass->UpdateSets();
         // m_restirResource->UpdateTemporalReusePassSets();
         // m_restirResource->UpdateSpatialReusePassSets();
         m_toneMappingPass->UpdateDescriptorSets();
@@ -540,6 +485,7 @@ namespace Shadowy {
                                                   reinterpret_cast<bool *>(&m_toneMappingPass->GetPassRenderOptions().EnableGammaCorrection));
             ShouldReAccumulate |= ImGui::Checkbox("Enable ToneMapping",
                                                   reinterpret_cast<bool *>(&m_toneMappingPass->GetPassRenderOptions().EnableToneMapping));
+            ShouldReAccumulate |= ImGui::Checkbox("Enable Bloom", &m_enableBloom);
             ShouldReAccumulate |= ImGui::InputFloat("Adapted Luminance",
                                                     &m_toneMappingPass->GetPassRenderOptions().AdaptedLuminance);
 
@@ -1033,9 +979,9 @@ namespace Shadowy {
         m_RTScene->CreateSkyTexture("../../asset/env/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
 
         // m_RTScene->AddModel("../../asset/bistro/BistroInterior.fbx");
-        m_RTScene->AddModel("../../asset/bistro/BistroExterior.fbx");
+        // m_RTScene->AddModel("../../asset/bistro/BistroExterior.fbx");
         // m_RTScene->AddModel("../../asset/nezha.gltf");
-        // m_RTScene->AddModel("../../asset/cornell_box_glossy/cornell_box.gltf");
+        m_RTScene->AddModel("../../asset/cornell_box_glossy/cornell_box.gltf");
         // m_RTScene->AddModel("../../asset/catedral-de-chihuahua/source/Catedral_Chihuahua_FINAL.fbx");
         // m_RTScene->AddModel("../../asset/sponza_fbx/sponza.fbx");
         // m_RTScene->AddModel("../../asset/test_material/test_material.glb");
@@ -1046,13 +992,13 @@ namespace Shadowy {
 //        m_RTScene->AddModel("../../asset/cornell_box/cornell_box.obj");
 //        m_RTScene->AddModel("../../asset/cornell_box_glossy/cornell_box.obj");
         m_RTScene->AddLight(
-                glm::normalize(glm::vec3(-.41f, -.91f, -0.09f)),
                 LightType::Directional,
+                glm::normalize(glm::vec3(-.41f, -.91f, -0.09f)),
                 glm::vec3(.5f, .5f, .5f),
                 0.f,
                 glm::vec3(1.f, 1.f, 1.f),
                 3.f,
-                0.0349f,
+                0.035f,
                 0.f,
                 0.f
         );
@@ -1160,6 +1106,7 @@ namespace Shadowy {
         m_gbufferPass->OnResize(m_viewportSize.x, m_viewportSize.y);
         m_accumulationPass->OnResize(m_viewportSize.x, m_viewportSize.y);
         m_accumulationPass->OnResize(m_viewportSize.x, m_viewportSize.y);
+        m_bloomPass->OnResize(m_viewportSize.x, m_viewportSize.y);
         // m_restirResource->OnResize(m_viewportSize.x, m_viewportSize.y);
 
         UpdateRTDescriptorSets();
@@ -1199,6 +1146,7 @@ namespace Shadowy {
 
         m_gbufferPass->Release();
         m_accumulationPass->Release();
+        m_bloomPass->Release();
 
         m_RTScene->OnRecreate();
         m_RTScene->AddModel(Path);
@@ -1213,10 +1161,12 @@ namespace Shadowy {
         m_gbufferPass->CreatePipeline();
         m_accumulationPass->CreateSets();
         m_accumulationPass->CreatePipeline();
+        m_bloomPass->CreatePipeline();
 
         UpdateRTDescriptorSets();
         m_gbufferPass->UpdateSets();
         m_accumulationPass->UpdateSets();
+        m_bloomPass->UpdateSets();
     }
 
     void VulkanRayTracingApp::ReCompileShaders() {
@@ -1231,6 +1181,7 @@ namespace Shadowy {
         // m_restirResource->CreateSpatialReusePassPipeline();
         m_gbufferPass->OnRecompile();
         m_accumulationPass->OnRecompile();
+        m_bloomPass->OnRecompile();
         m_toneMappingPass->CreatePipeline();
     }
 

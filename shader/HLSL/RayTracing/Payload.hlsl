@@ -14,9 +14,13 @@ struct RayPayload
     float3 emissive;
     bool is_hit;
 
+    float3 transmittance;
+    float ior;
+
     float opacity;
     float roughness;
     float metallic;
+    bool is_front_face;
 
     bool is_miss() {
         return !is_hit;

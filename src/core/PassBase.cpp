@@ -42,7 +42,6 @@ namespace Shadowy {
         AllocateInfo.pSetLayouts = Layouts.data();
 
         VkResult Res = vkAllocateDescriptorSets(GetVKDevice(), &AllocateInfo, m_sets.data());
-        Check(Res == VK_SUCCESS);
         m_writeSets.reserve(m_bindings.size() * MAX_FRAMES_IN_FLIGHT);
     }
 
