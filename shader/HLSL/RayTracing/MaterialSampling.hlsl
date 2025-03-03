@@ -210,8 +210,7 @@ MaterialSample SampleGlossyDiffuseTransmission(in float3 V, in RayPayload payloa
 }
 
 MaterialSample SampleMaterial(in float3 ray_direction, in RayPayload payload, in float4 rnd) {
-    static float specular_threshold = 1e-3f;
-    static float roughness_threshold = .999f;
+    static float specular_threshold = 5e-2f;
     float roughness = payload.roughness;
     float metallic = payload.metallic;
     float3 V = -ray_direction;
@@ -357,10 +356,6 @@ MaterialEval EvalGlossyDiffuse(in float3 V, in float3 L, in RayPayload payload, 
     mat_eval.pdf = 0.f;
     float roughness = payload.roughness, metallic = payload.metallic;
 
-    if (dot(L, payload.normal) < 0.f) {
-        return mat_eval;
-    }
-
     float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.albedo, metallic);
     float3 F = Fresnel_Schlick(max(dot(payload.normal, V), 0.0), F0, roughness);
 
@@ -379,7 +374,7 @@ MaterialEval EvalGlossyDiffuse(in float3 V, in float3 L, in RayPayload payload, 
     float3 specular_weight = CookTorranceBRDF(V, L, payload.normal, roughness, metallic, payload.albedo, F0) * NoL / specular_pdf;
 
     float3 Kd = (1 - F) * (1 - metallic);
-    if (dot(L, payload.normal) > 0.f) {
+     if (dot(L, payload.normal) > 0.f) {
         AddLobeWithMIS(mat_eval.weight, mat_eval.pdf, Kd * diffuse_weight, diffuse_pdf, diffuse_lobe_selected_weight);
         AddLobeWithMIS(mat_eval.weight, mat_eval.pdf, specular_weight, specular_pdf, 1.f - diffuse_lobe_selected_weight);
     }
@@ -389,8 +384,7 @@ MaterialEval EvalGlossyDiffuse(in float3 V, in float3 L, in RayPayload payload, 
 
 MaterialEval EvalMaterial(in float3 V, in float3 L, in RayPayload payload, inout uint seed) {
     MaterialEval mat_eval;
-    static float specular_threshold = 1e-3f;
-    static float roughness_threshold = .999f;
+    static float specular_threshold = 5e-2f;
     float roughness = payload.roughness;
 
 #if DIFFUSE_ONLY
@@ -398,9 +392,11 @@ MaterialEval EvalMaterial(in float3 V, in float3 L, in RayPayload payload, inout
 #else
     // Dealing with Ideal Reflection/Transmission
     if (roughness < specular_threshold) {
+#if ENABLE_TRANSMISSION
         if (payload.opacity < .99f) {
             return EvalSpecularTransmission(V, L, payload, seed);
         }
+#endif
         return EvalSpecularDiffuse(V, L, payload, seed);
     } else {
         return EvalGlossyDiffuse(V, L, payload, seed);

@@ -52,14 +52,13 @@ void PathTracingKernel(in float3 origin,
     float3 first_pos, first_normal;
     RayPayload payload;
 
-    bool use_MIS = render_options.MISMode == 2;
     bool b_sample_light = render_options.MISMode == 0;
     bool b_sample_material = render_options.MISMode == 1;
+    bool use_MIS = render_options.MISMode == 2;
     float light_pick_cdf[64];
     TraceMaterialState trace_material_state[64];
     uint valid_num_trace_light_state = 0;
 
-    [loop]
     for (int bounce = 0; bounce < render_options.Bounce; bounce++) {
         bool is_camera_ray = bounce == 0;
         bool is_last_bounce = (bounce == render_options.Bounce - 1);
@@ -215,10 +214,22 @@ void PathTracingKernel(in float3 origin,
         ao /= render_options.NumAORays;
     }
 
-    // Remove fireflies
+    /*
+     * Remove fireflies
+	 * Show different behavoir for NEE and Sample Material Only.
+	 * Since Sample Material get small radiance for most case(expect only a sky light in the scene),
+	 * when hit light, the radiance will be very big and will be clamped to fire_fly_clamp_threshold,
+	 * the time accumulated radiance value will be small which we don't expect.
+     * When use MIS, the problem will be canneled, since with MIS, each dispatched ray will get a quite
+     * smooth radiance value(it just like each frame we get quite smooth radiance value, little fireflies),
+     * so the time accumulated radiance will quite reasonable.
+	 * Well, if use sample light only, some scenario we hardly sample a good sky light direction, so
+	 * the clampped result will be cause the same issue.
+     * So here, we only apply firefly clamp for MIS.
+     */
     float lum = Luminance(radiance);
     const float fire_fly_clamp_threshold = 4.f;
-    if(lum > fire_fly_clamp_threshold)
+    if(use_MIS && lum > fire_fly_clamp_threshold)
     {
         radiance *= fire_fly_clamp_threshold / lum;
     }
@@ -249,9 +260,9 @@ void PathTracingKernelReSTIR(in float3 origin,
     float3 first_pos, first_normal;
     RayPayload payload;
 
-    bool use_MIS = render_options.MISMode == 2;
     bool b_sample_light = render_options.MISMode == 0;
     bool b_sample_material = render_options.MISMode == 1;
+    bool use_MIS = render_options.MISMode == 2;
     float light_pick_cdf[64];
     TraceMaterialState trace_material_state[64];
     uint valid_num_trace_light_state = 0;

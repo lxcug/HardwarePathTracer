@@ -979,9 +979,9 @@ namespace Shadowy {
         m_RTScene->CreateSkyTexture("../../asset/env/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
 
         // m_RTScene->AddModel("../../asset/bistro/BistroInterior.fbx");
-        // m_RTScene->AddModel("../../asset/bistro/BistroExterior.fbx");
+        m_RTScene->AddModel("../../asset/bistro/BistroExterior.fbx");
         // m_RTScene->AddModel("../../asset/nezha.gltf");
-        m_RTScene->AddModel("../../asset/cornell_box_glossy/cornell_box.gltf");
+        // m_RTScene->AddModel("../../asset/cornell_box_glossy/cornell_box.gltf");
         // m_RTScene->AddModel("../../asset/catedral-de-chihuahua/source/Catedral_Chihuahua_FINAL.fbx");
         // m_RTScene->AddModel("../../asset/sponza_fbx/sponza.fbx");
         // m_RTScene->AddModel("../../asset/test_material/test_material.glb");
