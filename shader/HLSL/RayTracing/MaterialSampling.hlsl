@@ -5,7 +5,7 @@
 
 
 #define DIFFUSE_ONLY 0
-#define ENABLE_TRANSMISSION 0
+#define ENABLE_TRANSMISSION 1
 
 
 struct MaterialSample {
@@ -45,13 +45,14 @@ MaterialSample SampleSpecular(in float3 V, in RayPayload payload, in float4 rnd)
 MaterialSample SampleSpecularTransmission(in float3 V, in RayPayload payload, in float4 rnd) {
     MaterialSample mat_sample;
     float roughness = payload.roughness, metallic = payload.metallic;
+	mat_sample.weight = 0.f;
     mat_sample.pdf = 0.f;
 
     float eta = payload.is_front_face ? 1.f / 2.f : 2.f / 1.f;
     float3 normal = payload.is_front_face ? payload.normal : -payload.normal;
     float3 reflect_dir = reflect(-V, normal);
     float CosTheta = dot(V, normal);
-    float R = FrDielectric(CosTheta, eta);  // Reflection Prob
+    float R = FrDielectric(CosTheta, eta) * payload.opacity;  // Reflection Prob
     float T = 1 - R;  // Transmission Prob
 
     float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.albedo, metallic);
@@ -59,20 +60,21 @@ MaterialSample SampleSpecularTransmission(in float3 V, in RayPayload payload, in
     float3 transmittance = (1.f).xxx;
     float3 refract_dir = refract(-V, normal, eta);
     float refract_NoL = dot(normal, refract_dir);
-    float refract_pdf = 1.f;
-    float3 refract_weight = transmittance / refract_pdf;
-    AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, refract_weight, refract_pdf, T);
 
-    float reflect_NoL = max(dot(reflect_dir, payload.normal), 0.f);
-    float reflect_pdf = 1.f;
-    float3 reflect_weight = F * reflect_NoL / reflect_pdf;
-    AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, reflect_weight, reflect_pdf, R);
-
+	float3 L;
     if (rnd.z < T) {
-        mat_sample.direction = refract_dir;
+        L = refract_dir;
+        float refract_pdf = 1.f;
+        float3 refract_weight = transmittance / refract_pdf;
+    	AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, refract_weight, refract_pdf, 1.f);
     } else {
-        mat_sample.direction = reflect_dir;
+        L = reflect_dir;
+        float reflect_NoL = max(dot(reflect_dir, payload.normal), 0.f);
+        float reflect_pdf = 1.f;
+        float3 reflect_weight = F * reflect_NoL / reflect_pdf;
+        AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, reflect_weight, reflect_pdf, 1.f);
     }
+	mat_sample.direction = L;
 
     return mat_sample;
 }
@@ -178,7 +180,7 @@ MaterialSample SampleGlossyDiffuseTransmission(in float3 V, in RayPayload payloa
     if (rnd.z < T) {  // Transmission Only
         L = refract_dir;
         float refract_pdf = BTDF_PDF(V, L, oriented_normal, refract_H, roughness, eta);
-        float3 refract_weight = BTDF(V, L, oriented_normal, refract_H, roughness, eta) / refract_pdf;
+        float3 refract_weight = transmittance * BTDF(V, L, oriented_normal, refract_H, roughness, eta) / refract_pdf;
         AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, refract_weight, refract_pdf, 1.f);
     } else {  // Diffuse + Glossy Lobe
         if (rnd.w < diffuse_lobe_selected_weight) {
@@ -392,12 +394,14 @@ MaterialEval EvalMaterial(in float3 V, in float3 L, in RayPayload payload, inout
 #else
     // Dealing with Ideal Reflection/Transmission
     if (roughness < specular_threshold) {
+        return EvalSpecularDiffuse(V, L, payload, seed);
+
+        // Don't use NEE for Dielectric Material
 #if ENABLE_TRANSMISSION
         if (payload.opacity < .99f) {
             return EvalSpecularTransmission(V, L, payload, seed);
         }
 #endif
-        return EvalSpecularDiffuse(V, L, payload, seed);
     } else {
         return EvalGlossyDiffuse(V, L, payload, seed);
 

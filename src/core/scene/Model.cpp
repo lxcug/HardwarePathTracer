@@ -402,7 +402,7 @@ namespace Shadowy {
         }
 
         glm::mat4 ParentNodeTransform = AIMatrix4x4ToGlm(m_aiScene->mRootNode->mTransformation);
-        std::vector<Light> SceneLights(m_aiScene->mNumLights);
+        std::vector<Light> SceneLights(m_aiScene->mNumLights, Light());
         for (int i = 0; i < m_aiScene->mNumLights; i++)
         {
             aiLight* AILight = m_aiScene->mLights[i];
@@ -432,7 +432,6 @@ namespace Shadowy {
             }
             else if (ShadowyLight.Type ==LightType::Directional)
             {
-                ShadowyLight.HalfSinAngleOrRange = 0.035f;
                 ShadowyLight.Intensity /= 1e1f;  // TODO
             }
             ShadowyLight.InnerAngle = AILight->mAngleInnerCone;

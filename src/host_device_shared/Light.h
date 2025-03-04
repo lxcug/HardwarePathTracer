@@ -33,7 +33,7 @@ BEGIN_SHADOWY_NAMESPACE
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, Intensity, 1.f);
 
         // For directional light, half angle is 2\degree, Range for point light
-        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, HalfSinAngleOrRange, 0.035);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, HalfSinAngleOrRange, 0.01);
         float InnerAngle;
         float OuterAngle;
         int Padding;
