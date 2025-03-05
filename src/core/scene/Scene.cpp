@@ -41,15 +41,15 @@ namespace Shadowy {
     }
 
     void Scene::CreateModelDescBuffer() {
-        if (!m_modelDescs.empty()) {
+        if (!m_instanceData.empty()) {
             m_sceneModelDescBuffer = std::make_shared<ArbitraryBuffer>(
-                    sizeof(ModelDesc) * m_modelDescs.size(),
-                    m_modelDescs.data(),
+                    sizeof(InstanceData) * m_instanceData.size(),
+                    m_instanceData.data(),
                     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         } else {
             m_sceneModelDescDummyBuffer = std::make_shared<ArbitraryBuffer>(
-                    sizeof(ModelDesc), &m_dummyDesc,
+                    sizeof(InstanceData), &m_dummyData,
                     VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         }
@@ -89,18 +89,19 @@ namespace Shadowy {
     // }
 
     void Scene::CreateSceneDescriptorSet() {
-        VkDescriptorSetLayoutBinding ModelInfoBinding{};
-        ModelInfoBinding.binding = 0;
-        ModelInfoBinding.descriptorCount = 1;
-        ModelInfoBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        ModelInfoBinding.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+        VkDescriptorSetLayoutBinding InstanceDataBinding{};
+        InstanceDataBinding.binding = 0;
+        InstanceDataBinding.descriptorCount = 1;
+        InstanceDataBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        InstanceDataBinding.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
 
         VkDescriptorSetLayoutBinding TexturesBinding{};
         TexturesBinding.binding = 1;
         TexturesBinding.descriptorCount = m_textureManager->m_uniqueTextures.size();
         TexturesBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         TexturesBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR |
-                                     VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+                VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+                VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
 
         VkDescriptorSetLayoutBinding SceneLightsBinding{};
         SceneLightsBinding.binding = 2;
@@ -117,7 +118,7 @@ namespace Shadowy {
                                        VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
 
         std::array<VkDescriptorSetLayoutBinding, 4> Bindings = {
-                ModelInfoBinding, TexturesBinding, SceneLightsBinding, SkyTextureBinding
+                InstanceDataBinding, TexturesBinding, SceneLightsBinding, SkyTextureBinding
         };
 
         VkDescriptorSetLayoutCreateInfo CreateInfo{};
@@ -257,7 +258,7 @@ namespace Shadowy {
                              m_sceneDescDescriptorSets.size(), m_sceneDescDescriptorSets.data());
         m_accelBuilder.reset();
         m_models.clear();
-        m_modelDescs.clear();
+        m_instanceData.clear();
         m_sceneModelDescBuffer.reset();
         m_textureManager->m_uniqueTextures.clear();
         m_textureManager->m_storedTextures.clear();

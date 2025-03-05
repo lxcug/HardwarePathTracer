@@ -118,7 +118,6 @@ namespace Shadowy {
         bool m_enableBloom = false;
         ToneMappingPass *m_toneMappingPass = nullptr;
 
-        // ReSTIRResource* m_restirResource = nullptr;
         // Delay several frames for correct accumulation when resize viewport images
         inline static int s_numFramesToDelay = 3;
         int m_currentDelayFrames = 0;

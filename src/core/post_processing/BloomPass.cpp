@@ -6,6 +6,7 @@
 
 
 namespace Shadowy {
+
     void BloomPass::CreateSets()
     {
         AddBinding(BindingType::StorageImage, 0, 1, VK_SHADER_STAGE_COMPUTE_BIT);

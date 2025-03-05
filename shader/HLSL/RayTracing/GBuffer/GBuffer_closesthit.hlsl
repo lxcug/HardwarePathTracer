@@ -19,60 +19,14 @@ void main(inout GBufferPayload payload, in GBufferHitAttribute attrib)
     float3 hit_pos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
     // hit_pos = mul(float4(hit_pos_obj_space, 1.f), ObjectToWorld4x3());
 
-    uint64_t MaterialBufferAddress = ModelInfo[InstanceID()].MaterialBufferAddress;
-    uint64_t MaterialIndexBufferAddress = ModelInfo[InstanceID()].MaterialIndexBufferAddress;
-
-    int material_index = vk::RawBufferLoad<int>(MaterialIndexBufferAddress + sizeof(int) * PrimitiveIndex());
-
-    Material material = GetMaterial(InstanceID(), PrimitiveIndex());
-    int TextureIndexOffset = ModelInfo[InstanceID()].TextureIndexOffset;
-    float3 albedo = material.Albedo;
-float opacity = material.Opacity;
-    if (material.AlbedoTextureID >= 0) {
-        int TextureIndex = material.AlbedoTextureID + TextureIndexOffset;
-        float4 Value = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0);
-        albedo = Value.rgb;
-        opacity = Value.a;
-    }
-    float roughness = material.Roughness;
-    if (material.RoughnessTextureID >= 0) {
-        int TextureIndex = material.RoughnessTextureID + TextureIndexOffset;
-        roughness = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0).r;
-    }
-    float metallic = material.Metallic;
-    if (material.MetallicTextureID >= 0) {
-        int TextureIndex = material.MetallicTextureID + TextureIndexOffset;
-        metallic = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0).r;
-    }
-    float3 emissive = material.Emissive;
-    if (material.EmissiveTextureID >= 0) {
-        int TextureIndex = material.EmissiveTextureID + TextureIndexOffset;
-        emissive = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0).rgb;
-    }
-    if (material.NormalTextureID >= 0) {
-        int TextureIndex = material.NormalTextureID + TextureIndexOffset;
-        float3 local_normal = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0).rgb * 2.f - 1.f;
-        float3 tangent = v0.Tangent.xyz;
-        float3 bitangent = cross(hit_normal, tangent) * v0.Tangent.w;
-        float3x3 TBN = transpose(float3x3(tangent, bitangent, hit_normal));
-        hit_normal = normalize(mul(TBN, local_normal));
-        if (material.IsDDSNormalTexture) {  // NOTE: Flip normal when using dds format texture
-            hit_normal *= -1;
-        }
-    }
-    if (material.SpecularTextureID >= 0) {
-        int TextureIndex = material.SpecularTextureID + TextureIndexOffset;
-        float4 Value = MaterialTextures[TextureIndex].SampleLevel(Samplers[TextureIndex], hit_uv, 0);
-        float occlusion = Value.r;
-        roughness = Value.g;
-        metallic = Value.b;
-    }
+    InputMaterial input_mat = GetInputMaterial(InstanceID());
+    ShaderMaterial shader_mat = ResolveShaderMaterial(input_mat, hit_uv, hit_normal, v0.Tangent);
 
     payload.pos = hit_pos;
-    payload.albedo = albedo;
-    payload.normal = hit_normal;
-    payload.roughness = roughness;
-    payload.metallic = metallic;
-    payload.opacity = opacity;
+    payload.albedo = shader_mat.albedo;
+    payload.normal = shader_mat.normal;
+    payload.roughness = shader_mat.roughness;
+    payload.metallic = shader_mat.metallic;
+    payload.opacity = shader_mat.opacity;
     payload.hit_t = RayTCurrent();
 }
