@@ -96,13 +96,13 @@ namespace Shadowy {
 
         if (QueueType_ == QueueType::Graphics) {
             Check(HasGraphicsCommandPool());
-            VK_CHECK(vkQueueSubmit(m_graphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE));
-            VK_CHECK(vkQueueWaitIdle(m_graphicsQueue));
+            VkResult Result = vkQueueSubmit(m_graphicsQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
+            Result = vkQueueWaitIdle(m_graphicsQueue);
             vkFreeCommandBuffers(GetVKDevice(), m_graphicsPool, 1, &CommandBuffer);
         } else if (QueueType_ == QueueType::Compute) {
             Check(HasComputeCommandPool());
-            vkQueueSubmit(m_computeQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
-            VK_CHECK(vkQueueWaitIdle(m_computeQueue));
+            VkResult Result = vkQueueSubmit(m_computeQueue, 1, &SubmitInfo, VK_NULL_HANDLE);
+            Result = vkQueueWaitIdle(m_computeQueue);
             vkFreeCommandBuffers(GetVKDevice(), m_computePool, 1, &CommandBuffer);
         }
     }

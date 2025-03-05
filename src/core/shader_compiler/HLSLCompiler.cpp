@@ -29,6 +29,8 @@ namespace Shadowy
             [[fallthrough]];
         case ShaderType::Miss:
             [[fallthrough]];
+        case ShaderType::AnyHit:
+            [[fallthrough]];
         case ShaderType::ClosestHit:
             ShaderStageString = "lib_6_3";
             break;

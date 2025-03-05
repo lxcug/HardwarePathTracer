@@ -14,7 +14,6 @@
 
 
 namespace Shadowy {
-
     void NRDDenoiser::SetResources() {
         nrd::UserPool UserPool = {};
         // 3D MV RGBA16f+ or 2D MV RG16f+
@@ -37,4 +36,6 @@ namespace Shadowy {
         nrd::Integration_SetResource(UserPool, nrd::ResourceType::IN_TRANSLUCENCY, nullptr);  // RGBA8+, See SIGMA_FrontEnd_PackTranslucency
         nrd::Integration_SetResource(UserPool, nrd::ResourceType::OUT_SHADOW_TRANSLUCENCY, nullptr);
     }
+
+
 }  // namespace Shadowy

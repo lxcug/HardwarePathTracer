@@ -218,31 +218,13 @@ namespace Shadowy {
                                 0, nullptr);
         vkCmdPushConstants(CommandBuffer, m_RTPipelineLayout,
                            VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-                           VK_SHADER_STAGE_MISS_BIT_KHR,
+                           VK_SHADER_STAGE_MISS_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
                            0, sizeof(PathTracingOptions), &m_pathTracingOptions);
 
         auto RayTraceFunc = reinterpret_cast<PFN_vkCmdTraceRaysKHR>(vkGetDeviceProcAddr(
                 m_device, "vkCmdTraceRaysKHR"));
         RayTraceFunc(CommandBuffer, &m_rayGenRegion, &m_missRegion, &m_hitRegion,
                      &m_callRegion, m_viewportSize.x, m_viewportSize.y, 1);
-
-//        if (m_pathTracingOptions.EnableReSTIRGI) {
-//            VkMemoryBarrier ReservoirBufferBarrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
-//            ReservoirBufferBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-//            ReservoirBufferBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-//            vkCmdPipelineBarrier(CommandBuffer,
-//                                 VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
-//                                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-//                                 0, 1, &ReservoirBufferBarrier,
-//                                 0, nullptr, 0, nullptr);
-//
-//            m_restirResource->DispatchTemporalReusePass(CommandBuffer, CurrentFrameViewportImage,
-//                                                        m_imageIndex,
-//                                                        m_viewportSize.x, m_viewportSize.y);
-//            m_restirResource->DispatchSpatialReusePass(CommandBuffer, CurrentFrameViewportImage,
-//                                                       m_imageIndex,
-//                                                       m_viewportSize.x, m_viewportSize.y);
-//        }
 
         RHI::TextureTransitionInput SrcInput{}, DstInput{};
         SrcInput.AccessMask = VK_ACCESS_SHADER_WRITE_BIT;
@@ -541,7 +523,7 @@ namespace Shadowy {
                 IGFD::FileDialogConfig Config;
                 Config.path = "../../asset";
                 Config.flags = ImGuiFileDialogFlags_Modal;
-                ImGuiFileDialog::Instance()->OpenDialog("ChooseObj", "Choose File",
+                ImGuiFileDialog::Instance()->OpenDialog("ChooseScene", "Choose File",
                                                         ".glb, .gltf, .fbx, .obj", Config);
             }
             if (ImGui::Button("Open Sky Texture")) {
@@ -819,7 +801,8 @@ namespace Shadowy {
         VkPushConstantRange RenderOptionRange{};
         RenderOptionRange.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR |
                                        VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
-                                       VK_SHADER_STAGE_MISS_BIT_KHR;
+                                       VK_SHADER_STAGE_MISS_BIT_KHR |
+                                       VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
         RenderOptionRange.offset = 0;
         RenderOptionRange.size = sizeof(PathTracingOptions);
 
@@ -838,13 +821,14 @@ namespace Shadowy {
     }
 
     void VulkanRayTracingApp::CreateRTPipeline() {
-        HLSLCompiler::CompileShader("RayTracing/RayGen.hlsl", "main", ShaderType::RayGen,
-                                    "RayTracing/RayGen");
-        HLSLCompiler::CompileShader("RayTracing/Miss.hlsl", "main", ShaderType::Miss,
-                                    "RayTracing/Miss");
+        HLSLCompiler::CompileShader("RayTracing/RayGen.hlsl", "main",
+                                    ShaderType::RayGen, "RayTracing/RayGen");
+        HLSLCompiler::CompileShader("RayTracing/Miss.hlsl", "main",
+                                    ShaderType::Miss, "RayTracing/Miss");
         HLSLCompiler::CompileShader("RayTracing/ClosestHit.hlsl", "main",
-                                    ShaderType::ClosestHit,
-                                    "RayTracing/ClosestHit");
+                                    ShaderType::ClosestHit, "RayTracing/ClosestHit");
+        HLSLCompiler::CompileShader("RayTracing/AnyHit.hlsl", "main",
+                                    ShaderType::AnyHit, "RayTracing/AnyHit");
 
         // Create Shader Modules
         ShaderBase RayGenShader(ShaderType::RayGen, "../../shader/HLSL/RayTracing/RayGen.spv",
@@ -853,46 +837,57 @@ namespace Shadowy {
                               "main");
         ShaderBase ClosestHitShader(ShaderType::ClosestHit,
                                     "../../shader/HLSL/RayTracing/ClosestHit.spv", "main");
+        ShaderBase AnyHitShader(ShaderType::AnyHit,
+                                "../../shader/HLSL/RayTracing/AnyHit.spv", "main");
 
-        std::array<VkPipelineShaderStageCreateInfo, 3> ShaderStages{};
+        std::array<VkPipelineShaderStageCreateInfo, 4> ShaderStages{};
         VkPipelineShaderStageCreateInfo ShaderStage{};
         ShaderStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         ShaderStage.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
         ShaderStage.module = RayGenShader.GetHandle();
         ShaderStage.pName = RayGenShader.GetEntryName();
         ShaderStages[RayGen] = ShaderStage;
+
         ShaderStage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
         ShaderStage.module = MissShader.GetHandle();
         ShaderStage.pName = MissShader.GetEntryName();
         ShaderStages[Miss] = ShaderStage;
+
         ShaderStage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
         ShaderStage.module = ClosestHitShader.GetHandle();
         ShaderStage.pName = ClosestHitShader.GetEntryName();
         ShaderStages[ClosestHit] = ShaderStage;
 
+        ShaderStage.stage = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+        ShaderStage.module = AnyHitShader.GetHandle();
+        ShaderStage.pName = AnyHitShader.GetEntryName();
+        ShaderStages[AnyHit] = ShaderStage;
+
         // Create Shader Group
-        VkRayTracingShaderGroupCreateInfoKHR ShaderGroupCreateInfo{};
-        ShaderGroupCreateInfo.sType =
-                VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-        ShaderGroupCreateInfo.generalShader = VK_SHADER_UNUSED_KHR;
+        VkRayTracingShaderGroupCreateInfoKHR ShaderGroupCreateInfo{VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR};
+
+        ShaderGroupCreateInfo.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
         ShaderGroupCreateInfo.anyHitShader = VK_SHADER_UNUSED_KHR;
         ShaderGroupCreateInfo.closestHitShader = VK_SHADER_UNUSED_KHR;
         ShaderGroupCreateInfo.intersectionShader = VK_SHADER_UNUSED_KHR;
-
-        ShaderGroupCreateInfo.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
         ShaderGroupCreateInfo.generalShader = RayGen;
         m_RTShaderGroups.push_back(ShaderGroupCreateInfo);
 
         ShaderGroupCreateInfo.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+        ShaderGroupCreateInfo.anyHitShader = VK_SHADER_UNUSED_KHR;
+        ShaderGroupCreateInfo.closestHitShader = VK_SHADER_UNUSED_KHR;
+        ShaderGroupCreateInfo.intersectionShader = VK_SHADER_UNUSED_KHR;
         ShaderGroupCreateInfo.generalShader = Miss;
         m_RTShaderGroups.push_back(ShaderGroupCreateInfo);
 
         ShaderGroupCreateInfo.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
-        ShaderGroupCreateInfo.generalShader = ClosestHit;
+        ShaderGroupCreateInfo.generalShader = VK_SHADER_UNUSED_KHR;
+        ShaderGroupCreateInfo.intersectionShader = VK_SHADER_UNUSED_KHR;
+        ShaderGroupCreateInfo.anyHitShader = AnyHit;
+        ShaderGroupCreateInfo.closestHitShader = ClosestHit;
         m_RTShaderGroups.push_back(ShaderGroupCreateInfo);
 
-        VkRayTracingPipelineCreateInfoKHR CreateInfo{};
-        CreateInfo.sType = VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR;
+        VkRayTracingPipelineCreateInfoKHR CreateInfo{VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR};
         CreateInfo.stageCount = ShaderStages.size();
         CreateInfo.pStages = ShaderStages.data();
         CreateInfo.groupCount = m_RTShaderGroups.size();
@@ -924,14 +919,14 @@ namespace Shadowy {
 
         m_hitRegion.stride = HandleSizeAligned;
         m_hitRegion.size = Utils::Align(HitCount * HandleSizeAligned,
-                                        m_RTProps.shaderGroupBaseAlignment);
+                                        m_RTProps.shaderGroupBaseAlignment);  // any hit + closest hit
 
         uint DataSize = HandleCount * m_RTProps.shaderGroupHandleSize;
         std::vector<uint8_t> Handles(DataSize);
         auto Func = reinterpret_cast<PFN_vkGetRayTracingShaderGroupHandlesKHR>(
                 vkGetDeviceProcAddr(
                         m_device, "vkGetRayTracingShaderGroupHandlesKHR"));
-        VK_CHECK(Func(m_device, m_RTPipeline, 0, HandleCount, DataSize, Handles.data()));
+        VkResult Result = Func(m_device, m_RTPipeline, 0, HandleCount, DataSize, Handles.data());
 
         VkDeviceSize SBTSize = m_rayGenRegion.size + m_missRegion.size + m_hitRegion.size;
         m_RTSBTBuffer = new ArbitraryBuffer(SBTSize,
@@ -963,12 +958,13 @@ namespace Shadowy {
                    m_RTProps.shaderGroupHandleSize);
             pData += m_missRegion.stride;
         }
-        for (int i = 0; i < HitCount; i++) {
+        for (int i = 0; i < MissCount; i++) {
             memcpy(reinterpret_cast<void *>(pData),
                    Handles.data() + HandleIndex++ * m_RTProps.shaderGroupHandleSize,
                    m_RTProps.shaderGroupHandleSize);
             pData += m_hitRegion.stride;
         }
+
         vkUnmapMemory(m_device, m_RTSBTBuffer->GetMemoryHandle());
     }
 
@@ -978,13 +974,14 @@ namespace Shadowy {
         // TODO: Choose a default sky texture
         m_RTScene->CreateSkyTexture("../../asset/env/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
 
-        // m_RTScene->AddModel("../../asset/bistro/BistroInterior.fbx");
-        // m_RTScene->AddModel("../../asset/bistro/BistroExterior.fbx");
+         m_RTScene->AddModel("../../asset/bistro/BistroInterior.fbx");
+//         m_RTScene->AddModel("../../asset/bistro/BistroExterior.gltf");
         // m_RTScene->AddModel("../../asset/nezha.gltf");
-        m_RTScene->AddModel("../../asset/cornell_box_glossy/cornell_box.gltf");
+//        m_RTScene->AddModel("../../asset/cornell_box/cornell_box.gltf");
+//         m_RTScene->AddModel("../../asset/cornell_box_glossy/cornell_box.gltf");
         // m_RTScene->AddModel("../../asset/catedral-de-chihuahua/source/Catedral_Chihuahua_FINAL.fbx");
-        // m_RTScene->AddModel("../../asset/sponza_fbx/sponza.fbx");
-        // m_RTScene->AddModel("../../asset/test_material/test_material.glb");
+//         m_RTScene->AddModel("../../asset/sponza_fbx/sponza.fbx");
+//         m_RTScene->AddModel("../../asset/test_material/test_material.glb");
 
 //        m_RTScene->AddModel("../../asset/dragon/Dragon_Baked_Actions.obj");
 //        m_RTScene->AddModel("../../asset/house_with_tree/house_with_tree.obj");
@@ -998,7 +995,7 @@ namespace Shadowy {
                 0.f,
                 glm::vec3(1.f, 1.f, 1.f),
                 3.f,
-                0.035f,
+                0.01f,
                 0.f,
                 0.f
         );
@@ -1089,9 +1086,11 @@ namespace Shadowy {
             return;
         }
 
+        vkDeviceWaitIdle(m_device);
+
         m_currentViewportImageSize = m_viewportSize;
         m_currentDelayFrames = s_numFramesToDelay;
-        vkDeviceWaitIdle(m_device);
+
         for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
             ImGui_ImplVulkan_RemoveTexture(m_viewportImageDescriptorSets[i]);
         }

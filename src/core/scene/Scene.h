@@ -24,41 +24,12 @@ namespace Shadowy {
 
         ~Scene();
 
-        // void AddModel(ObjModel *ModelPtr) {
-        //     std::shared_ptr<ObjModel> SharedModel(ModelPtr);
-        //     AddModel(SharedModel);
-        // }
-        //
-        // template<typename... Args>
-        // void AddModel(const std::string &ModelName, Args &&... Args_) {
-        //     auto SharedModel = std::make_shared<ObjModel>(Args_...);
-        //     SharedModel->SetModelName(ModelName);
-        //     AddModel(SharedModel);
-        // }
-        //
-        // template<typename... Args>
-        // void AddModel(Args &&... Args_) {
-        //     auto SharedModel = std::make_shared<ObjModel>(Args_...);
-        //     AddModel(SharedModel);
-        // }
-        //
-        // void AddModel(std::shared_ptr<ObjModel> &SharedModel) {
-        //     SharedModel->SetInstanceID(s_instanceIDCounter++);
-        //     // NOTE: Set Global Texture Offset for each ModelDesc
-        //     SharedModel->SetModelDescTextureOffset(static_cast<int>(m_sceneModelTextures.size()));
-        //     CreateModelTextures(SharedModel->GetModelTexturePaths());
-        //
-        //     m_models.emplace_back(SharedModel);
-        //     m_modelDescs.emplace_back(SharedModel->GetModelDesc());
-        // }
-
         void AddModel(const std::filesystem::path& Path) {
             auto SharedModel = std::make_shared<Model>(Path);
 
             for (auto& Mesh : SharedModel->m_meshes)
             {
-                Mesh->m_meshDesc.TextureIndexOffset = 0;  // Deprecated, Set to 0
-                m_modelDescs.emplace_back(Mesh->m_meshDesc);
+                m_instanceData.emplace_back(Mesh->m_meshDesc);
             }
             auto ModelLights = SharedModel->ProcessLight();
             m_sceneLights.insert(m_sceneLights.end(), ModelLights.begin(), ModelLights.end());
@@ -149,7 +120,7 @@ namespace Shadowy {
     private:
         std::shared_ptr<ASBuilder> m_accelBuilder;
         std::vector<std::shared_ptr<Model>> m_models;
-        std::vector<ModelDesc> m_modelDescs;
+        std::vector<InstanceData> m_instanceData;
         std::shared_ptr<ArbitraryBuffer> m_sceneModelDescBuffer;
         std::shared_ptr<TextureManager> m_textureManager;
 
@@ -162,7 +133,7 @@ namespace Shadowy {
         std::shared_ptr<Texture2D> m_skyTexture;
 
         Light m_dummyLight;
-        ModelDesc m_dummyDesc;
+        InstanceData m_dummyData;
         // Used when m_models.empty()
         std::shared_ptr<ArbitraryBuffer> m_sceneModelDescDummyBuffer;
         // Used when m_sceneLights.empty()

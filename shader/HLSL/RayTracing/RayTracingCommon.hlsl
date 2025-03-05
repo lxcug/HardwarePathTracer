@@ -3,7 +3,7 @@
 #include "Random.hlsl"
 #include "Payload.hlsl"
 #include "../../../src/host_device_shared/Vertex.h"
-#include "../../../src/host_device_shared/Material.h"
+#include "../../../src/host_device_shared/ShadowyMaterial.h"
 #include "../../../src/host_device_shared/RenderOptions.h"
 #include "../../../src/host_device_shared/ReSTIRCommon.h"
 #include "../../../src/host_device_shared/ViewUniformBuffer.h"

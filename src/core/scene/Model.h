@@ -12,9 +12,9 @@
 #include <filesystem>
 #include <vector>
 #include "core/acceleration_structure/AccelerationStructure.h"
-#include "host_device_shared/Material.h"
 #include "assimp/scene.h"
 #include "assimp/Importer.hpp"
+#include "host_device_shared/ShadowyMaterial.h"
 
 
 namespace Shadowy {
@@ -28,7 +28,6 @@ namespace Shadowy {
         {
             delete m_vertexBuffer;
             delete m_indexBuffer;
-            delete m_materialIndexBuffer;
         }
 
         void Init(aiMesh* AIMesh, const aiScene* Scene, const glm::mat4& Transform);
@@ -44,9 +43,8 @@ namespace Shadowy {
 
         IndexBuffer *m_indexBuffer = nullptr;
         VertexBuffer *m_vertexBuffer = nullptr;
-        ArbitraryBuffer *m_materialIndexBuffer = nullptr;  // Store Local Material Index for this Mesh
 
-        ModelDesc m_meshDesc{};
+        InstanceData m_meshDesc{};
         std::string m_name;
     };
 
@@ -68,7 +66,9 @@ namespace Shadowy {
 
         void ProcessNode(aiNode* Node, const aiScene* Scene, const glm::mat4& ParentTransform);
 
-        auto ProcessMaterial(aiMaterial* AIMaterial, const aiScene* Scene) -> Material;
+//        auto ProcessMaterial(aiMaterial* AIMaterial) -> Material;
+
+        auto ProcessMaterial(aiMaterial* AIMaterial) -> InputMaterial;
 
         [[nodiscard]] auto
         GetTLASBuildInput(const ASBuilder *AccelBuilder) const -> VkAccelerationStructureInstanceKHR;
@@ -80,7 +80,7 @@ namespace Shadowy {
         glm::mat4 m_transform = glm::identity<glm::mat4>();
         std::filesystem::path m_path;
         std::vector<Mesh*> m_meshes;
-        std::vector<Material> m_materials;
+        std::vector<InputMaterial> m_materials;
         ArbitraryBuffer *m_materialBuffer = nullptr;  // Store All Materials for Meshes
 
         Assimp::Importer Importer;
@@ -96,97 +96,26 @@ namespace Shadowy {
         static auto AIColorToGlm(const aiColor3D& Color) -> glm::vec3;
 
         static auto AILightTypeToShadowy(aiLightSourceType Type) -> LightType;
-    };
 
-    // class ObjModel {
-    // public:
-    //     explicit ObjModel(const std::filesystem::path &ModelPath);
-    //
-    //     ~ObjModel();
-    //
-    //     void LoadModel(const std::filesystem::path &ModelPath);
-    //
-    //     void Bind(VkCommandBuffer CommandBuffer);
-    //
-    //     [[nodiscard]] auto GetVertexCount() const -> uint {
-    //         return m_vertexBuffer->GetVertexCount();
-    //     }
-    //
-    //     [[nodiscard]] auto GetIndexCount() const -> uint {
-    //         return m_indexBuffer->GetIndexCount();
-    //     }
-    //
-    //     auto GetVertexBuffer() -> VertexBuffer * {
-    //         return m_vertexBuffer;
-    //     }
-    //
-    //     auto GetIndexBuffer() -> IndexBuffer * {
-    //         return m_indexBuffer;
-    //     }
-    //
-    //     auto GetVertexBufferLayout() -> VertexBufferLayout * {
-    //         return m_vertexBuffer->GetLayout();
-    //     }
-    //
-    //     void DrawIndexed(VkCommandBuffer CommandBuffer);
-    //
-    //     [[nodiscard]] auto GetBLASBuildInput() const -> BLASBuildInput;
-    //
-    //     [[nodiscard]] auto
-    //     GetTLASBuildInput(const ASBuilder *AccelBuilder) const -> VkAccelerationStructureInstanceKHR;
-    //
-    //     void SetModelTransform(const glm::mat4 &ModelTransform) {
-    //         m_transform = ModelTransform;
-    //     }
-    //
-    //     auto GetModelTransform() -> const glm::mat4 & {
-    //         return m_transform;
-    //     }
-    //
-    //     void SetInstanceID(uint InstanceID) {
-    //         m_instanceID = InstanceID;
-    //     }
-    //
-    //     [[nodiscard]] auto GetInstanceID() const -> uint {
-    //         return m_instanceID;
-    //     }
-    //
-    //     void SetModelName(const std::string &Name) {
-    //         m_modelName = Name;
-    //     }
-    //
-    //     [[nodiscard]] auto GetModelName() -> const std::string & {
-    //         return m_modelName;
-    //     }
-    //
-    //     [[nodiscard]] auto GetModelDesc() const -> const ModelDesc & {
-    //         return m_modelDesc;
-    //     }
-    //
-    //     void SetModelDescTextureOffset(int Offset) {
-    //         m_modelDesc.TextureIndexOffset = Offset;
-    //     }
-    //
-    //     [[nodiscard]] auto GetModelTexturePaths() const -> const std::vector<std::string> & {
-    //         return m_textureNames;
-    //     }
-    //
-    // private:
-    //     std::string m_modelName = "Empty";
-    //     glm::mat4 m_transform = glm::identity<glm::mat4>();
-    //     uint m_instanceID = 0;
-    //
-    //     std::vector<std::string> m_textureNames;
-    //     std::vector<Material> m_materials;
-    //     std::vector<int> m_materialIndex;
-    //
-    //     IndexBuffer *m_indexBuffer = nullptr;
-    //     VertexBuffer *m_vertexBuffer = nullptr;
-    //     ArbitraryBuffer *m_materialBuffer = nullptr;
-    //     ArbitraryBuffer *m_materialIndexBuffer = nullptr;
-    //
-    //     ModelDesc m_modelDesc;
-    // };
+        static void GetAIMaterialColor(aiMaterial* AIMaterial,
+                                       const char* pKey, unsigned int Type, unsigned int Idx,
+                                       glm::vec3& Value);
+
+        static void GetAIMaterialFloat(aiMaterial* AIMaterial,
+                                       const char* pKey, unsigned int Type, unsigned int Idx,
+                                       float& Value);
+
+        static void GetAIMaterialInt(aiMaterial* AIMaterial,
+                                     const char* pKey, unsigned int Type, unsigned int Idx,
+                                     int& Value);
+
+        static auto GetAIMaterialString(aiMaterial* AIMaterial,
+                                        const char* pKey, unsigned int Type, unsigned int Idx)
+                                        -> std::tuple<bool, std::string>;
+
+        static auto GetAIMaterialTexturePath(aiMaterial* AIMaterial, aiTextureType Type,
+                                             uint Index) -> std::tuple<bool, std::string>;
+    };
 
 }  // namespace Shadowy
 

@@ -1,5 +1,4 @@
 #include "GBufferCommon.hlsl"
-#include "../../../../src/host_device_shared/Material.h"
 
 
 [shader("raygeneration")]
@@ -27,7 +26,7 @@ void main()
 
     if (payload.hit_t > 0.f) {
         GBuffer[0][index] = float4(payload.albedo, payload.metallic);
-        GBuffer[1][index] = float4(payload.normal * .5f + .5f, payload.roughness);
+        GBuffer[1][index] = float4(payload.normal, payload.roughness);
         GBuffer[2][index] = float4(payload.pos, 1.f);
         SceneDepth[index] = length(payload.pos - view_uniform_buffer.CameraPos);
         MotionVector[index] = float2(0.f, 0.f);
@@ -43,5 +42,5 @@ void main()
         Translucency[index] = float4(0.f, 0.f, 0.f, 0.f);
     }
 
-    // SceneColor[index] = float4(GBuffer[1][index]);
+    //SceneColor[index] = float4(GBuffer[0][index]);
 }

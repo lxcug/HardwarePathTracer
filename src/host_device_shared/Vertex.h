@@ -19,13 +19,13 @@ struct Vertex
 {
     float3 Pos;
     uint PosPadding;
-    float3 Normal;
+    float3 Normal;  // TODO: Compress
     uint NormalPadding;
     float3 Color;
     uint ColorPadding;
     float2 TexCoord;
     float2 TexCoordPadding;
-    float4 Tangent;  // w for handedness
+    float4 Tangent;  // w for handedness TODO: as float3
 
 
 #if IS_COMPILING_CPP

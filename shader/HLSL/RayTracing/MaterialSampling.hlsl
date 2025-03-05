@@ -5,7 +5,7 @@
 
 
 #define DIFFUSE_ONLY 0
-#define ENABLE_TRANSMISSION 1
+#define ENABLE_TRANSMISSION 0
 
 
 struct MaterialSample {
@@ -48,7 +48,7 @@ MaterialSample SampleSpecularTransmission(in float3 V, in RayPayload payload, in
 	mat_sample.weight = 0.f;
     mat_sample.pdf = 0.f;
 
-    float eta = payload.is_front_face ? 1.f / 2.f : 2.f / 1.f;
+    float eta = payload.is_front_face ? 1.f / payload.ior : payload.ior / 1.f;
     float3 normal = payload.is_front_face ? payload.normal : -payload.normal;
     float3 reflect_dir = reflect(-V, normal);
     float CosTheta = dot(V, normal);
@@ -157,7 +157,7 @@ MaterialSample SampleGlossyDiffuseTransmission(in float3 V, in RayPayload payloa
     mat_sample.pdf = 0.f;
     float roughness = payload.roughness, metallic = payload.metallic;
 
-    float eta = payload.is_front_face ? 1.f / 2.f : 2.f / 1.f;  // TODO: Get IOR
+    float eta = payload.is_front_face ? 1.f / payload.ior : payload.ior / 1.f;  // TODO: Get IOR
 
     float3 transmittance = (1.f).xxx;
     float4 sample = SampleGGXNormal(rnd.xy, V, payload.normal, roughness);

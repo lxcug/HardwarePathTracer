@@ -3,7 +3,7 @@
 #include "../../../../src/host_device_shared/ViewUniformBuffer.h"
 #include "../Random.hlsl"
 #include "../../../../src/host_device_shared/Vertex.h"
-#include "../../../../src/host_device_shared/Material.h"
+#include "../../../../src/host_device_shared/ShadowyMaterial.h"
 
 struct GBufferHitAttribute
 {

@@ -188,6 +188,7 @@ namespace Shadowy {
         if (ImGui::CollapsingHeader(FolderName.c_str())) {
             if (Light.Type == LightType::Directional) {
                 ImGui::Text("Type: Directional");
+                float indent = ImGui::GetCursorPos().x;
                 UILayer::DrawFloat3Control("Direction", Light.Direction, 1.f,
                                            ValueChangedSignal);
                 UILayer::DrawFloat3Control("Color", Light.Color, 1.f, ValueChangedSignal,
