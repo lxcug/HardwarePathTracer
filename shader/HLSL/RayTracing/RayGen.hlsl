@@ -4,7 +4,7 @@
 #include "../../../src/host_device_shared/RenderOptions.h"
 #include "BRDF.hlsl"
 #include "TraceUtils.hlsl"
-#include "PathTracing.hlsl"
+#include "ShadowyPathTracing.hlsl"
 
 
 [shader("raygeneration")]
@@ -23,12 +23,12 @@ void main()
     float4 target_view_space = mul(view_uniform_buffer.InvProj, float4(screen_coord, 1.f, 1.f));
     float3 dir = mul(view_uniform_buffer.InvView, float4(normalize(target_view_space.xyz), 0.f)).xyz;
 
-    PathTracingPayload payload;
-    PathTracingKernel(origin, dir, seed, payload);
+    PathTracingReturn pt_ret;
+    PathTracing(origin, dir, seed, pt_ret);
 
-    if (payload.is_hit() || payload.hit_sky) {
-        DiffuseHitDis[index] = float4(payload.diffuse_radiance, payload.hit_t);
-        SpecularHitDis[index] = float4(payload.diffuse_radiance, payload.hit_t);
+    if (pt_ret.is_hit() || pt_ret.hit_sky) {
+        DiffuseHitDis[index] = float4(pt_ret.radiance, pt_ret.hit_t);
+        SpecularHitDis[index] = float4(pt_ret.radiance, pt_ret.hit_t);
     } else {
         DiffuseHitDis[index] = float4(0.f, 0.f, 0.f, 0.f);
         SpecularHitDis[index] = float4(0.f, 0.f, 0.f, 0.f);

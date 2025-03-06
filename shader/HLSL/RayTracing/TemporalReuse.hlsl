@@ -41,7 +41,7 @@ void TemporalReuse(uint3 GlobalThreadID : SV_DispatchThreadID) {
     RayPayload restir_sample_payload;
     restir_sample_payload.roughness = temporal_reservoir.y.vis_point_roughness;
     restir_sample_payload.metallic = temporal_reservoir.y.vis_point_metallic;
-    restir_sample_payload.albedo = temporal_reservoir.y.vis_point_albedo;
+    restir_sample_payload.base_color = temporal_reservoir.y.vis_point_albedo;
     restir_sample_payload.normal = temporal_reservoir.y.vis_point_normal;
     MaterialEval sample_point_mat = EvalMaterial(-temporal_reservoir.y.primary_dir, temporal_reservoir.y.second_dir, restir_sample_payload);
 

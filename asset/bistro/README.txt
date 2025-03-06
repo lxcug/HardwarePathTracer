@@ -2,7 +2,7 @@ Amazon Lumberyard Bistro
 
 Originally revealed at the 2017 Game Developer Conference.
 
-All scenes contain emissive surfaces for raytracing and analytic lighting for raster. If raytracing, analytic lighting will need to be disabled.
+All scenes contain emission surfaces for raytracing and analytic lighting for raster. If raytracing, analytic lighting will need to be disabled.
 
 BistroExterior can also become a night scene when rendered without analytical lighting or environment map.
 

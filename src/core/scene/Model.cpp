@@ -29,7 +29,7 @@ namespace Shadowy {
         m_meshDesc.MaterialIndex = AIMesh->mMaterialIndex;
 
         m_transform = Transform;
-
+        glm::mat4 NormalMatrix = glm::inverse(glm::transpose(Transform));
         m_name = AIMesh->mName.data;
 
         // Process Vertices
@@ -41,8 +41,9 @@ namespace Shadowy {
             Vertex_.Pos = {
                 AIMesh->mVertices[i].x, AIMesh->mVertices[i].y, AIMesh->mVertices[i].z
             };
+            Check(AIMesh->HasNormals());
             Vertex_.Normal = {
-                AIMesh->mNormals[i].x, AIMesh->mNormals[i].y, AIMesh->mNormals[i].z
+                    AIMesh->mNormals[i].x, AIMesh->mNormals[i].y, AIMesh->mNormals[i].z
             };
             if (AIMesh->HasTangentsAndBitangents())
             {
@@ -87,7 +88,8 @@ namespace Shadowy {
             {VertexAttributeDataType::Float3, "Pos"},
             {VertexAttributeDataType::Float3, "Normal"},
             {VertexAttributeDataType::Float3, "Color"},
-            {VertexAttributeDataType::Float2, "TexCoord"}
+            {VertexAttributeDataType::Float2, "TexCoord"},
+            {VertexAttributeDataType::Float4, "Tangent"}
         });
         m_indexBuffer = new IndexBuffer(
             Indices.size(),
@@ -161,7 +163,7 @@ namespace Shadowy {
     {
         m_aiScene = Importer.ReadFile(
             ModelPath.string(),
-            aiProcess_Triangulate  | aiProcess_GenNormals | aiProcess_FlipUVs
+            aiProcess_Triangulate | aiProcess_GenNormals | aiProcess_FlipUVs
             | aiProcess_GenUVCoords | aiProcess_CalcTangentSpace
         );
 
@@ -191,6 +193,11 @@ namespace Shadowy {
 
     void Model::ProcessNode(aiNode* Node, const aiScene* Scene, const glm::mat4& ParentTransform)
     {
+        std::string NodeName = Node->mName.C_Str();
+        if (NodeName == "Table") {
+            int a = 1;
+            int b = a;
+        }
         glm::mat4 CurrentNodeTransform = ParentTransform * AIMatrix4x4ToGlm(Node->mTransformation);
         for (uint i = 0; i < Node->mNumMeshes; i++)
         {
@@ -327,15 +334,17 @@ namespace Shadowy {
 //        }
 
 //        GetAIMaterialColor(AIMaterial, AI_MATKEY_COLOR_DIFFUSE, Material.albedo);
-        GetAIMaterialColor(AIMaterial, AI_MATKEY_BASE_COLOR, Material.albedo);
-        GetAIMaterialColor(AIMaterial, AI_MATKEY_COLOR_EMISSIVE, Material.emissive);
-        GetAIMaterialColor(AIMaterial, AI_MATKEY_COLOR_TRANSPARENT, Material.transmission);
-        GetAIMaterialColor(AIMaterial, AI_MATKEY_COLOR_SPECULAR, Material.specular);
+        GetAIMaterialColor(AIMaterial, AI_MATKEY_BASE_COLOR, Material.base_color);
+        GetAIMaterialColor(AIMaterial, AI_MATKEY_COLOR_EMISSIVE, Material.emission);
+        GetAIMaterialFloat(AIMaterial, AI_MATKEY_TRANSMISSION_FACTOR, Material.transmission);
         GetAIMaterialFloat(AIMaterial, AI_MATKEY_ROUGHNESS_FACTOR, Material.roughness);
         GetAIMaterialFloat(AIMaterial, AI_MATKEY_METALLIC_FACTOR, Material.metallic);
         GetAIMaterialFloat(AIMaterial, AI_MATKEY_OPACITY, Material.opacity);
         GetAIMaterialFloat(AIMaterial, AI_MATKEY_REFRACTI, Material.ior);
         GetAIMaterialInt(AIMaterial, AI_MATKEY_TWOSIDED, Material.two_sided);
+
+        GetAIMaterialFloat(AIMaterial, AI_MATKEY_SPECULAR_FACTOR, Material.specular);
+//        GetAIMaterialFloat(AIMaterial, AI_MATKEY_COLOR_SPECULAR, Material.specular_tint);  // TODO: Load specular tint
 
         // Process Alpha Mode
         auto [Exist, AlphaString] = GetAIMaterialString(AIMaterial, AI_MATKEY_GLTF_ALPHAMODE);
@@ -344,7 +353,7 @@ namespace Shadowy {
                 Material.alpha_mode = ALPHA_MODE_OPAQUE;
             } else if (AlphaString == "Mask") {
                 GetAIMaterialFloat(AIMaterial, AI_MATKEY_GLTF_ALPHACUTOFF, Material.alpha_cutoff);
-                Material.alpha_mode = ALPHA_MODE_TRANSPARENT;
+                Material.alpha_mode = ALPHA_MODE_MASK;
             } else if (AlphaString == "Blend") {
                 Material.alpha_mode = ALPHA_MODE_TRANSPARENT;
             }
@@ -356,17 +365,16 @@ namespace Shadowy {
         auto Ret = GetAIMaterialTexturePath(AIMaterial, aiTextureType_NORMALS, 0);
         if (std::get<0>(Ret)) {
             std::string& SubPath = std::get<1>(Ret);
-            std::filesystem::path Path = std::get<1>(Ret);
             const aiTexture* TextureData = m_aiScene->GetEmbeddedTexture(SubPath.c_str());
             if (TextureData) {
-                auto [TexturePtr, Index] = RTScene->CreateOrRetrieveTexture(TextureData);
+                auto [TexturePtr, Index] = RTScene->CreateOrRetrieveTexture(TextureData, false);
                 Material.normal_tex_id = Index;
             } else {
+                std::filesystem::path Path = std::get<1>(Ret);
                 std::string FullPath = m_path.string() + '/' + SubPath;
-                auto [TexturePtr, Index] = RTScene->CreateOrRetrieveTexture(FullPath);
+                auto [TexturePtr, Index] = RTScene->CreateOrRetrieveTexture(FullPath, false);
                 Material.normal_tex_id = Index;
             }
-            Material.is_dds_normal_tex = Path.extension() == ".dds";
         }
 
         Ret = GetAIMaterialTexturePath(AIMaterial, aiTextureType_BASE_COLOR, 0);
@@ -377,13 +385,13 @@ namespace Shadowy {
             std::string& SubPath = std::get<1>(Ret);
             const aiTexture* TextureData = m_aiScene->GetEmbeddedTexture(SubPath.c_str());
             if (TextureData) {
-                auto [TexturePtr, Index] = RTScene->CreateOrRetrieveTexture(TextureData);
-                Material.albedo_tex_id = Index;
+                auto [TexturePtr, Index] = RTScene->CreateOrRetrieveTexture(TextureData, true);
+                Material.base_color_tex_id = Index;
             } else {
                 std::filesystem::path Path = std::get<1>(Ret);
                 std::string FullPath = m_path.string() + '/' + SubPath;
-                auto [TexturePtr, Index] = RTScene->CreateOrRetrieveTexture(FullPath);
-                Material.albedo_tex_id = Index;
+                auto [TexturePtr, Index] = RTScene->CreateOrRetrieveTexture(FullPath, true);
+                Material.base_color_tex_id = Index;
             }
         }
 
@@ -395,12 +403,12 @@ namespace Shadowy {
             std::string& SubPath = std::get<1>(Ret);
             const aiTexture* TextureData = m_aiScene->GetEmbeddedTexture(SubPath.c_str());
             if (TextureData) {
-                auto [TexturePtr, Index] = RTScene->CreateOrRetrieveTexture(TextureData);
+                auto [TexturePtr, Index] = RTScene->CreateOrRetrieveTexture(TextureData, false);
                 Material.specular_tex_id = Index;
             } else {
                 std::filesystem::path Path = std::get<1>(Ret);
                 std::string FullPath = m_path.string() + '/' + SubPath;
-                auto [TexturePtr, Index] = RTScene->CreateOrRetrieveTexture(FullPath);
+                auto [TexturePtr, Index] = RTScene->CreateOrRetrieveTexture(FullPath, false);
                 Material.specular_tex_id = Index;
             }
         }
@@ -450,12 +458,18 @@ namespace Shadowy {
     auto Model::GetAIMaterialTexturePath(aiMaterial *AIMaterial, aiTextureType Type,
                                          uint Index) -> std::tuple<bool, std::string> {
         aiString Temp;
+        aiTextureMapping Mapping;
+        uint UVIndex;
+        ai_real Blend;
+        aiTextureOp Op;
+        aiTextureMapMode MapMode;
         aiReturn Ret = AIMaterial->GetTexture(Type, Index, &Temp);
         std::string String;
         bool Exist = Ret == aiReturn_SUCCESS;
         if (Exist) {
             String = Temp.C_Str();
         }
+
         return {Exist, String};
     }
 

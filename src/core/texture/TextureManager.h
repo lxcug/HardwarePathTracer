@@ -21,9 +21,9 @@ namespace Shadowy {
     public:
         ~TextureManager() = default;
 
-        auto CreateOrRetrieveTexture(const std::filesystem::path& Path) -> const std::tuple<Texture2D*, uint>&;
+        auto CreateOrRetrieveTexture(const std::filesystem::path& Path, bool IsSRGB) -> const std::tuple<Texture2D*, uint>&;
 
-        auto CreateOrRetrieveTexture(const aiTexture* AITexture) -> const std::tuple<Texture2D*, uint>&;
+        auto CreateOrRetrieveTexture(const aiTexture* AITexture, bool IsSRGB) -> const std::tuple<Texture2D*, uint>&;
 
         [[nodiscard]] auto IsTextureExist(const std::filesystem::path& Path) const -> bool
         {

@@ -18,7 +18,7 @@ struct GBufferPayload
     float3 normal;
     float roughness;
 
-    float3 albedo;
+    float3 base_color;
     float metallic;
 
     float opacity;

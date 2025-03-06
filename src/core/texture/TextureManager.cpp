@@ -9,14 +9,14 @@
 namespace Shadowy {
 
     auto TextureManager::CreateOrRetrieveTexture(
-        const std::filesystem::path& Path) -> const std::tuple<Texture2D*, uint>&
+        const std::filesystem::path& Path, bool IsSRGB) -> const std::tuple<Texture2D*, uint>&
     {
         if (IsTextureExist(Path))
         {
             return m_storedTextures[Path];
         }
 
-        const auto Tex = std::make_shared<Texture2D>(Path);
+        const auto Tex = std::make_shared<Texture2D>(Path, false, IsSRGB);
         m_storedTextures[Path] = {Tex.get(), m_uniqueTextures.size()};
         m_uniqueTextures.push_back(Tex);
 
@@ -24,7 +24,7 @@ namespace Shadowy {
     }
 
     auto TextureManager::CreateOrRetrieveTexture(
-        const aiTexture* AITexture) -> const std::tuple<Texture2D*, uint>&
+        const aiTexture* AITexture, bool IsSRGB) -> const std::tuple<Texture2D*, uint>&
     {
         const std::filesystem::path Path = AITexture->mFilename.C_Str();
         if (IsTextureExist(Path))
@@ -32,7 +32,7 @@ namespace Shadowy {
             return m_storedTextures[Path];
         }
 
-        const auto Tex = std::make_shared<Texture2D>(AITexture);
+        const auto Tex = std::make_shared<Texture2D>(AITexture, false, IsSRGB);
         m_storedTextures[Path] = {Tex.get(), m_uniqueTextures.size()};
         m_uniqueTextures.push_back(Tex);
 

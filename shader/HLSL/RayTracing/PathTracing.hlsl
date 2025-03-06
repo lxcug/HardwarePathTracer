@@ -13,7 +13,7 @@ struct PathTracingPayload {
     float3 diffuse_radiance;
     float3 specular_radiance;
 
-    float3 albedo;
+    float3 base_color;
     float ao;
 
     float3 normal;
@@ -70,14 +70,14 @@ void PathTracingKernel(in float3 origin,
         if (render_options.DeferredTraceMaterial && !b_sample_light) {
             for (int idx = 0; idx < valid_num_trace_light_state; idx++) {
                 TraceMaterialState curr_state = trace_material_state[idx];
-                if ((payload.is_miss() || payload.hit_t >= curr_state.distance) && should_accumulate_radiance_for_deferred_trace_light) {
+                if ((!payload.is_hit() || payload.hit_t >= curr_state.distance) && should_accumulate_radiance_for_deferred_trace_light) {
                     radiance += curr_state.radiance;
                 }
             }
             valid_num_trace_light_state = 0;
         }
 
-        if (payload.is_miss()) {
+        if (!payload.is_hit()) {
             // For Displaying SkyTexture
             if (render_options.EnableSkyLight && is_camera_ray) {
                 pt_payload.hit_sky = true;
@@ -93,7 +93,7 @@ void PathTracingKernel(in float3 origin,
         }
 
         if (include_emissive && should_accumulate_radiance) {
-            radiance += path_throughput * payload.emissive * payload.opacity;
+            radiance += path_throughput * payload.emission * payload.opacity;
         }
 
         float4 random_sample = rnd4(seed);
@@ -216,11 +216,11 @@ void PathTracingKernel(in float3 origin,
 
     /*
      * Remove fireflies
-	 * Show different behavoir for NEE and Sample Material Only.
+	 * Show different behavior for NEE and Sample Material Only.
 	 * Since Sample Material get small radiance for most case(expect only a sky light in the scene),
 	 * when hit light, the radiance will be very big and will be clamped to fire_fly_clamp_threshold,
 	 * the time accumulated radiance value will be small which we don't expect.
-     * When use MIS, the problem will be canneled, since with MIS, each dispatched ray will get a quite
+     * When use MIS, the problem will be cancelled, since with MIS, each dispatched ray will get a quite
      * smooth radiance value(it just like each frame we get quite smooth radiance value, little fireflies),
      * so the time accumulated radiance will quite reasonable.
 	 * Well, if use sample light only, some scenario we hardly sample a good sky light direction, so
@@ -282,8 +282,8 @@ void PathTracingKernelReSTIR(in float3 origin,
         if (render_options.DeferredTraceMaterial && !b_sample_light) {
             for (int idx = 0; idx < valid_num_trace_light_state; idx++) {
                 TraceMaterialState curr_state = trace_material_state[idx];
-                if ((payload.is_miss() || payload.hit_t >= curr_state.distance) && should_accumulate_radiance_for_deferred_trace_light) {
-                    radiance += path_throughput * curr_state.radiance;
+                if ((!payload.is_hit() || payload.hit_t >= curr_state.distance) && should_accumulate_radiance_for_deferred_trace_light) {
+                    radiance += curr_state.radiance;
                     if (bounce >= 2) {
                         second_bounce_radiance += curr_state.radiance * second_bounce_thp;
                     }
@@ -296,7 +296,7 @@ void PathTracingKernelReSTIR(in float3 origin,
             ray_payload = payload;
         }
 
-        if (payload.is_miss()) {
+        if (!payload.is_hit()) {
             // For Displaying SkyTexture
             if (render_options.EnableSkyLight && is_camera_ray) {
                 radiance += path_throughput * SkyTexture.SampleLevel(SkyTextureSampler, uint_vector_to_hdri_uv(-ray.Direction), 0).rgb;
@@ -319,14 +319,14 @@ void PathTracingKernelReSTIR(in float3 origin,
             restir_sample.vis_point_normal = payload.normal;
             restir_sample.vis_point_roughness = payload.roughness;
             restir_sample.vis_point_metallic = payload.metallic;
-            restir_sample.vis_point_albedo = payload.albedo;
+            restir_sample.vis_point_albedo = payload.base_color;
             restir_sample.is_valid_sample = true;
         }
 
         if (include_emissive && should_accumulate_radiance) {
-            radiance += path_throughput * payload.emissive * payload.opacity;
+            radiance += path_throughput * payload.emission * payload.opacity;
             if (bounce >= 1) {
-                second_bounce_radiance += second_bounce_thp * payload.emissive * payload.opacity;
+                second_bounce_radiance += second_bounce_thp * payload.emission * payload.opacity;
             }
         }
 
