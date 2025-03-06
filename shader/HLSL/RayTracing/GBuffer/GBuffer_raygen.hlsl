@@ -25,7 +25,7 @@ void main()
     TraceRay(TLAS, RAY_FLAG_NONE, 0xff, 0, 0, 0, ray, payload);
 
     if (payload.hit_t > 0.f) {
-        GBuffer[0][index] = float4(payload.albedo, payload.metallic);
+        GBuffer[0][index] = float4(payload.base_color, payload.metallic);
         GBuffer[1][index] = float4(payload.normal, payload.roughness);
         GBuffer[2][index] = float4(payload.pos, 1.f);
         SceneDepth[index] = length(payload.pos - view_uniform_buffer.CameraPos);
@@ -42,5 +42,5 @@ void main()
         Translucency[index] = float4(0.f, 0.f, 0.f, 0.f);
     }
 
-    //SceneColor[index] = float4(GBuffer[0][index]);
+    // SceneColor[index] = float4(GBuffer[1][index]);
 }

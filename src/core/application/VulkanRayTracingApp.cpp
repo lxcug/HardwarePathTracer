@@ -200,7 +200,7 @@ namespace Shadowy {
         BeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         VK_CHECK(vkBeginCommandBuffer(CommandBuffer, &BeginInfo));
 
-        m_gbufferPass->Dispatch(CommandBuffer, m_imageIndex);
+//        m_gbufferPass->Dispatch(CommandBuffer, m_imageIndex);
 
         // Dispatch Ray Tracing Pass
         std::array<VkDescriptorSet, 2> BindingDescriptorSets = {
@@ -476,6 +476,7 @@ namespace Shadowy {
             ImGui::Separator();
             ImGui::NewLine();
             ImGui::Text("Path Tracing Options");
+            ShouldReAccumulate |= ImGui::InputInt("DebugMode", &m_pathTracingOptions.DebugMode);
             ShouldReAccumulate |= ImGui::Checkbox("Enable ReSTIRGI",
                                                   reinterpret_cast<bool *>(&m_pathTracingOptions.EnableReSTIRGI));
             // ShouldReAccumulate |= ImGui::Checkbox("Enable SpatialReuse",
@@ -616,7 +617,8 @@ namespace Shadowy {
         ViewUniformBufferBinding.descriptorCount = 1;
         ViewUniformBufferBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         ViewUniformBufferBinding.stageFlags =
-                VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+                VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+                VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
 
         VkDescriptorSetLayoutBinding TLASBinding{};
         TLASBinding.binding = 1;
@@ -974,13 +976,12 @@ namespace Shadowy {
         // TODO: Choose a default sky texture
         m_RTScene->CreateSkyTexture("../../asset/env/kloofendal_48d_partly_cloudy_puresky_4k.hdr");
 
-         m_RTScene->AddModel("../../asset/bistro/BistroInterior.fbx");
+//         m_RTScene->AddModel("../../asset/bistro/BistroInterior.gltf");
 //         m_RTScene->AddModel("../../asset/bistro/BistroExterior.gltf");
-        // m_RTScene->AddModel("../../asset/nezha.gltf");
+//        m_RTScene->AddModel("../../asset/kitchen/kitchen.gltf");
+         m_RTScene->AddModel("../../asset/shader_balls/ShaderBalls.gltf");
 //        m_RTScene->AddModel("../../asset/cornell_box/cornell_box.gltf");
 //         m_RTScene->AddModel("../../asset/cornell_box_glossy/cornell_box.gltf");
-        // m_RTScene->AddModel("../../asset/catedral-de-chihuahua/source/Catedral_Chihuahua_FINAL.fbx");
-//         m_RTScene->AddModel("../../asset/sponza_fbx/sponza.fbx");
 //         m_RTScene->AddModel("../../asset/test_material/test_material.glb");
 
 //        m_RTScene->AddModel("../../asset/dragon/Dragon_Baked_Actions.obj");

@@ -10,6 +10,30 @@
 BEGIN_SHADOWY_NAMESPACE
     struct PathTracingOptions
     {
+#define NO_DEBUG 0
+#define DEBUG_BASE_COLOR 1
+#define DEBUG_NORMAL 2
+#define DEBUG_EMISSION 3
+#define DEBUG_ROUGHNESS 4
+#define DEBUG_METALLIC 5
+#define DEBUG_UV 6
+        /*
+         * 0 for path tracing
+         * 1 for base color
+         * 2 for normal
+         * 3 for roughness
+         * 4 for metallic
+         */
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, DebugMode, NO_DEBUG);
+
+#define MATERIAL_MODE_DISNEY 0
+#define MATERIAL_MODE_PBR 1
+        /*
+         * 0 for disney
+         * 1 for pbr
+         */
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, MaterialMode, MATERIAL_MODE_DISNEY);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, FireFlyThreshold, 4.f);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableAO, 0);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, NumAORays, 4);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, AORayLength, 1.f);

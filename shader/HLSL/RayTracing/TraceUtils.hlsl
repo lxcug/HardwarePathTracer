@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Payload.hlsl"
+#include "GlobalDefs.hlsl"
 #include "../../../src/host_device_shared/Light.h"
 
 #define MAX_SKY_LIGHT_INTENSITY 1e2f
@@ -10,7 +10,7 @@ float TraceVisibilityRay(in RayDesc ray) {
     RayPayload payload;
     TraceRay(TLAS, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xff, 0, 0, 0, ray, payload);
 
-    return !payload.is_hit;
+    return !payload.is_hit();
 }
 
 struct LightHitSample {
@@ -97,7 +97,7 @@ LightHitSample TraceSkyLight(in RayDesc ray, in Light light) {
 
     LightHitSample hit_sample;
     hit_sample.pdf = 1 / (4 * PI);
-    hit_sample.radiance = light.Intensity * min(SkyTexture.SampleLevel(SkyTextureSampler, uint_vector_to_hdri_uv(-ray.Direction), 0).rgb, 1e2f);
+    hit_sample.radiance = light.Intensity * SkyTexture.SampleLevel(SkyTextureSampler, uint_vector_to_hdri_uv(-ray.Direction), 0).rgb;
     hit_sample.hit_t = render_options.MaxTraceDistance;
 
     return hit_sample;

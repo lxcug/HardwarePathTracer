@@ -102,14 +102,14 @@ namespace Shadowy {
 
         static inline uint s_instanceIDCounter = 0; // TODO: dispatch instance index to models
 
-        auto CreateOrRetrieveTexture(const std::filesystem::path& Path) const -> const std::tuple<Texture2D*, uint>&
+        auto CreateOrRetrieveTexture(const std::filesystem::path& Path, bool IsSRGB) const -> const std::tuple<Texture2D*, uint>&
         {
-            return m_textureManager->CreateOrRetrieveTexture(Path);
+            return m_textureManager->CreateOrRetrieveTexture(Path, IsSRGB);
         }
 
-        auto CreateOrRetrieveTexture(const aiTexture* AITexture) -> const std::tuple<Texture2D*, uint>&
+        auto CreateOrRetrieveTexture(const aiTexture* AITexture, bool IsSRGB) -> const std::tuple<Texture2D*, uint>&
         {
-            return m_textureManager->CreateOrRetrieveTexture(AITexture);
+            return m_textureManager->CreateOrRetrieveTexture(AITexture, IsSRGB);
         }
 
         [[nodiscard]] auto IsTextureExist(const std::filesystem::path& Path) const -> bool

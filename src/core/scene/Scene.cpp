@@ -93,7 +93,9 @@ namespace Shadowy {
         InstanceDataBinding.binding = 0;
         InstanceDataBinding.descriptorCount = 1;
         InstanceDataBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        InstanceDataBinding.stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+        InstanceDataBinding.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR |
+                VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+                VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
 
         VkDescriptorSetLayoutBinding TexturesBinding{};
         TexturesBinding.binding = 1;

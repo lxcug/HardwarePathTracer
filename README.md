@@ -47,6 +47,14 @@ Control the scene lights in the UI panel.
 
 
 
+![](imgs/kitchen.png)
+
+
+
+![](imgs/ShaderBalls.png)
+
+
+
 ![](imgs/CornellBoxGallery.png)
 
 

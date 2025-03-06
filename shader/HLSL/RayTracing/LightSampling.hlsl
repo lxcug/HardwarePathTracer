@@ -103,7 +103,7 @@ LightSample SampleSkyLight(in Light light, in float2 rnd, in float3 pos, in floa
     light_sample.direction = sample_value.xyz;
     light_sample.pdf = sample_value.w;
     light_sample.radiance_over_pdf = light.Intensity *
-                                     min(SkyTexture.SampleLevel(SkyTextureSampler, uint_vector_to_hdri_uv(-light_sample.direction), 0).rgb, 1e2f) /
+                                     SkyTexture.SampleLevel(SkyTextureSampler, uint_vector_to_hdri_uv(-light_sample.direction), 0).rgb /
                                      light_sample.pdf;
     light_sample.distance = render_options.MaxTraceDistance;
     return light_sample;

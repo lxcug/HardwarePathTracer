@@ -22,7 +22,7 @@ MaterialSample SampleDiffuseLambert(in float3 V, in RayPayload payload, in float
     float4 sample = CosineSampleHemisphere(rnd.xy, payload.normal);
     mat_sample.direction = sample.xyz;
     mat_sample.pdf = sample.w;
-    mat_sample.weight = payload.albedo;
+    mat_sample.weight = payload.base_color;
 
     return mat_sample;
 }
@@ -31,7 +31,7 @@ MaterialSample SampleSpecular(in float3 V, in RayPayload payload, in float4 rnd)
     MaterialSample mat_sample;
 
     float3 L = reflect(-V, payload.normal);
-    float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.albedo, payload.metallic);
+    float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.base_color, payload.metallic);
     float NoL = max(dot(payload.normal, L), 0.f);
     float3 F = Fresnel_Schlick(dot(V, payload.normal), F0, payload.roughness);
 
@@ -55,7 +55,7 @@ MaterialSample SampleSpecularTransmission(in float3 V, in RayPayload payload, in
     float R = FrDielectric(CosTheta, eta) * payload.opacity;  // Reflection Prob
     float T = 1 - R;  // Transmission Prob
 
-    float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.albedo, metallic);
+    float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.base_color, metallic);
     float3 F = Fresnel_Schlick(CosTheta, F0, roughness);
     float3 transmittance = (1.f).xxx;
     float3 refract_dir = refract(-V, normal, eta);
@@ -87,20 +87,20 @@ MaterialSample SampleSpecularDiffuse(in float3 V, in RayPayload payload, in floa
     float3 L = reflect(-V, payload.normal);
     mat_sample.direction = L;
 
-    float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.albedo, metallic);
+    float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.base_color, metallic);
     float NoL = max(dot(payload.normal, L), 0.f);
 
     float HoV = max(dot(payload.normal, V), 0.f);
     float3 F = Fresnel_Schlick(HoV, F0, roughness);
 
-    float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.albedo);
+    float diffuse_lobe_selected_weight = LobeSelectionProb(payload.base_color, payload.base_color);
 
     float NoV = max(dot(payload.normal, V), 0.f);
     float3 H = normalize(V + L);
     float HoL = max(dot(H, L), 0.f);
 
     float diffuse_pdf = max(NoL / PI, SHADOWY_SMALL_NUMBER);
-    float3 diffuse_weight = Diffuse_Burley_Disney(payload.albedo, F0, roughness, NoV, NoL, HoL) * NoL / diffuse_pdf;
+    float3 diffuse_weight = Diffuse_Burley_Disney(payload.base_color, F0, roughness, NoV, NoL, HoL) * NoL / diffuse_pdf;
 
     float specular_pdf = 1.f;
     float3 specular_weight = F * NoL;
@@ -117,10 +117,10 @@ MaterialSample SampleGlossyDiffuse(in float3 V, in RayPayload payload, in float4
 	mat_sample.pdf = 0.f;
     float roughness = payload.roughness, metallic = payload.metallic;
 
-    float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.albedo, metallic);
+    float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.base_color, metallic);
     float3 F = Fresnel_Schlick(max(dot(payload.normal, V), 0.0), F0, roughness);
 
-    float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.albedo);
+    float diffuse_lobe_selected_weight = LobeSelectionProb(payload.base_color, payload.base_color);
 
     float4 sample;
     if (rnd.w < diffuse_lobe_selected_weight) {
@@ -139,10 +139,10 @@ MaterialSample SampleGlossyDiffuse(in float3 V, in RayPayload payload, in float4
     float HoL = max(dot(H, L), 0.f);
 
     float diffuse_pdf = max(NoL / PI, SHADOWY_SMALL_NUMBER);
-    float3 diffuse_weight = Diffuse_Burley_Disney(payload.albedo, F0, roughness, NoV, NoL, HoL) * NoL / diffuse_pdf;
+    float3 diffuse_weight = Diffuse_Burley_Disney(payload.base_color, F0, roughness, NoV, NoL, HoL) * NoL / diffuse_pdf;
 
     float specular_pdf = BRDF_PDF(V, L, payload.normal, roughness, F0);
-    float3 specular_weight = CookTorranceBRDF(V, L, payload.normal, roughness, metallic, payload.albedo, F0) * NoL / specular_pdf;
+    float3 specular_weight = CookTorranceBRDF(V, L, payload.normal, roughness, metallic, payload.base_color, F0) * NoL / specular_pdf;
 
     float3 Kd = (1 - F) * (1 - metallic);
     AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, Kd * diffuse_weight, diffuse_pdf, diffuse_lobe_selected_weight);
@@ -172,7 +172,7 @@ MaterialSample SampleGlossyDiffuseTransmission(in float3 V, in RayPayload payloa
     if (dot(payload.normal, refract_H) < 0.f)
         oriented_normal = -payload.normal;
 
-    float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.albedo);
+    float diffuse_lobe_selected_weight = LobeSelectionProb(payload.base_color, payload.base_color);
     float4 diffuse_lobe_dir = CosineSampleHemisphere(rnd.xy, payload.normal);
     float4 glossy_lobe_dir = SampleGGXReflection(rnd.xy, V, payload.normal, roughness);
 
@@ -193,14 +193,14 @@ MaterialSample SampleGlossyDiffuseTransmission(in float3 V, in RayPayload payloa
         float HoV = max(dot(H, V), 0.f);
         float NoV = max(dot(payload.normal, V), 0.f);
         float HoL = max(dot(H, L), 0.f);
-        float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.albedo, metallic);
+        float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.base_color, metallic);
         float3 F = Fresnel_Schlick(max(dot(payload.normal, V), 0.0), F0, roughness);
 
         float diffuse_pdf = max(NoL / PI, SHADOWY_SMALL_NUMBER);
-        float3 diffuse_weight = Diffuse_Burley_Disney(payload.albedo, F0, roughness, NoV, NoL, HoL) * NoL / diffuse_pdf;
+        float3 diffuse_weight = Diffuse_Burley_Disney(payload.base_color, F0, roughness, NoV, NoL, HoL) * NoL / diffuse_pdf;
 
         float specular_pdf = BRDF_PDF(V, L, payload.normal, roughness, F0);
-        float3 specular_weight = CookTorranceBRDF(V, L, payload.normal, roughness, metallic, payload.albedo, F0) * NoL / specular_pdf;
+        float3 specular_weight = CookTorranceBRDF(V, L, payload.normal, roughness, metallic, payload.base_color, F0) * NoL / specular_pdf;
 
         float3 Kd = (1 - F) * (1 - metallic);
         AddLobeWithMIS(mat_sample.weight, mat_sample.pdf, Kd * diffuse_weight, diffuse_pdf, diffuse_lobe_selected_weight);
@@ -249,7 +249,7 @@ struct MaterialEval
 MaterialEval EvalDiffuseLambert(in float3 V, in float3 L, in RayPayload payload, inout uint seed) {
     MaterialEval mat_eval;
     float NoL = max(dot(payload.normal, L), 0.f);
-    mat_eval.weight = payload.albedo;
+    mat_eval.weight = payload.base_color;
     mat_eval.pdf = max(NoL / PI, SHADOWY_SMALL_NUMBER);
 
     return mat_eval;
@@ -263,23 +263,23 @@ MaterialEval EvalSpecularDiffuse(in float3 V, in float3 L, in RayPayload payload
 
     float3 H = normalize(V + L);
     if (dot(H, payload.normal) < SHADOWY_SMALL_NUMBER) {
-        float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.albedo, metallic);
+        float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.base_color, metallic);
         float NoL = max(dot(payload.normal, L), 0.f);
 
         float3 H = normalize(V + L);
         float HoV = max(dot(H, V), 0.f);
         float3 F = Fresnel_Schlick(HoV, F0, roughness);
 
-        float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.albedo);
+        float diffuse_lobe_selected_weight = LobeSelectionProb(payload.base_color, payload.base_color);
 
         float NoV = max(dot(payload.normal, V), 0.f);
         float HoL = max(dot(H, L), 0.f);
 
         float diffuse_pdf = max(NoL / PI, SHADOWY_SMALL_NUMBER);
-        float3 diffuse_weight = Diffuse_Burley_Disney(payload.albedo, F0, roughness, NoV, NoL, HoL) * NoL / diffuse_pdf;
+        float3 diffuse_weight = Diffuse_Burley_Disney(payload.base_color, F0, roughness, NoV, NoL, HoL) * NoL / diffuse_pdf;
 
         float specular_pdf = BRDF_PDF(V, L, payload.normal, roughness, F0);
-        float3 specular_weight = CookTorranceBRDF(V, L, payload.normal, roughness, metallic, payload.albedo, F0) * NoL / specular_pdf;
+        float3 specular_weight = CookTorranceBRDF(V, L, payload.normal, roughness, metallic, payload.base_color, F0) * NoL / specular_pdf;
 
         float3 Kd = (1 - F) * (1 - metallic);
         if (dot(L, payload.normal) > 0.f) {
@@ -327,21 +327,21 @@ MaterialEval EvalGlossyDiffuseTransmission(in float3 V, in float3 L, in RayPaylo
         AddLobeWithMIS(mat_eval.weight, mat_eval.pdf, refract_weight, refract_pdf, R);
     }
 
-    float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.albedo);
+    float diffuse_lobe_selected_weight = LobeSelectionProb(payload.base_color, payload.base_color);
 
     float NoL = max(dot(payload.normal, L), 0.f);
     float3 H = normalize(V + L);
     float HoV = max(dot(H, V), 0.f);
     float NoV = max(dot(payload.normal, V), 0.f);
     float HoL = max(dot(H, L), 0.f);
-    float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.albedo, metallic);
+    float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.base_color, metallic);
     float3 F = Fresnel_Schlick(max(dot(payload.normal, V), 0.0), F0, roughness);
 
     float diffuse_pdf = max(NoL / PI, SHADOWY_SMALL_NUMBER);
-    float3 diffuse_weight = Diffuse_Burley_Disney(payload.albedo, F0, roughness, NoV, NoL, HoL) * NoL / diffuse_pdf;
+    float3 diffuse_weight = Diffuse_Burley_Disney(payload.base_color, F0, roughness, NoV, NoL, HoL) * NoL / diffuse_pdf;
 
     float specular_pdf = BRDF_PDF(V, L, payload.normal, roughness, F0);
-    float3 specular_weight = CookTorranceBRDF(V, L, payload.normal, roughness, metallic, payload.albedo, F0) * NoL / specular_pdf;
+    float3 specular_weight = CookTorranceBRDF(V, L, payload.normal, roughness, metallic, payload.base_color, F0) * NoL / specular_pdf;
 
     float3 Kd = (1 - F) * (1 - metallic);
     if (prob < R || dot(L, payload.normal) > 0.f) {
@@ -358,7 +358,7 @@ MaterialEval EvalGlossyDiffuse(in float3 V, in float3 L, in RayPayload payload, 
     mat_eval.pdf = 0.f;
     float roughness = payload.roughness, metallic = payload.metallic;
 
-    float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.albedo, metallic);
+    float3 F0 = lerp(float3(0.04, 0.04, 0.04), payload.base_color, metallic);
     float3 F = Fresnel_Schlick(max(dot(payload.normal, V), 0.0), F0, roughness);
 
     float NoL = max(dot(payload.normal, L), 0.f);
@@ -367,13 +367,13 @@ MaterialEval EvalGlossyDiffuse(in float3 V, in float3 L, in RayPayload payload, 
     float NoV = max(dot(payload.normal, V), 0.f);
     float HoL = max(dot(H, L), 0.f);
 
-    float diffuse_lobe_selected_weight = LobeSelectionProb(payload.albedo, payload.albedo);
+    float diffuse_lobe_selected_weight = LobeSelectionProb(payload.base_color, payload.base_color);
 
     float diffuse_pdf = max(NoL / PI, SHADOWY_SMALL_NUMBER);
-    float3 diffuse_weight = Diffuse_Burley_Disney(payload.albedo, F0, roughness, NoV, NoL, HoL) * NoL / diffuse_pdf;
+    float3 diffuse_weight = Diffuse_Burley_Disney(payload.base_color, F0, roughness, NoV, NoL, HoL) * NoL / diffuse_pdf;
 
     float specular_pdf = BRDF_PDF(V, L, payload.normal, roughness, F0);
-    float3 specular_weight = CookTorranceBRDF(V, L, payload.normal, roughness, metallic, payload.albedo, F0) * NoL / specular_pdf;
+    float3 specular_weight = CookTorranceBRDF(V, L, payload.normal, roughness, metallic, payload.base_color, F0) * NoL / specular_pdf;
 
     float3 Kd = (1 - F) * (1 - metallic);
      if (dot(L, payload.normal) > 0.f) {
@@ -424,7 +424,7 @@ float TargetDistribution(in ReSTIRGISample sample, in float3 V) {
    RayPayload restir_sample_payload;
    restir_sample_payload.roughness = sample.vis_point_roughness;
    restir_sample_payload.metallic = sample.vis_point_metallic;
-   restir_sample_payload.albedo = sample.vis_point_albedo;
+   restir_sample_payload.base_color = sample.vis_point_albedo;
    restir_sample_payload.normal = sample.vis_point_normal;
    uint seed = 1u;
    MaterialEval sample_point_mat = EvalMaterial(V, sample.second_dir, restir_sample_payload, seed);  // TODO: seed

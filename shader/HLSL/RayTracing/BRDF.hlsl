@@ -2,8 +2,8 @@
 
 #include "Utils.hlsl"
 
-float3 diffuse_lambert(float3 albedo) {
-    return albedo * (1 / PI);
+float3 diffuse_lambert(float3 base_color) {
+    return base_color * (1 / PI);
 }
 
 // NOTE: H and N must in same hemisphere
@@ -47,7 +47,7 @@ float3 Fresnel_Schlick(float cosTheta, float3 F0, float Roughness)
     return F0 + (max((1.0 - Roughness).xxx, F0) - F0) * pow(1.0 - cosTheta, 5.0);
 }
 
-float3 CookTorranceBRDF(float3 V, float3 L, float3 N, float roughness, float metallic, float3 albedo, float3 F0)
+float3 CookTorranceBRDF(float3 V, float3 L, float3 N, float roughness, float metallic, float3 base_color, float3 F0)
 {
     float3 H = normalize(V + L);
 

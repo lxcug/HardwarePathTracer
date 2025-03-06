@@ -1,6 +1,6 @@
 #pragma once
 
-#define SHADOWY_SMALL_NUMBER 1e-6
+#define SHADOWY_SMALL_NUMBER (1e-8f)
 
 
 float max(float3 value) {
@@ -42,9 +42,9 @@ float3 UniformSampleHemisphere(in float rnd1, in float rnd2) {
     return dir;
 }
 
-float3 UniformSampleHemisphere(in float2 rnd) {
-    return UniformSampleHemisphere(rnd.x, rnd.y);
-}
+// float3 UniformSampleHemisphere(in float2 rnd) {
+//     return UniformSampleHemisphere(rnd.x, rnd.y);
+// }
 
 void GetCoordBasis(in float3 normal, out float3 tangent, out float3 bitangent) {
     float3 z  = normal;
@@ -68,13 +68,13 @@ float3 UniformSampleHemisphere(in float rnd1, in float rnd2, in float3 normal) {
     return local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * normal;
 }
 
-float4 UniformSampleHemisphere(in float2 rnd, in float3 normal) {
-    float3 local_dir = UniformSampleHemisphere(rnd);
-    float3 tangent, bitangent;
-
-    GetCoordBasis(normal, tangent, bitangent);
-    return float4(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * normal, 1.f / (2.f * PI));
-}
+// float4 UniformSampleHemisphere(in float2 rnd, in float3 normal) {
+//     float3 local_dir = UniformSampleHemisphere(rnd);
+//     float3 tangent, bitangent;
+//
+//     GetCoordBasis(normal, tangent, bitangent);
+//     return float4(local_dir.x * tangent + local_dir.y * bitangent + local_dir.z * normal, 1.f / (2.f * PI));
+// }
 
 float4 CosineSampleHemisphere(in float2 rnd) {
     float phi = 2 * PI * rnd.x;

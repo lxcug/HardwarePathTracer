@@ -116,7 +116,7 @@ void SpatialReuse(uint3 GlobalThreadID : SV_DispatchThreadID) {
         RayPayload restir_sample_payload;
         restir_sample_payload.roughness = reservoir.y.vis_point_roughness;
         restir_sample_payload.metallic = reservoir.y.vis_point_metallic;
-        restir_sample_payload.albedo = reservoir.y.vis_point_albedo;
+        restir_sample_payload.base_color = reservoir.y.vis_point_albedo;
         restir_sample_payload.normal = reservoir.y.vis_point_normal;
         MaterialEval sample_point_mat = EvalMaterial(-reservoir.y.primary_dir, reservoir.y.second_dir, restir_sample_payload);
 
