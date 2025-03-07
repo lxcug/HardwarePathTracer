@@ -54,7 +54,7 @@ float3 NextEventEstimation(
             light_sample.radiance_over_pdf *= TraceVisibilityRay(light_ray);
             ShadowyMaterialEval mat_eval =
                 ShadowyEvalMaterial(state, -ray.Direction, light_sample.direction, state.face_front_normal);
-            light_contrib = light_sample.radiance_over_pdf * mat_eval.bxdf *
+            light_contrib = light_sample.radiance_over_pdf * mat_eval.bsdf *
                 abs(dot(light_sample.direction, state.face_front_normal));
 
             if (mis) {
@@ -123,6 +123,7 @@ void PathTracing(
 
         if (is_camera_ray) {
             pt_ret.hit_t = payload.hit_t;
+            pt_ret.instance_id = payload.instance_id;
         }
 
         ResolvePathStateGeometry(state, ray, payload);
@@ -146,10 +147,16 @@ void PathTracing(
         } else if (render_options.DebugMode == DEBUG_EMISSION) {
             radiance = state.mat.emission;
             break;
+        } else if (render_options.DebugMode == DEBUG_INSTANCE_ID) {
+            radiance = payload.instance_id / 5000.f;
+            break;
+        } else if (render_options.DebugMode == DEBUG_OPACITY) {
+            radiance = state.mat.opacity;
+            break;
         }
 
         if (include_emission) {
-            radiance += thp * state.mat.emission;
+            radiance += thp * state.mat.emission * render_options.EmissionIntensity;
         }
 //         thp *= exp(-absorption * payload.hit_t);
 
@@ -167,7 +174,7 @@ void PathTracing(
 //             absorption =
 //         }
 
-        float3 next_path_thp = thp * mat_sample.bxdf *
+        float3 next_path_thp = thp * mat_sample.bsdf *
             abs(dot(state.face_front_normal, mat_sample.direction)) / mat_sample.pdf;
         float continue_prob = sqrt(max(next_path_thp) / max(thp));
         if (continue_prob < 1.f) {

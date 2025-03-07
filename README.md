@@ -33,11 +33,12 @@ Control the scene lights in the UI panel.
 ## Features
 
 * RayTracing AO
-* Path Tracing Microfacet Material
 * Next Event Estimation
-* PostProcess: ToneMapping
+* PostProcess: ToneMapping, Bloom
 * Multi Asset Format(fbx, gltf, ...)
 * Large Scene Load
+* Disney Principled BSDF
+* GPU-based Picking
 
 ## Gallery
 
@@ -194,3 +195,15 @@ Control the scene lights in the UI panel.
 >
 > * Load Multi Format Asset(tinyobjloader -> assimp)
 > * Texture De-duplicate
+
+
+
+> 2025.3.7
+>
+> * Disney Principled BSDF
+
+
+
+> 2025.3.8
+>
+> * GPU-based Picking

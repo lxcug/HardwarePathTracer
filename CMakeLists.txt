@@ -18,6 +18,8 @@ add_executable(Shadowy
         ${stb_SOURCES}
         src/core/post_processing/BloomPass.cpp
         src/core/post_processing/BloomPass.h
+        src/core/post_processing/PickingObjectHighlightPass.cpp
+        src/core/post_processing/PickingObjectHighlightPass.h
 )
 
 target_include_directories(

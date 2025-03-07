@@ -56,6 +56,11 @@ namespace Shadowy {
         void MakeBufferWriteSet(BindingType Type,
                                 uint BindingIndex,
                                 uint Count,
+                                VkBuffer Buffer);
+
+        void MakeBufferWriteSet(BindingType Type,
+                                uint BindingIndex,
+                                uint Count,
                                 const std::vector<VkBuffer>& Buffers);
 
         void MakeImageWriteSet(BindingType Type,
@@ -66,7 +71,7 @@ namespace Shadowy {
         void MakeImageWriteSet(BindingType Type,
                                uint BindingIndex,
                                uint Count,
-                               VkImageView ImageViews);
+                               VkImageView ImageView);
 
         void MakeTLASWriteSet(BindingType Type,
                               uint BindingIndex,

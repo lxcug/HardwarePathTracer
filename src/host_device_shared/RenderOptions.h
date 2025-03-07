@@ -17,6 +17,8 @@ BEGIN_SHADOWY_NAMESPACE
 #define DEBUG_ROUGHNESS 4
 #define DEBUG_METALLIC 5
 #define DEBUG_UV 6
+#define DEBUG_INSTANCE_ID 7
+#define DEBUG_OPACITY 8
         /*
          * 0 for path tracing
          * 1 for base color
@@ -47,6 +49,12 @@ BEGIN_SHADOWY_NAMESPACE
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, DeferredTraceMaterial, 1);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, EnableReSTIRGI, 0);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, ShowIndirectOnly, 0);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, DiffuseIntensity, 1.f);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, SpecularIntensity, 1.f);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, EmissionIntensity, 1.f);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, IsPickingObject, 0);
+        float4 RayOrigin;  // .z > 0.f for ReTracePickingRay
+        float4 RayDirection;
     };
 
     struct ToneMappingOptions {

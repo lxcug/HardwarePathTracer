@@ -70,6 +70,36 @@ namespace Shadowy {
                              });
     }
 
+    void
+    PassBase::MakeBufferWriteSet(BindingType Type, uint BindingIndex, uint Count, VkBuffer Buffer) {
+        std::vector<VkWriteDescriptorSet> Writes(MAX_FRAMES_IN_FLIGHT);
+        std::vector<VkDescriptorBufferInfo> BufferInfos(MAX_FRAMES_IN_FLIGHT);
+        for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            auto& BufferInfo = BufferInfos[i];
+            BufferInfo.buffer = Buffer;
+            BufferInfo.offset = 0;
+            BufferInfo.range = VK_WHOLE_SIZE;
+
+            Writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            Writes[i].dstSet = m_sets[i];
+            Writes[i].dstBinding = BindingIndex;
+            Writes[i].dstArrayElement = 0;
+            switch (Type) {
+                case BindingType::UniformBuffer:
+                    Writes[i].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+                    break;
+                case BindingType::StorageBuffer:
+                    Writes[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+                    break;
+            }
+            Writes[i].descriptorCount = Count;
+            Writes[i].pBufferInfo = &BufferInfo;
+        }
+        vkUpdateDescriptorSets(GetVKDevice(), Writes.size(), Writes.data(), 0, nullptr);
+//        m_writeSets.insert(m_writeSets.end(), Writes.begin(), Writes.end());
+    }
+
+
     void PassBase::MakeBufferWriteSet(BindingType Type, uint BindingIndex, uint Count,
                                       const std::vector<VkBuffer> &Buffers) {
         std::vector<VkWriteDescriptorSet> Writes(MAX_FRAMES_IN_FLIGHT);

@@ -261,7 +261,7 @@ float3 EvalClearcoat(
     float NoV = dot(N, V);
     float D = GTR2(NoH, lerp(1e-2f, .2f, state.mat.clearcoat_roughness));
 
-    pdf = max(D * NoH / (4.f * HoV), SHADOWY_SMALL_NUMBER);
+    pdf = D * NoH / (4.f * HoV);
 
     float FH = Fresnel_Schlick(dot(H, L));
     float F = lerp(0.04f, 1.f, FH);

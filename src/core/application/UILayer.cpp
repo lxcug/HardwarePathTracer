@@ -83,7 +83,7 @@ namespace Shadowy {
         if (ValueChangeSignal) {
             *ValueChangeSignal |= ImGui::DragFloat("##Z", &Value.z, 0.1f, Min, Max, Format);
         } else {
-            *ValueChangeSignal |= ImGui::DragFloat("##Z", &Value.z, 0.1f, Min, Max, Format);
+            ImGui::DragFloat("##Z", &Value.z, 0.1f, Min, Max, Format);
         }
         ImGui::PopItemWidth();
 
@@ -190,7 +190,7 @@ namespace Shadowy {
                 ImGui::Text("Type: Directional");
                 float indent = ImGui::GetCursorPos().x;
                 UILayer::DrawFloat3Control("Direction", Light.Direction, 1.f,
-                                           ValueChangedSignal);
+                                           ValueChangedSignal, 150.f, -1.f, 1.f);
                 UILayer::DrawFloat3Control("Color", Light.Color, 1.f, ValueChangedSignal,
                                            150.f, 0.f, 1.f);
                 UILayer::DrawInputFloatControl("Intensity", Light.Intensity, 0.f,
@@ -232,4 +232,40 @@ namespace Shadowy {
         }
     }
 
+    void UILayer::DrawModelInfo(Model *Model, bool *ValueChangedSignal) {
+        ImGui::PushID(Model->m_name.c_str());
+        if (ImGui::CollapsingHeader(Model->m_name.c_str())) {
+            for (auto *Mesh: Model->m_meshes) {
+                ImGui::PushID(Mesh->m_name.c_str());
+                if (ImGui::CollapsingHeader(Mesh->m_name.c_str())) {
+                    uint MaterialIndex = Mesh->m_meshDesc.MaterialIndex;
+                    InputMaterial *Material = &Model->m_materials[MaterialIndex];
+                    DrawMaterialInfo(Material, ValueChangedSignal);
+                }
+                ImGui::PopID();
+            }
+        }
+        ImGui::PopID();
+    }
+
+    void UILayer::DrawMeshInfo(Model *Model, Mesh *Mesh, bool *ValueChangedSignal) {
+
+    }
+
+    void UILayer::DrawMaterialInfo(InputMaterial *Material, bool *ValueChangedSignal) {
+        DrawSlideFloatControl("roughness", Material->roughness, .5f, ValueChangedSignal);
+        DrawSlideFloatControl("metallic", Material->metallic, 0.f, ValueChangedSignal);
+        DrawFloat3Control("emission", Material->emission, 0.f, ValueChangedSignal);
+        DrawSlideFloatControl("transmission", Material->transmission, 0.f, ValueChangedSignal);
+        DrawSlideFloatControl("opacity", Material->opacity, 1.f, ValueChangedSignal);
+        DrawSlideFloatControl("ior", Material->ior, 1.5f, ValueChangedSignal, 150.f, 1.0001f, 3.f);
+        DrawSlideFloatControl("specular", Material->specular, .5f, ValueChangedSignal);
+        DrawSlideFloatControl("specular tint", Material->specular_tint, 0.f, ValueChangedSignal);
+        DrawSlideFloatControl("clearcoat", Material->clearcoat, 0.f, ValueChangedSignal);
+        DrawSlideFloatControl("clearcoat roughness", Material->clearcoat_roughness, 0.f, ValueChangedSignal);
+        DrawSlideFloatControl("sheen", Material->sheen, 1.f, ValueChangedSignal);
+        DrawFloat3Control("sheen tint", Material->sheen_tint, 1.f, ValueChangedSignal);
+        DrawSlideFloatControl("subsurface", Material->subsurface, 10.f, ValueChangedSignal);
+        DrawSlideFloatControl("anisotropy", Material->anisotropy, 0.f, ValueChangedSignal);
+    }
 }

@@ -42,23 +42,27 @@ BEGIN_SHADOWY_NAMESPACE
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, roughness, .5f);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, metallic, 0.f);
 
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, metallic_factor, 1.f);
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, roughness_factor, 1.f);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, transmission, 0.f);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, opacity, 1.f);
+
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, ior, 1.5f);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(int, two_sided, 0);
-
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(uint, alpha_mode, ALPHA_MODE_OPAQUE);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, alpha_cutoff, 0.f);
+
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, specular_tint, 0.f);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, specular, .5f);
-
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, clearcoat, 0.f);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, clearcoat_roughness, 0.f);
-        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, sheen, 1.f);
-        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, subsurface, 0.f);
 
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, sheen, 1.f);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float3, sheen_tint, float3(1.f, 1.f, 1.f));
+
+        DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, subsurface, 0.f);
         DECLARE_MEMBER_WITH_DEFAULT_VALUE(float, anisotropy, 0.f);
+        float2 padding;
     };
 END_SHADOWY_NAME_SPACE
 

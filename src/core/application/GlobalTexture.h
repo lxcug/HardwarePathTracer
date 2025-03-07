@@ -29,6 +29,8 @@ namespace Shadowy {
         Denoised_Specular_Radiance_HitDis,
         SceneColor,
 
+        InstanceID,
+
         TextureTypeMax
     };
 

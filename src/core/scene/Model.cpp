@@ -175,6 +175,7 @@ namespace Shadowy {
 
         m_materials.resize(m_aiScene->mNumMaterials);
 
+        m_name = m_aiScene->mName.C_Str();
         auto IdentityTransform = glm::identity<glm::mat4>();
         ProcessNode(m_aiScene->mRootNode, m_aiScene, IdentityTransform);
 
@@ -342,6 +343,9 @@ namespace Shadowy {
         GetAIMaterialFloat(AIMaterial, AI_MATKEY_OPACITY, Material.opacity);
         GetAIMaterialFloat(AIMaterial, AI_MATKEY_REFRACTI, Material.ior);
         GetAIMaterialInt(AIMaterial, AI_MATKEY_TWOSIDED, Material.two_sided);
+        GetAIMaterialFloat(AIMaterial, AI_MATKEY_ROUGHNESS_FACTOR, Material.roughness_factor);
+        GetAIMaterialFloat(AIMaterial, AI_MATKEY_METALLIC_FACTOR, Material.metallic_factor);
+
 
         GetAIMaterialFloat(AIMaterial, AI_MATKEY_SPECULAR_FACTOR, Material.specular);
 //        GetAIMaterialFloat(AIMaterial, AI_MATKEY_COLOR_SPECULAR, Material.specular_tint);  // TODO: Load specular tint
@@ -471,6 +475,10 @@ namespace Shadowy {
         }
 
         return {Exist, String};
+    }
+
+    void Model::UpdateMaterialBuffer() {
+        m_materialBuffer->Update(sizeof(InputMaterial) * m_materials.size(), m_materials.data());
     }
 
 } // namespace Shadowy
