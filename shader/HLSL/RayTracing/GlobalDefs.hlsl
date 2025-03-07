@@ -25,6 +25,7 @@ struct PathTracingReturn {
     float3 radiance;
     float hit_t;
     bool hit_sky;
+    int instance_id;
 
     bool is_hit() {
         return hit_t > 0.f;

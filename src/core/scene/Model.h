@@ -66,9 +66,9 @@ namespace Shadowy {
 
         void ProcessNode(aiNode* Node, const aiScene* Scene, const glm::mat4& ParentTransform);
 
-//        auto ProcessMaterial(aiMaterial* AIMaterial) -> Material;
-
         auto ProcessMaterial(aiMaterial* AIMaterial) -> InputMaterial;
+
+        void UpdateMaterialBuffer();
 
         [[nodiscard]] auto
         GetTLASBuildInput(const ASBuilder *AccelBuilder) const -> VkAccelerationStructureInstanceKHR;
@@ -77,6 +77,7 @@ namespace Shadowy {
 
 
         // TODO
+        std::string m_name;
         glm::mat4 m_transform = glm::identity<glm::mat4>();
         std::filesystem::path m_path;
         std::vector<Mesh*> m_meshes;

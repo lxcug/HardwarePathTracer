@@ -17,6 +17,10 @@ namespace Shadowy {
 
         ~ArbitraryBuffer();
 
+        void Update(VkDeviceSize Size, void* Data);
+
+        void Update(void* Data);
+
         auto GetHandle() -> VkBuffer& {
             return m_buffer;
         }
@@ -25,10 +29,12 @@ namespace Shadowy {
             return m_bufferMemory;
         }
 
+        void ReadBuffer(void* &OutData);
+
     private:
         VkBuffer m_buffer = VK_NULL_HANDLE;
         VkDeviceMemory m_bufferMemory = VK_NULL_HANDLE;
-        VkDeviceAddress m_deviceAddress = 0;
+        VkDeviceSize m_size;
     };
 }  // namespace Shadowy
 

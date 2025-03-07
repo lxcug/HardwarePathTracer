@@ -26,9 +26,28 @@ void main()
     PathTracingReturn pt_ret;
     PathTracing(origin, dir, seed, pt_ret);
 
+    if (render_options.RayDirection.w > 0.f && all(index == 0)) {
+        RayDesc picking_ray;
+        picking_ray.Origin = view_uniform_buffer.CameraPos;
+        picking_ray.Direction = render_options.RayDirection.xyz;
+        picking_ray.TMin = render_options.RayMinBias;
+        picking_ray.TMax = render_options.MaxTraceDistance;
+        RayPayload picking_payload;
+        TraceRay(TLAS, RAY_FLAG_NONE, 0xff, 0, 0, 0, picking_ray, picking_payload);
+        if (picking_payload.is_hit()) {
+            PickingInstanceID[0] = picking_payload.instance_id;
+        } else {
+            PickingInstanceID[0] = -2;
+        }
+    }
+
+    InstanceIDTex[index] = -1;
     if (pt_ret.is_hit() || pt_ret.hit_sky) {
         DiffuseHitDis[index] = float4(pt_ret.radiance, pt_ret.hit_t);
         SpecularHitDis[index] = float4(pt_ret.radiance, pt_ret.hit_t);
+        if (pt_ret.is_hit()) {
+            InstanceIDTex[index] = pt_ret.instance_id;
+        }
     } else {
         DiffuseHitDis[index] = float4(0.f, 0.f, 0.f, 0.f);
         SpecularHitDis[index] = float4(0.f, 0.f, 0.f, 0.f);

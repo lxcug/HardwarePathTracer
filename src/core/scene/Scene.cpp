@@ -284,4 +284,10 @@ namespace Shadowy {
             m_sceneLights.push_back(SkyLight);
         }
     }
+
+    void Scene::UpdateMaterialBuffer() {
+        for (auto& Model : m_models) {
+            Model->UpdateMaterialBuffer();
+        }
+    }
 } // namespace Shadowy

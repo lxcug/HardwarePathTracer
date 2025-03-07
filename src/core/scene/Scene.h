@@ -76,6 +76,8 @@ namespace Shadowy {
 
         void UpdateSceneDescDescriptorSets() const;
 
+        void UpdateMaterialBuffer();
+
         [[nodiscard]] auto GetSceneDescriptorSetLayout() const -> VkDescriptorSetLayout {
             return m_sceneDescDescriptorSetLayout;
         }
@@ -115,6 +117,10 @@ namespace Shadowy {
         [[nodiscard]] auto IsTextureExist(const std::filesystem::path& Path) const -> bool
         {
             return m_textureManager->IsTextureExist(Path);
+        }
+
+        auto GetModels() -> std::vector<std::shared_ptr<Model>>& {
+            return m_models;
         }
 
     private:

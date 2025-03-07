@@ -17,6 +17,7 @@
 #include "GlobalTexture.h"
 #include "core/post_processing/AccumulationPass.h"
 #include "core/post_processing/BloomPass.h"
+#include "core/post_processing/PickingObjectHighlightPass.h"
 
 
 namespace Shadowy {
@@ -46,12 +47,20 @@ namespace Shadowy {
 
         void UpdateRenderOptions();
 
+        void ProcessPickingState();
+
+        void ReadPickingInstanceID();
+
         auto GetScene() const -> Scene* {
             return m_RTScene;
         };
 
         auto GetLastFrameSceneColor() const -> Texture2D* {
             return m_lastFrameViewportImage;
+        }
+
+        auto GetPickingInstanceIDBuffer() -> ArbitraryBuffer* {
+            return m_pickingInstanceIDBuffer;
         }
 
     protected:
@@ -102,6 +111,8 @@ namespace Shadowy {
 
         Scene *m_RTScene = nullptr;
 
+        ArbitraryBuffer* m_pickingInstanceIDBuffer = nullptr;
+
         Texture2D *m_lastFrameViewportImage = nullptr;
 
         glm::vec2 m_viewportSize = glm::vec2(1.f, 1.f);
@@ -123,9 +134,11 @@ namespace Shadowy {
         int m_currentDelayFrames = 0;
 
         // Post Processing
+        std::vector<PassBase*> m_passes;  // TODO(scolu): move the following pass into m_passes for unified management
         GBufferPass* m_gbufferPass = nullptr;
         AccumulationPass* m_accumulationPass = nullptr;
         BloomPass* m_bloomPass = nullptr;
+        PickingObjectHighlightPass* m_pickingHighlightPass = nullptr;
 
     public:
         GlobalTexture* m_globalTexture = nullptr;

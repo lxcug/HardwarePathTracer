@@ -118,13 +118,13 @@ void ResolvePathStateMaterial(
         state.face_front_normal = dot(state.normal, -ray.Direction) > 0.f ? state.normal : -state.normal;
     }
 
-    state.mat.roughness = input_mat.roughness;
-    state.mat.metallic = input_mat.metallic;
+    state.mat.roughness = input_mat.roughness * input_mat.roughness_factor;
+    state.mat.metallic = input_mat.metallic * input_mat.metallic_factor;
     texture_id = input_mat.specular_tex_id;
     if (texture_id >= 0) {
         float3 sample_value = MaterialTextures[texture_id].SampleLevel(Samplers[texture_id], state.uv, 0).rgb;
-        state.mat.roughness = sample_value.g;
-        state.mat.metallic = sample_value.b;
+        state.mat.roughness = sample_value.g * input_mat.roughness_factor;
+        state.mat.metallic = sample_value.b * input_mat.metallic_factor;
     }
     state.mat.roughness = max(state.mat.roughness, 1e-3f);  // NOTE: clamp min roughness to 1e-3f
 
